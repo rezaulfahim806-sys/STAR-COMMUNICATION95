@@ -46,4 +46,4 @@ jobs:
       - name: Verify APK
         run: |
           echo "=== APK output ==="
-          find app/build/outputs/apk/debug -type f -name "*.apk
+          find app/build/outputs/apk/debug -type f -name "*.apk"
