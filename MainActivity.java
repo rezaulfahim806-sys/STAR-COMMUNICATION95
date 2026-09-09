@@ -1,19 +1,182 @@
 package com.starcommunication.isp;
 
 import android.Manifest;
-import android.app.*;
-import android.os.*;
-import android.content.*;
+import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.content.Context;
 import android.content.pm.PackageManager;
-import android.webkit.*;
-import android.view.*;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.Vibrator;
+import android.webkit.JavascriptInterface;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.widget.TextView;
 
 public class MainActivity extends Activity {
-    WebView web;
-    static final String CHANNEL="bkash";
-    @Override public void onCreate(Bundle b){super.onCreate(b); if(Build.VERSION.SDK_INT>=33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED) requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},7); createChannel();
-        web=new WebView(this); web.setBackgroundColor(0xfff5f7fb); WebSettings s=web.getSettings(); s.setJavaScriptEnabled(true); s.setDomStorageEnabled(true); s.setAllowFileAccess(true); s.setAllowContentAccess(true); s.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE); s.setBuiltInZoomControls(false); web.addJavascriptInterface(new Bridge(this),"Android"); web.setWebViewClient(new WebViewClient()); web.loadUrl("file:///android_asset/index.html"); setContentView(web); }
-    void createChannel(){ if(Build.VERSION.SDK_INT>=26){ NotificationManager n=(NotificationManager)getSystemService(NOTIFICATION_SERVICE); n.createNotificationChannel(new NotificationChannel(CHANNEL,"bKash Payments",NotificationManager.IMPORTANCE_HIGH)); } }
-    @Override public void onBackPressed(){ if(web.canGoBack()) web.goBack(); else super.onBackPressed(); }
-    public static class Bridge { Context c; Bridge(Context c){this.c=c;} @JavascriptInterface public void notifyPayment(String title,String body){ NotificationManager n=(NotificationManager)c.getSystemService(Context.NOTIFICATION_SERVICE); Notification.Builder x=Build.VERSION.SDK_INT>=26?new Notification.Builder(c,CHANNEL):new Notification.Builder(c); x.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(title).setContentText(body).setAutoCancel(true).setPriority(Notification.PRIORITY_HIGH); n.notify((int)System.currentTimeMillis(),x.build()); ((android.os.Vibrator)c.getSystemService(Context.VIBRATOR_SERVICE)).vibrate(300); }}
+
+    private WebView web;
+    private static final String CHANNEL = "bkash";
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        try {
+            createChannel();
+
+            if (Build.VERSION.SDK_INT >= 33 &&
+                    checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                            != PackageManager.PERMISSION_GRANTED) {
+
+                requestPermissions(
+                        new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                        7
+                );
+            }
+
+            web = new WebView(this);
+
+            web.setBackgroundColor(0xfff5f7fb);
+
+            WebSettings settings = web.getSettings();
+            settings.setJavaScriptEnabled(true);
+            settings.setDomStorageEnabled(true);
+            settings.setAllowFileAccess(true);
+            settings.setAllowContentAccess(true);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                settings.setMixedContentMode(
+                        WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+                );
+            }
+
+            settings.setBuiltInZoomControls(false);
+            settings.setDisplayZoomControls(false);
+
+            web.setWebViewClient(new WebViewClient());
+
+            web.addJavascriptInterface(
+                    new Bridge(getApplicationContext()),
+                    "Android"
+            );
+
+            setContentView(web);
+
+            web.loadUrl("file:///android_asset/index.html");
+
+        } catch (Exception e) {
+
+            TextView error = new TextView(this);
+            error.setText(
+                    "STAR COMMUNICATION\n\n" +
+                    "App Error:\n" +
+                    e.toString()
+            );
+            error.setTextSize(16);
+            error.setPadding(40, 80, 40, 40);
+
+            setContentView(error);
+        }
+    }
+
+    private void createChannel() {
+
+        if (Build.VERSION.SDK_INT >= 26) {
+
+            NotificationManager manager =
+                    (NotificationManager)
+                            getSystemService(NOTIFICATION_SERVICE);
+
+            NotificationChannel channel =
+                    new NotificationChannel(
+                            CHANNEL,
+                            "bKash Payments",
+                            NotificationManager.IMPORTANCE_HIGH
+                    );
+
+            manager.createNotificationChannel(channel);
+        }
+    }
+
+    @Override
+    public void onBackPressed() {
+
+        if (web != null && web.canGoBack()) {
+            web.goBack();
+        } else {
+            super.onBackPressed();
+        }
+    }
+
+    public static class Bridge {
+
+        private final Context context;
+
+        Bridge(Context context) {
+            this.context = context.getApplicationContext();
+        }
+
+        @JavascriptInterface
+        public void notifyPayment(String title, String body) {
+
+            try {
+
+                NotificationManager manager =
+                        (NotificationManager)
+                                context.getSystemService(
+                                        Context.NOTIFICATION_SERVICE
+                                );
+
+                Notification.Builder builder;
+
+                if (Build.VERSION.SDK_INT >= 26) {
+                    builder = new Notification.Builder(
+                            context,
+                            CHANNEL
+                    );
+                } else {
+                    builder = new Notification.Builder(context);
+                }
+
+                builder
+                        .setSmallIcon(android.R.drawable.ic_dialog_info)
+                        .setContentTitle(title)
+                        .setContentText(body)
+                        .setAutoCancel(true)
+                        .setPriority(Notification.PRIORITY_HIGH);
+
+                manager.notify(
+                        (int) System.currentTimeMillis(),
+                        builder.build()
+                );
+
+                Vibrator vibrator =
+                        (Vibrator)
+                                context.getSystemService(
+                                        Context.VIBRATOR_SERVICE
+                                );
+
+                if (vibrator != null && vibrator.hasVibrator()) {
+
+                    if (Build.VERSION.SDK_INT >= 26) {
+                        vibrator.vibrate(
+                                android.os.VibrationEffect.createOneShot(
+                                        300,
+                                        android.os.VibrationEffect.DEFAULT_AMPLITUDE
+                                )
+                        );
+                    } else {
+                        vibrator.vibrate(300);
+                    }
+                }
+
+            } catch (Exception ignored) {
+                // Notification failure must not crash the app
+            }
+        }
+    }
 }
