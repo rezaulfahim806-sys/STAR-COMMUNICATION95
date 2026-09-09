@@ -26,20 +26,9 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
 
         try {
-            createChannel();
-
-            if (Build.VERSION.SDK_INT >= 33 &&
-                    checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
-                            != PackageManager.PERMISSION_GRANTED) {
-
-                requestPermissions(
-                        new String[]{Manifest.permission.POST_NOTIFICATIONS},
-                        7
-                );
-            }
+            createNotificationChannel();
 
             web = new WebView(this);
-
             web.setBackgroundColor(0xfff5f7fb);
 
             WebSettings settings = web.getSettings();
@@ -47,15 +36,14 @@ public class MainActivity extends Activity {
             settings.setDomStorageEnabled(true);
             settings.setAllowFileAccess(true);
             settings.setAllowContentAccess(true);
+            settings.setBuiltInZoomControls(false);
+            settings.setDisplayZoomControls(false);
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 settings.setMixedContentMode(
                         WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
                 );
             }
-
-            settings.setBuiltInZoomControls(false);
-            settings.setDisplayZoomControls(false);
 
             web.setWebViewClient(new WebViewClient());
 
@@ -68,38 +56,62 @@ public class MainActivity extends Activity {
 
             web.loadUrl("file:///android_asset/index.html");
 
-        } catch (Exception e) {
+            if (Build.VERSION.SDK_INT >= 33 &&
+                    checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                            != PackageManager.PERMISSION_GRANTED) {
 
-            TextView error = new TextView(this);
-            error.setText(
-                    "STAR COMMUNICATION\n\n" +
-                    "App Error:\n" +
-                    e.toString()
-            );
-            error.setTextSize(16);
-            error.setPadding(40, 80, 40, 40);
+                requestPermissions(
+                        new String[]{
+                                Manifest.permission.POST_NOTIFICATIONS
+                        },
+                        7
+                );
+            }
 
-            setContentView(error);
+        } catch (Throwable e) {
+
+            showError(e);
         }
     }
 
-    private void createChannel() {
+    private void createNotificationChannel() {
 
-        if (Build.VERSION.SDK_INT >= 26) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 
             NotificationManager manager =
                     (NotificationManager)
                             getSystemService(NOTIFICATION_SERVICE);
 
-            NotificationChannel channel =
-                    new NotificationChannel(
-                            CHANNEL,
-                            "bKash Payments",
-                            NotificationManager.IMPORTANCE_HIGH
-                    );
+            if (manager != null) {
 
-            manager.createNotificationChannel(channel);
+                NotificationChannel channel =
+                        new NotificationChannel(
+                                CHANNEL,
+                                "bKash Payments",
+                                NotificationManager.IMPORTANCE_HIGH
+                        );
+
+                manager.createNotificationChannel(channel);
+            }
         }
+    }
+
+    private void showError(Throwable e) {
+
+        TextView error = new TextView(this);
+
+        error.setText(
+                "STAR COMMUNICATION\n\n" +
+                "App Error:\n\n" +
+                e.getClass().getName() +
+                "\n\n" +
+                String.valueOf(e.getMessage())
+        );
+
+        error.setTextSize(16);
+        error.setPadding(40, 80, 40, 40);
+
+        setContentView(error);
     }
 
     @Override
@@ -131,9 +143,13 @@ public class MainActivity extends Activity {
                                         Context.NOTIFICATION_SERVICE
                                 );
 
+                if (manager == null) {
+                    return;
+                }
+
                 Notification.Builder builder;
 
-                if (Build.VERSION.SDK_INT >= 26) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     builder = new Notification.Builder(
                             context,
                             CHANNEL
@@ -143,16 +159,25 @@ public class MainActivity extends Activity {
                 }
 
                 builder
-                        .setSmallIcon(android.R.drawable.ic_dialog_info)
+                        .setSmallIcon(
+                                android.R.drawable.ic_dialog_info
+                        )
                         .setContentTitle(title)
                         .setContentText(body)
                         .setAutoCancel(true)
                         .setPriority(Notification.PRIORITY_HIGH);
 
                 manager.notify(
-                        (int) System.currentTimeMillis(),
+                        (int) (System.currentTimeMillis() & 0x7fffffff),
                         builder.build()
                 );
+
+                if (Build.VERSION.SDK_INT >= 31 &&
+                        context.checkSelfPermission(
+                                Manifest.permission.VIBRATE
+                        ) != PackageManager.PERMISSION_GRANTED) {
+                    return;
+                }
 
                 Vibrator vibrator =
                         (Vibrator)
@@ -163,19 +188,24 @@ public class MainActivity extends Activity {
                 if (vibrator != null && vibrator.hasVibrator()) {
 
                     if (Build.VERSION.SDK_INT >= 26) {
+
                         vibrator.vibrate(
-                                android.os.VibrationEffect.createOneShot(
-                                        300,
-                                        android.os.VibrationEffect.DEFAULT_AMPLITUDE
-                                )
+                                android.os.VibrationEffect
+                                        .createOneShot(
+                                                300,
+                                                android.os.VibrationEffect
+                                                        .DEFAULT_AMPLITUDE
+                                        )
                         );
+
                     } else {
                         vibrator.vibrate(300);
                     }
                 }
 
-            } catch (Exception ignored) {
-                // Notification failure must not crash the app
+            } catch (Throwable ignored) {
+                // Notification/vibration failure
+                // must never crash the application.
             }
         }
     }
