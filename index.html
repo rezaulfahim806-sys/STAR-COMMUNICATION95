@@ -751,31 +751,84 @@ function renderCustomers(){
 
 function renderBilling(){
 
+  const paidCustomers = customers.filter(
+    c => c.billStatus === "Paid"
+  );
+
+  const unpaidCustomers = customers.filter(
+    c => c.billStatus !== "Paid"
+  );
+
   document.getElementById("content").innerHTML = `
 
     <div class="page-title">
+
       <h2>Billing</h2>
-      <p>Payment & bill management</p>
+
+      <p>Payment & Bill Management</p>
+
     </div>
 
-    <div class="card">
-      <h3>Total Paid</h3>
-      <br>
-      ${
-        customers.filter(
-          c => c.billStatus === "Paid"
-        ).length
-      }
+
+    <div class="stats-grid">
+
+      <div class="stat-card"
+           onclick="showPaidCustomers()">
+
+        <h3>Total Paid</h3>
+
+        <strong>${paidCustomers.length}</strong>
+
+      </div>
+
+
+      <div class="stat-card"
+           onclick="showUnpaidCustomers()">
+
+        <h3>Total Unpaid</h3>
+
+        <strong>${unpaidCustomers.length}</strong>
+
+      </div>
+
     </div>
 
+
+    <br>
+
+
     <div class="card">
-      <h3>Total Unpaid</h3>
+
+      <h3>Monthly Billing</h3>
+
       <br>
-      ${
-        customers.filter(
-          c => c.billStatus === "Unpaid"
-        ).length
-      }
+
+      <p>
+        Paid Customers:
+        <strong>${paidCustomers.length}</strong>
+      </p>
+
+      <p>
+        Unpaid Customers:
+        <strong>${unpaidCustomers.length}</strong>
+      </p>
+
+      <br>
+
+      <p>
+        Collection:
+        <strong>
+          ${
+            customers.length
+            ? Math.round(
+                (paidCustomers.length /
+                customers.length) * 100
+              )
+            : 0
+          }%
+        </strong>
+      </p>
+
     </div>
 
   `;
@@ -784,27 +837,63 @@ function renderBilling(){
 
 
 /* =========================
-   OLT
+   PAID CUSTOMER LIST
 ========================= */
 
-function renderMonitoring(){
+function showPaidCustomers(){
+
+  const list = customers.filter(
+    c => c.billStatus === "Paid"
+  );
 
   document.getElementById("content").innerHTML = `
 
     <div class="page-title">
-      <h2>OLT Live Monitoring</h2>
-      <p>OLT connection will be added later</p>
-    </div>
 
-    <div class="card">
+      <h2>Paid Customers</h2>
 
-      <h3>OLT Status</h3>
-
-      <br>
-
-      <strong>Not Connected</strong>
+      <p>
+        Total: ${list.length}
+      </p>
 
     </div>
+
+
+    ${
+      list.length === 0
+
+      ? `
+        <div class="card empty">
+          No paid customers.
+        </div>
+      `
+
+      : list.map((c,index) => `
+
+        <div class="card">
+
+          <h3>${c.name || "Customer"}</h3>
+
+          <p>
+            📱 ${c.phone || "-"}
+          </p>
+
+          <p>
+            💰 Bill:
+            <strong>Paid</strong>
+          </p>
+
+          <br>
+
+          <button
+            onclick="renderCustomers()">
+            Customer Details
+          </button>
+
+        </div>
+
+      `).join("")
+    }
 
   `;
 
@@ -812,23 +901,95 @@ function renderMonitoring(){
 
 
 /* =========================
-   SETTINGS
+   UNPAID CUSTOMER LIST
 ========================= */
 
-function renderSettings(){
+function showUnpaidCustomers(){
+
+  const list = customers.filter(
+    c => c.billStatus !== "Paid"
+  );
 
   document.getElementById("content").innerHTML = `
 
     <div class="page-title">
-      <h2>Settings</h2>
-      <p>App settings</p>
+
+      <h2>Unpaid Customers</h2>
+
+      <p>
+        Total: ${list.length}
+      </p>
+
     </div>
 
-    <div class="card">
-      <h3>STAR COMMUNICATION</h3>
-      <br>
-      <p>App Settings</p>
-    </div>
+
+    ${
+      list.length === 0
+
+      ? `
+        <div class="card empty">
+          No unpaid customers.
+        </div>
+      `
+
+      : list.map(c => {
+
+        const index =
+          customers.findIndex(
+            x => x.id === c.id
+          );
+
+        return `
+
+          <div class="card">
+
+            <h3>
+              ${c.name || "Customer"}
+            </h3>
+
+            <p>
+              📱 ${c.phone || "-"}
+            </p>
+
+            <p>
+              💰 Status:
+              <strong>Unpaid</strong>
+            </p>
+
+            <p>
+              Previous Due:
+              ৳${c.previousDue || 0}
+            </p>
+
+            <p>
+              Current Bill:
+              ৳${c.currentBill || 0}
+            </p>
+
+            <p>
+              Total Due:
+              ৳${
+                (Number(c.previousDue) || 0) +
+                (Number(c.currentBill) || 0)
+              }
+            </p>
+
+            <br>
+
+            <button
+              class="primary"
+              onclick="manualPaid(${index})">
+
+              💵 Manual Paid
+
+            </button>
+
+          </div>
+
+        `;
+
+      }).join("")
+    }
 
   `;
 
@@ -836,12 +997,30 @@ function renderSettings(){
 
 
 /* =========================
-   START APP
+   MANUAL PAID
 ========================= */
 
-go("dashboard");
+function manualPaid(index){
 
-</script>
+  if(!customers[index]){
+    return;
+  }
 
-</body>
-</html>
+  if(!confirm(
+    "Mark this customer's bill as Paid?"
+  )){
+    return;
+  }
+
+  customers[index].billStatus = "Paid";
+
+  customers[index].paidAt =
+    new Date().toISOString();
+
+  saveCustomers();
+
+  alert("Payment marked as Paid");
+
+  showUnpaidCustomers();
+
+}
