@@ -259,7 +259,383 @@ function go(page){
    DASHBOARD
 ========================= */
 
-function renderDashboard(){
+function renderDashboard(){function renderCustomers(){
+
+  document.getElementById("content").innerHTML = `
+
+    <div class="page-title">
+
+      <h2>Customers</h2>
+      <p>Customer management</p>
+
+    </div>
+
+    <div class="card">
+
+      <button class="primary"
+              onclick="addCustomerForm()">
+        ➕ Add Customer
+      </button>
+
+    </div>
+
+    ${
+      customers.length === 0
+
+      ? `
+        <div class="card empty">
+          No customers added yet.
+        </div>
+      `
+
+      : customers.map((c,index) => `
+
+        <div class="card">
+
+          <h3>${c.name || "Customer"}</h3>
+
+          <p>📱 Phone: ${c.phone || "-"}</p>
+
+          <p>
+            📡 PPPoE:
+            ${c.pppoe || "-"}
+          </p>
+
+          <p>
+            📅 Expiry:
+            ${c.expiry || "-"}
+          </p>
+
+          <p>
+            Status:
+            <strong>${c.status || "Active"}</strong>
+          </p>
+
+          <p>
+            Bill:
+            <strong>${c.billStatus || "Unpaid"}</strong>
+          </p>
+
+          <br>
+
+          <button
+            class="primary"
+            onclick="editCustomer(${index})">
+            ✏️ Edit
+          </button>
+
+          <button
+            onclick="deleteCustomer(${index})">
+            🗑️ Delete
+          </button>
+
+          <button
+            onclick="callCustomer('${c.phone || ""}')">
+            📞 Call
+          </button>
+
+          <button
+            onclick="whatsappCustomer('${c.phone || ""}')">
+            WhatsApp
+          </button>
+
+        </div>
+
+      `).join("")
+    }
+
+  `;
+}
+
+
+/* =========================
+   ADD CUSTOMER
+========================= */
+
+function addCustomerForm(){
+
+  document.getElementById("content").innerHTML = `
+
+    <div class="page-title">
+
+      <h2>Add Customer</h2>
+
+      <p>New customer information</p>
+
+    </div>
+
+    <div class="card">
+
+      <input id="cName"
+        placeholder="Customer Name"
+        style="width:100%;padding:12px;margin-bottom:10px">
+
+      <input id="cPhone"
+        placeholder="Phone Number"
+        type="tel"
+        style="width:100%;padding:12px;margin-bottom:10px">
+
+      <input id="cAddress"
+        placeholder="Address"
+        style="width:100%;padding:12px;margin-bottom:10px">
+
+      <input id="cPppoe"
+        placeholder="PPPoE Username"
+        style="width:100%;padding:12px;margin-bottom:10px">
+
+      <input id="cPassword"
+        placeholder="PPPoE Password"
+        type="password"
+        style="width:100%;padding:12px;margin-bottom:10px">
+
+      <input id="cExpiry"
+        type="date"
+        style="width:100%;padding:12px;margin-bottom:15px">
+
+      <button
+        class="primary"
+        onclick="saveNewCustomer()">
+        💾 Save Customer
+      </button>
+
+      <button
+        onclick="renderCustomers()">
+        Cancel
+      </button>
+
+    </div>
+
+  `;
+}
+
+
+/* =========================
+   SAVE NEW CUSTOMER
+========================= */
+
+function saveNewCustomer(){
+
+  const name =
+    document.getElementById("cName").value.trim();
+
+  const phone =
+    document.getElementById("cPhone").value.trim();
+
+  const address =
+    document.getElementById("cAddress").value.trim();
+
+  const pppoe =
+    document.getElementById("cPppoe").value.trim();
+
+  const password =
+    document.getElementById("cPassword").value.trim();
+
+  const expiry =
+    document.getElementById("cExpiry").value;
+
+
+  if(!name){
+
+    alert("Customer name required");
+
+    return;
+  }
+
+
+  const customer = {
+
+    id: Date.now(),
+
+    name:name,
+
+    phone:phone,
+
+    address:address,
+
+    pppoe:pppoe,
+
+    password:password,
+
+    expiry:expiry,
+
+    status:"Active",
+
+    billStatus:"Unpaid",
+
+    createdAt:
+      new Date().toISOString()
+
+  };
+
+
+  customers.push(customer);
+
+  saveCustomers();
+
+  alert("Customer added successfully");
+
+  renderCustomers();
+}
+
+
+/* =========================
+   EDIT CUSTOMER
+========================= */
+
+function editCustomer(index){
+
+  const c = customers[index];
+
+  document.getElementById("content").innerHTML = `
+
+    <div class="page-title">
+
+      <h2>Edit Customer</h2>
+
+      <p>Update customer information</p>
+
+    </div>
+
+    <div class="card">
+
+      <input id="eName"
+        value="${c.name || ""}"
+        placeholder="Customer Name"
+        style="width:100%;padding:12px;margin-bottom:10px">
+
+      <input id="ePhone"
+        value="${c.phone || ""}"
+        placeholder="Phone Number"
+        type="tel"
+        style="width:100%;padding:12px;margin-bottom:10px">
+
+      <input id="eAddress"
+        value="${c.address || ""}"
+        placeholder="Address"
+        style="width:100%;padding:12px;margin-bottom:10px">
+
+      <input id="ePppoe"
+        value="${c.pppoe || ""}"
+        placeholder="PPPoE Username"
+        style="width:100%;padding:12px;margin-bottom:10px">
+
+      <input id="ePassword"
+        value="${c.password || ""}"
+        placeholder="PPPoE Password"
+        type="password"
+        style="width:100%;padding:12px;margin-bottom:10px">
+
+      <input id="eExpiry"
+        value="${c.expiry || ""}"
+        type="date"
+        style="width:100%;padding:12px;margin-bottom:15px">
+
+      <button
+        class="primary"
+        onclick="updateCustomer(${index})">
+        💾 Update
+      </button>
+
+      <button
+        onclick="renderCustomers()">
+        Cancel
+      </button>
+
+    </div>
+
+  `;
+}
+
+
+/* =========================
+   UPDATE CUSTOMER
+========================= */
+
+function updateCustomer(index){
+
+  customers[index].name =
+    document.getElementById("eName").value.trim();
+
+  customers[index].phone =
+    document.getElementById("ePhone").value.trim();
+
+  customers[index].address =
+    document.getElementById("eAddress").value.trim();
+
+  customers[index].pppoe =
+    document.getElementById("ePppoe").value.trim();
+
+  customers[index].password =
+    document.getElementById("ePassword").value.trim();
+
+  customers[index].expiry =
+    document.getElementById("eExpiry").value;
+
+
+  saveCustomers();
+
+  alert("Customer updated");
+
+  renderCustomers();
+}
+
+
+/* =========================
+   DELETE CUSTOMER
+========================= */
+
+function deleteCustomer(index){
+
+  if(!confirm(
+    "Are you sure you want to delete this customer?"
+  )){
+    return;
+  }
+
+  customers.splice(index,1);
+
+  saveCustomers();
+
+  renderCustomers();
+}
+
+
+/* =========================
+   PHONE
+========================= */
+
+function callCustomer(phone){
+
+  if(!phone){
+    alert("Phone number not available");
+    return;
+  }
+
+  window.location.href =
+    "tel:" + phone;
+}
+
+
+/* =========================
+   WHATSAPP
+========================= */
+
+function whatsappCustomer(phone){
+
+  if(!phone){
+    alert("Phone number not available");
+    return;
+  }
+
+  let number = phone.replace(/\D/g,"");
+
+  if(number.startsWith("01")){
+    number = "88" + number;
+  }
+
+  window.location.href =
+    "https://wa.me/" + number;
+}
 
   const total = customers.length;
 
