@@ -43,6 +43,9 @@ jobs:
           echo '=== App assembleDebug task ==='
           gradle :app:tasks --all --no-daemon | grep -E 'assembleDebug|assembleRelease' || true
 
+      - name: Apply app source patch
+        run: python3 tools/patch_payment_flow.py
+
       - name: Build Debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace --warning-mode all
 
