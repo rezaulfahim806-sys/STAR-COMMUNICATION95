@@ -1,0 +1,43 @@
+name: Deploy STAR COMMUNICATION to Chrome
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Prepare web app
+        run: |
+          rm -rf public
+          mkdir -p public
+          cp app/src/main/assets/index.html public/index.html
+          cp app/src/main/assets/logo.svg public/logo.svg
+          cp app/src/main/assets/sw.js public/sw.js 2>/dev/null || true
+          cp app/src/main/assets/manifest.webmanifest public/manifest.webmanifest 2>/dev/null || true
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
