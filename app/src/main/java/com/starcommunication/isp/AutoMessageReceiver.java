@@ -1,5 +1,6 @@
 package com.starcommunication.isp;
 
+import android.Manifest;
 import android.app.AlarmManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -8,13 +9,15 @@ import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Build;
+import android.telephony.SmsManager;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
 
-/** Reliable reminder receiver. No SMS permission and no AndroidX dependency. */
+/** Automatic customer SMS receiver. Uses the phone SIM when SEND_SMS permission is granted. */
 public class AutoMessageReceiver extends BroadcastReceiver {
     public static final String ACTION = "com.starcommunication.isp.AUTO_MESSAGE";
     public static final String TYPE = "type";
@@ -37,89 +40,57 @@ public class AutoMessageReceiver extends BroadcastReceiver {
             msg = "প্রিয় " + customer + ", নতুন মাসের ইন্টারনেট বিল শুরু হয়েছে। অনুগ্রহ করে সময়মতো বিল পরিশোধ করুন। — STAR COMMUNICATION";
         }
 
-        showReminder(context, customer, msg, phone);
+        boolean sent = sendSimSms(context, phone, msg);
+        if (!sent) showReminder(context, customer, msg, phone);
         if ("month_end".equals(type)) scheduleMonthEnd(context, phone, name);
+    }
+
+    private static boolean sendSimSms(Context context, String phone, String msg) {
+        try {
+            if (Build.VERSION.SDK_INT >= 23 && context.checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) return false;
+            SmsManager.getDefault().sendTextMessage(phone.trim(), null, msg, null, null);
+            return true;
+        } catch (Exception ignored) { return false; }
     }
 
     private static void showReminder(Context context, String name, String msg, String phone) {
         try {
             NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm == null) return;
-            if (Build.VERSION.SDK_INT >= 26) {
-                nm.createNotificationChannel(new NotificationChannel(CHANNEL, "Customer Message Reminders", NotificationManager.IMPORTANCE_HIGH));
-            }
+            if (Build.VERSION.SDK_INT >= 26) nm.createNotificationChannel(new NotificationChannel(CHANNEL, "Customer Message Reminders", NotificationManager.IMPORTANCE_HIGH));
             Intent open = new Intent(context, MainActivity.class);
             open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            PendingIntent pi = PendingIntent.getActivity(context, (phone + msg).hashCode(), open,
-                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-            Notification.Builder builder = Build.VERSION.SDK_INT >= 26
-                    ? new Notification.Builder(context, CHANNEL) : new Notification.Builder(context);
-            builder.setSmallIcon(R.drawable.star_launcher)
-                    .setContentTitle("STAR COMMUNICATION — Customer Message")
-                    .setContentText(name + " এর জন্য message reminder")
-                    .setStyle(new Notification.BigTextStyle().bigText(msg))
-                    .setAutoCancel(true).setContentIntent(pi);
+            PendingIntent pi = PendingIntent.getActivity(context, (phone + msg).hashCode(), open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            Notification.Builder builder = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(context, CHANNEL) : new Notification.Builder(context);
+            builder.setSmallIcon(R.drawable.star_launcher).setContentTitle("STAR COMMUNICATION — SMS failed").setContentText(name + " এর জন্য SMS পাঠানো যায়নি").setStyle(new Notification.BigTextStyle().bigText(msg)).setAutoCancel(true).setContentIntent(pi);
             nm.notify((phone + msg).hashCode(), builder.build());
-        } catch (SecurityException ignored) {
-            // Notification permission may be denied; never crash the app.
-        } catch (Exception ignored) {
-            // Reminder failure must never close/crash the app.
-        }
+        } catch (Exception ignored) {}
     }
 
     public static void scheduleExpiry(Context c, String phone, String name, String expiry) {
         try {
             Date d = new SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(expiry);
             if (d == null) return;
-            Calendar cal = Calendar.getInstance();
-            cal.setTime(d);
-            cal.add(Calendar.DAY_OF_MONTH, 1);
-            cal.set(Calendar.HOUR_OF_DAY, 9);
-            cal.set(Calendar.MINUTE, 0);
-            cal.set(Calendar.SECOND, 0);
-            cal.set(Calendar.MILLISECOND, 0);
+            Calendar cal = Calendar.getInstance(); cal.setTime(d); cal.add(Calendar.DAY_OF_MONTH, 1); cal.set(Calendar.HOUR_OF_DAY, 9); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0);
             schedule(c, phone, name, "expiry", cal.getTimeInMillis());
         } catch (Exception ignored) {}
     }
 
     public static void scheduleMonthEnd(Context c, String phone, String name) {
         Calendar cal = Calendar.getInstance();
-        cal.set(Calendar.DAY_OF_MONTH, 1);
-        cal.add(Calendar.MONTH, 1);
-        cal.add(Calendar.DAY_OF_MONTH, -1);
-        cal.set(Calendar.HOUR_OF_DAY, 20);
-        cal.set(Calendar.MINUTE, 0);
-        cal.set(Calendar.SECOND, 0);
-        cal.set(Calendar.MILLISECOND, 0);
-        if (cal.getTimeInMillis() <= System.currentTimeMillis()) {
-            cal.add(Calendar.MONTH, 1);
-            cal.set(Calendar.DAY_OF_MONTH, 1);
-            cal.add(Calendar.MONTH, -1);
-        }
+        cal.set(Calendar.DAY_OF_MONTH, 1); cal.add(Calendar.MONTH, 1); cal.add(Calendar.DAY_OF_MONTH, -1); cal.set(Calendar.HOUR_OF_DAY, 20); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0);
+        if (cal.getTimeInMillis() <= System.currentTimeMillis()) { cal.add(Calendar.MONTH, 1); cal.set(Calendar.DAY_OF_MONTH, 1); cal.add(Calendar.MONTH, -1); }
         schedule(c, phone, name, "month_end", cal.getTimeInMillis());
     }
 
     private static void schedule(Context c, String phone, String name, String type, long when) {
         if (when <= System.currentTimeMillis()) return;
         try {
-            AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
-            if (am == null) return;
-            Intent i = new Intent(c, AutoMessageReceiver.class);
-            i.setAction(ACTION);
-            i.putExtra(PHONE, phone);
-            i.putExtra(NAME, name);
-            i.putExtra(TYPE, type);
-            int code = (phone + type).hashCode();
-            PendingIntent pi = PendingIntent.getBroadcast(c, code, i,
-                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-            if (Build.VERSION.SDK_INT >= 23) {
-                try { am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, when, pi); }
-                catch (SecurityException e) { am.set(AlarmManager.RTC_WAKEUP, when, pi); }
-            } else {
-                am.setExact(AlarmManager.RTC_WAKEUP, when, pi);
-            }
-        } catch (Exception ignored) {
-            // Scheduling must never crash or close the app.
-        }
+            AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE); if (am == null) return;
+            Intent i = new Intent(c, AutoMessageReceiver.class); i.setAction(ACTION); i.putExtra(PHONE, phone); i.putExtra(NAME, name); i.putExtra(TYPE, type);
+            int code = (phone + type).hashCode(); PendingIntent pi = PendingIntent.getBroadcast(c, code, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            if (Build.VERSION.SDK_INT >= 23) { try { am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, when, pi); } catch (SecurityException e) { am.set(AlarmManager.RTC_WAKEUP, when, pi); } }
+            else am.setExact(AlarmManager.RTC_WAKEUP, when, pi);
+        } catch (Exception ignored) {}
     }
 }
