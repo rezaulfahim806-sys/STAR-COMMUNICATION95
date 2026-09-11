@@ -1,0 +1,9 @@
+{
+  "name": "STAR COMMUNICATION ISP",
+  "short_name": "STAR COMMUNICATION",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f7f9fc",
+  "theme_color": "#0b2145",
+  "icons": [{"src":"logo.svg","sizes":"any","type":"image/svg+xml"}]
+}
