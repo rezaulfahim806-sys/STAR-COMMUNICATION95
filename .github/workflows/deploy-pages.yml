@@ -1,4 +1,4 @@
-name: Deploy STAR COMMUNICATION to Chrome
+name: Prepare STAR COMMUNICATION Web Payment PWA
 
 on:
   workflow_dispatch:
@@ -8,36 +8,31 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
 
 jobs:
-  deploy:
+  prepare-web:
+    name: Prepare Web Payment PWA
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Prepare web app
+        shell: bash
         run: |
+          set -e
           rm -rf public
           mkdir -p public
           cp app/src/main/assets/index.html public/index.html
           cp app/src/main/assets/logo.svg public/logo.svg
-          cp app/src/main/assets/sw.js public/sw.js 2>/dev/null || true
-          cp app/src/main/assets/manifest.webmanifest public/manifest.webmanifest 2>/dev/null || true
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+          cp app/src/main/assets/sw.js public/sw.js
+          cp app/src/main/assets/manifest.webmanifest public/manifest.webmanifest
+          echo 'Web Payment PWA files prepared successfully.'
+          ls -lh public
+
+      - name: Upload Web PWA artifact
+        uses: actions/upload-artifact@v4
         with:
+          name: STAR-COMMUNICATION-web-pwa
           path: public
-      - name: Deploy
-        id: deployment
-        uses: actions/deploy-pages@v4
+          if-no-files-found: error
