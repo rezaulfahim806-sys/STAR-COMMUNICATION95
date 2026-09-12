@@ -1,0 +1,12 @@
+from pathlib import Path
+p=Path('app/src/main/assets/index.html')
+s=p.read_text(encoding='utf-8')
+s=s.replace('body{margin:0;background:var(--bg);','body{margin:0;background:var(--bg);min-height:100%;overflow-x:hidden;')
+s=s.replace('.app{max-width:520px;margin:auto;min-height:100vh;','.app{width:100%;max-width:480px;margin:auto;min-height:calc(100vh - 24px);')
+s=s.replace('.content{padding:12px 11px 86px}','.content{padding:10px 10px 78px}')
+s=s.replace('.header{height:62px;','.header{height:56px;')
+s=s.replace('.top{height:46px;','.top{height:42px;')
+s=s.replace('.logo{width:38px;height:38px;','.logo{width:34px;height:34px;')
+s=s.replace('.title{font-size:21px;','.title{font-size:20px;')
+s=s.replace('height:66px;background:#fff;','height:60px;background:#fff;')
+p.write_text(s,encoding='utf-8')
