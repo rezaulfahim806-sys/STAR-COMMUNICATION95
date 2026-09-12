@@ -1,0 +1,1 @@
+Build patch scripts are applied by GitHub Actions.
