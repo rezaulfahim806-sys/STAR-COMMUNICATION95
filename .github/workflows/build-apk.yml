@@ -26,13 +26,6 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
-      - name: Install premium launcher icon
-        shell: bash
-        run: |
-          set -e
-          base64 -d tools/star_launcher.b64 > app/src/main/res/drawable/star_launcher.png
-          rm -f app/src/main/res/drawable/star_launcher.xml
-          file app/src/main/res/drawable/star_launcher.png
       - name: Verify Android project
         shell: bash
         run: |
@@ -42,7 +35,7 @@ jobs:
           test -f app/build.gradle
           test -f app/src/main/AndroidManifest.xml
           test -f app/src/main/assets/index.html
-          test -f app/src/main/res/drawable/star_launcher.png
+          test -f app/src/main/res/drawable/star_launcher.xml
           echo '=== Gradle projects ==='
           gradle projects --no-daemon
           echo '=== App assembleDebug task ==='
