@@ -52,6 +52,7 @@ jobs:
           python3 tools/patch_final_customer_fix.py
           python3 tools/patch_growth_expectation.py
           python3 tools/patch_customer_view_edit.py
+          python3 tools/patch_sms_csv_import.py
       - name: Build Debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace --warning-mode all
       - name: Verify APK exists
