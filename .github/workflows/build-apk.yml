@@ -47,6 +47,8 @@ jobs:
           python3 tools/patch_web_payment.py
           python3 tools/patch_customer_persistence.py
           python3 tools/patch_customer_add_status.py
+          python3 tools/patch_ui_layout.py
+          python3 tools/patch_main_activity.py
       - name: Build Debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace --warning-mode all
       - name: Verify APK exists
