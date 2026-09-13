@@ -4,7 +4,7 @@ p=Path('app/src/main/assets/index.html')
 s=p.read_text(encoding='utf-8')
 
 marker="function totalUnpaid(){return d.customers.filter(c=>due(c)>0).reduce((a,c)=>a+due(c),0)}"
-insert="function monthlyBillExpectation(){return d.customers.filter(c=>c.status==='active').reduce((a,c)=>a+Number(c.fee||0),0)}function currentMonthUnpaid(){return Math.max(0,monthlyBillExpectation()-totalPaid())}function collectionPercent(){let e=monthlyBillExpectation();return e>0?Math.min(100,Math.round(totalPaid()/e*100)):0}function nextMonthExpected(){return monthlyBillExpectation()}"
+insert="function monthlyBillExpectation(){return d.customers.filter(c=>c.status==='active'||c.status==='expired').reduce((a,c)=>a+Number(c.fee||0),0)}function currentMonthUnpaid(){return Math.max(0,monthlyBillExpectation()-totalPaid())}function collectionPercent(){let e=monthlyBillExpectation();return e>0?Math.min(100,Math.round(totalPaid()/e*100)):0}function nextMonthExpected(){return monthlyBillExpectation()}"
 if 'function monthlyBillExpectation()' not in s:
     if marker not in s:
         raise SystemExit('billing marker not found')
@@ -18,4 +18,4 @@ if '📅 Monthly Bill Expectation' not in s:
     s=s.replace(old,new,1)
 
 p.write_text(s,encoding='utf-8')
-print('growth expectation patch applied')
+print('growth expectation patch applied: active + expired customers included')
