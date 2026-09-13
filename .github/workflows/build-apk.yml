@@ -57,6 +57,7 @@ jobs:
           python3 tools/patch_sim2_sms.py
           python3 tools/patch_sms_permission_fix.py
           python3 tools/patch_default_sms_handler.py
+          python3 tools/patch_billing_expiry_activation.py
       - name: Build Debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace --warning-mode all
       - name: Verify APK exists
