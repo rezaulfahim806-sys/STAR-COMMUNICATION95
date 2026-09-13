@@ -1,0 +1,1 @@
+Expired customers remain in Expired list after partial payment. Monthly Expected Bill auto-calculation enabled. Total Customer includes Expired customers. Example: 500 bill, 400 paid => Paid 400, Due 100, still Expired.
