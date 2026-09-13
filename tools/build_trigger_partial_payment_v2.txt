@@ -1,0 +1,1 @@
+Fix expired customer partial payment: paid amount moves customer to Active and keeps remaining Due for next month.
