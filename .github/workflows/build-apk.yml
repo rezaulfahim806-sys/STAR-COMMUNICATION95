@@ -58,6 +58,7 @@ jobs:
           python3 tools/patch_sms_permission_fix.py
           python3 tools/patch_default_sms_handler.py
           python3 tools/patch_billing_expiry_activation.py
+          python3 tools/patch_sms_dedupe.py
       - name: Build Debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace --warning-mode all
       - name: Verify APK exists
@@ -73,4 +74,4 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-# Trigger fresh APK build for the latest app state.
+# Trigger fresh APK build after SMS helper fix.
