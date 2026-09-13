@@ -7,7 +7,25 @@ js = r'''<script>
 (function(){
 window.card=function(c){
   var dv=due(c), num=esc(c.phone||'');
-  return `<div class="customer"><div class="cmain"><div class="avatar">${esc((c.name||'?')[0].toUpperCase())}</div><div class="grow"><div class="name">${esc(c.name||'')}</div><div class="muted">${esc(c.clientCode||'')} • ${num} • ${esc(c.pkg||'')}</div></div><span class="badge ${c.status}">${String(c.status||'').toUpperCase()}</span></div><div class="actions">${billBadge(c)}</div><div class="detail"><span>Monthly Bill</span><b>${money(c.fee)}</b></div><div class="detail"><span>Total Due</span><b>${money(dv)}</b></div><div class="actions"><button class="small view" onclick="go('details',{id:'${c.id}'})">👁 View</button><button class="small btn light" onclick="editCustomer('${c.id}')">✏️ Edit</button><button class="small call" onclick="callCustomer('${num}')">📞 Call</button><button class="small wa" onclick="waCustomer('${num}')">WhatsApp</button>${dv>0?`<button class="small pay" onclick="payCustomer('${c.id}')">Pay</button>`:''}</div></div>`;
+  return `<div class="customer"><div class="cmain"><div class="avatar">${esc((c.name||'?')[0].toUpperCase())}</div><div class="grow"><div class="name">${esc(c.name||'')}</div><div class="muted">${esc(c.clientCode||'')} • ${num} • ${esc(c.pkg||'')}</div></div><span class="badge ${c.status}">${String(c.status||'').toUpperCase()}</span></div><div class="actions">${billBadge(c)}</div><div class="detail"><span>Monthly Bill</span><b>${money(c.fee)}</b></div><div class="detail"><span>Total Due</span><b>${money(dv)}</b></div><div class="actions"><button class="small view" onclick="go('details',{id:'${c.id}'})">👁 View</button><button class="small btn light" onclick="editCustomer('${c.id}')">✏️ Edit</button><button class="small call" onclick="callCustomer('${num}')">📞 Call</button><button class="small wa" onclick="waCustomer('${num}')">WhatsApp</button><button class="small" style="background:#1677d2;color:#fff" onclick="sendCustomerSMS('${c.id}')">📨 Send SMS</button>${dv>0?`<button class="small pay" onclick="payCustomer('${c.id}')">Pay</button>`:''}</div></div>`;
+};
+window.sendCustomerSMS=function(id){
+  var c=d.customers.find(function(x){return String(x.id)===String(id);});
+  if(!c){toast('Customer not found');return;}
+  if(!c.phone){toast('Customer mobile number নেই');return;}
+  openSheet(`<h3>📨 Send SMS</h3><div class="muted"><b>${esc(c.name||'Customer')}</b> • ${esc(c.phone)}</div><textarea id="singleSmsMsg" class="input" rows="5" placeholder="Write SMS message"></textarea><button class="btn full" style="margin-top:6px" onclick="sendSingleCustomerSMS('${c.id}')">📨 Send SMS from SIM 2</button><button class="btn light full" style="margin-top:7px" onclick="closeSheet()">Cancel</button>`);
+};
+window.sendSingleCustomerSMS=function(id){
+  var c=d.customers.find(function(x){return String(x.id)===String(id);});
+  var msg=(document.getElementById('singleSmsMsg')||{}).value||'';
+  if(!c||!c.phone){toast('Customer mobile number নেই');return;}
+  if(!msg.trim()){toast('Write a message first');return;}
+  try{
+    if(window.AndroidBridge && AndroidBridge.sendSmsFromSim2){AndroidBridge.sendSmsFromSim2(String(c.phone),String(msg));}
+    else if(window.AndroidBridge && AndroidBridge.sendSms){AndroidBridge.sendSms(String(c.phone),String(msg));}
+    else {toast('SIM SMS is not available');return;}
+    d.smsSentCount=Number(d.smsSentCount||0)+1;save();closeSheet();toast('SMS sent from SIM 2');
+  }catch(e){toast('SMS failed: '+(e.message||'unknown error'));}
 };
 window.editCustomer=function(id){
   var c=d.customers.find(function(x){return String(x.id)===String(id);});
@@ -29,14 +47,14 @@ window.details=function(){
   var c=d.customers.find(function(x){return String(x.id)===String(opts.id);});
   if(!c){go('customers');return;}
   var hist=(d.payments||[]).filter(function(x){return String(x.customer)===String(c.id);}).sort(function(a,b){return String(b.date).localeCompare(String(a.date));});
-  return `<h1 class="title">Customer Details</h1><div class="actions"><button class="small view" onclick="go('customers')">← Back</button><button class="small btn light" onclick="editCustomer('${c.id}')">✏️ Edit Customer</button></div><div class="customer"><div class="cmain"><div class="avatar">${esc((c.name||'?')[0].toUpperCase())}</div><div class="grow"><div class="name">${esc(c.name||'')}</div><div class="muted">Client Code: ${esc(c.clientCode||'—')} • ${esc(c.phone||'')}</div></div><span class="badge ${c.status}">${String(c.status||'').toUpperCase()}</span></div><div class="detail"><span>Client Code</span><b>${esc(c.clientCode||'—')}</b></div><div class="detail"><span>Mobile / WhatsApp</span><b>${esc(c.phone||'—')}</b></div><div class="detail"><span>Address</span><b>${esc(c.address||'—')}</b></div><div class="detail"><span>Package / Mbps</span><b>${esc(c.pkg||'—')}</b></div><div class="detail"><span>Monthly Bill</span><b>${money(c.fee)}</b></div><div class="detail"><span>PPPoE Username</span><b>${esc(c.pppoeUser||c.pppoe||'—')}</b></div><div class="detail"><span>PPPoE Password</span><b>${esc(c.pppoePass||c.pppoePassword||'—')}</b></div><div class="detail"><span>ONU ID</span><b>${esc(c.onu||'—')}</b></div><div class="detail"><span>Connection Date</span><b>${esc(c.connectionDate||'—')}</b></div><div class="detail"><span>Expiry Date</span><b>${esc(c.expiry||'—')}</b></div><div class="detail"><span>Previous Due</span><b>${money(c.prevDue)}</b></div><div class="detail"><span>Running Bill</span><b>${money(billDue(c))}</b></div><div class="detail"><span>Total Due</span><b>${money(due(c))}</b></div><div class="actions"><button class="small call" onclick="callCustomer('${esc(c.phone||'')}')">📞 Call</button><button class="small wa" onclick="waCustomer('${esc(c.phone||'')}')">WhatsApp</button>${due(c)>0?`<button class="small pay" onclick="payCustomer('${c.id}')">Customer Bill Payment</button>`:''}</div></div><div class="section"><h3>Payment History</h3>${hist.length?hist.map(function(x){return `<div class="detail"><span>${esc(x.date||'')} • ${esc(x.month||'')} • ${esc(x.source||'manual')}</span><b>${money(x.amount)}</b></div>`;}).join(''):'<div class="muted">No payments yet.</div>'}</div>`;
+  return `<h1 class="title">Customer Details</h1><div class="actions"><button class="small view" onclick="go('customers')">← Back</button><button class="small btn light" onclick="editCustomer('${c.id}')">✏️ Edit Customer</button></div><div class="customer"><div class="cmain"><div class="avatar">${esc((c.name||'?')[0].toUpperCase())}</div><div class="grow"><div class="name">${esc(c.name||'')}</div><div class="muted">Client Code: ${esc(c.clientCode||'—')} • ${esc(c.phone||'')}</div></div><span class="badge ${c.status}">${String(c.status||'').toUpperCase()}</span></div><div class="detail"><span>Client Code</span><b>${esc(c.clientCode||'—')}</b></div><div class="detail"><span>Mobile / WhatsApp</span><b>${esc(c.phone||'—')}</b></div><div class="detail"><span>Address</span><b>${esc(c.address||'—')}</b></div><div class="detail"><span>Package / Mbps</span><b>${esc(c.pkg||'—')}</b></div><div class="detail"><span>Monthly Bill</span><b>${money(c.fee)}</b></div><div class="detail"><span>PPPoE Username</span><b>${esc(c.pppoeUser||c.pppoe||'—')}</b></div><div class="detail"><span>PPPoE Password</span><b>${esc(c.pppoePass||c.pppoePassword||'—')}</b></div><div class="detail"><span>ONU ID</span><b>${esc(c.onu||'—')}</b></div><div class="detail"><span>Connection Date</span><b>${esc(c.connectionDate||'—')}</b></div><div class="detail"><span>Expiry Date</span><b>${esc(c.expiry||'—')}</b></div><div class="detail"><span>Previous Due</span><b>${money(c.prevDue)}</b></div><div class="detail"><span>Running Bill</span><b>${money(billDue(c))}</b></div><div class="detail"><span>Total Due</span><b>${money(due(c))}</b></div><div class="actions"><button class="small call" onclick="callCustomer('${esc(c.phone||'')}')">📞 Call</button><button class="small wa" onclick="waCustomer('${esc(c.phone||'')}')">WhatsApp</button><button class="small" style="background:#1677d2;color:#fff" onclick="sendCustomerSMS('${c.id}')">📨 Send SMS</button>${due(c)>0?`<button class="small pay" onclick="payCustomer('${c.id}')">Customer Bill Payment</button>`:''}</div></div><div class="section"><h3>Payment History</h3>${hist.length?hist.map(function(x){return `<div class="detail"><span>${esc(x.date||'')} • ${esc(x.month||'')} • ${esc(x.source||'manual')}</span><b>${money(x.amount)}</b></div>`;}).join(''):'<div class="muted">No payments yet.</div>'}</div>`;
 };
 })();
 </script>'''
 
-if 'window.saveCustomerEdit=function(id)' not in s:
+if 'window.sendCustomerSMS=function(id)' not in s:
     s=s.replace('</body>',js+'</body>',1)
-    print('Customer View/Edit patch applied')
+    print('Customer View/Edit + Send SMS patch applied')
 else:
-    print('Customer View/Edit patch already present')
+    print('Customer View/Edit + Send SMS patch already present')
 p.write_text(s,encoding='utf-8')
