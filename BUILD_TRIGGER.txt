@@ -1,1 +1,1 @@
-Trigger latest STAR COMMUNICATION APK build with SIM 2 Robi SMS support.
+Trigger latest STAR COMMUNICATION APK build after duplicate SMS permission helper fix.
