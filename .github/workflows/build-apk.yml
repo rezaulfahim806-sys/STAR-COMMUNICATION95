@@ -55,6 +55,7 @@ jobs:
           python3 tools/patch_sms_csv_import.py
           python3 tools/patch_native_storage.py
           python3 tools/patch_sim2_sms.py
+          python3 tools/patch_sms_permission_fix.py
       - name: Build Debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace --warning-mode all
       - name: Verify APK exists
