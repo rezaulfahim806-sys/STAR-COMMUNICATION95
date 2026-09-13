@@ -18,7 +18,7 @@ method='''        @JavascriptInterface public void sendSmsFromSim2(String phone,
                 if(sim2==null){ runOnUiThread(() -> Toast.makeText(MainActivity.this,"SIM 2 Robi is not active.",Toast.LENGTH_LONG).show()); return; }
                 int subId=sim2.getSubscriptionId();
                 SmsManager sms;
-                if(Build.VERSION.SDK_INT>=31) sms=SmsManager.createForSubscriptionId(subId);
+                if(Build.VERSION.SDK_INT>=31) sms=SmsManager.getDefault().createForSubscriptionId(subId);
                 else sms=SmsManager.getSmsManagerForSubscriptionId(subId);
                 sms.sendTextMessage(phone.trim(),null,message,null,null);
                 runOnUiThread(() -> Toast.makeText(MainActivity.this,"SMS sent from SIM 2 (Robi)",Toast.LENGTH_SHORT).show());
