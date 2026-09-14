@@ -63,7 +63,6 @@ jobs:
           python3 tools/patch_sms_dedupe.py
           python3 tools/patch_sms_method_reference.py
           python3 tools/patch_active_line_growth_monitor.py
-          python3 tools/patch_customer_payment_portal.py
       - name: Build Debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace --warning-mode all
       - name: Verify APK exists
@@ -78,5 +77,3 @@ jobs:
           name: STAR-COMMUNICATION-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-
-# Customer-specific bKash bill payment portal
