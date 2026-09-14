@@ -54,6 +54,7 @@ jobs:
           python3 tools/patch_customer_view_edit.py
           python3 tools/patch_sms_csv_import.py
           python3 tools/patch_native_storage.py
+          python3 tools/patch_update_data_migration.py
           python3 tools/patch_sim2_sms.py
           python3 tools/patch_sms_permission_fix.py
           python3 tools/patch_default_sms_handler.py
@@ -76,4 +77,4 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-# Final expired payment activation fix build trigger
+# Data migration update build trigger
