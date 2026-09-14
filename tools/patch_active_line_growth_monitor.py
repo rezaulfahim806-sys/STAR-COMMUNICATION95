@@ -41,7 +41,3 @@ if 'active-line-growth-monitor' not in s:
 
 p.write_text(s, encoding='utf-8')
 print('Added Active Line, Growth and Live Monitoring dashboard panel.')
-'''
-
-p.write_text(s, encoding='utf-8')
-print('Added Active Line, Growth and Live Monitoring dashboard panel.')
