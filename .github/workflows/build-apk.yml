@@ -75,4 +75,4 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-# Fresh build trigger
+# Partial payment fix build trigger
