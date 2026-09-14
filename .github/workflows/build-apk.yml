@@ -58,6 +58,7 @@ jobs:
           python3 tools/patch_sms_permission_fix.py
           python3 tools/patch_default_sms_handler.py
           python3 tools/patch_billing_expiry_activation.py
+          python3 tools/patch_expired_paid_active.py
           python3 tools/patch_sms_dedupe.py
           python3 tools/patch_sms_method_reference.py
       - name: Build Debug APK
@@ -75,4 +76,4 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-# Partial payment fix build trigger
+# Final expired payment activation fix build trigger
