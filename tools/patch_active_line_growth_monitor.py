@@ -7,7 +7,7 @@ css = '<style id="active-line-growth-monitor-css">.quickgrid{display:grid;grid-t
 if 'active-line-growth-monitor-css' not in s:
     s = s.replace('</head>', css + '</head>', 1)
 
-js = r'''<script>
+js = r'''<script id="active-line-growth-monitor-script">
 (function(){
   function addQuickPanel(){
     if(typeof page==='undefined' || page!=='dashboard') return;
@@ -36,7 +36,8 @@ js = r'''<script>
   setTimeout(addQuickPanel,120);
 })();
 </script>'''
-if 'active-line-growth-monitor' not in s:
+
+if 'active-line-growth-monitor-script' not in s:
     s = s.replace('</body>', js + '</body>', 1)
 
 p.write_text(s, encoding='utf-8')
