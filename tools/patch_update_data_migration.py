@@ -3,19 +3,18 @@ from pathlib import Path
 html = Path('app/src/main/assets/index.html')
 s = html.read_text(encoding='utf-8')
 
-# The app HTML is minified into one line. Replace the loader by locating its
-# stable JavaScript markers instead of relying on a fragile regex.
 start = s.find('let d;try{')
 end_marker = 'if(!d)d=JSON.parse(JSON.stringify(DEF));'
 end = s.find(end_marker, start)
 if start < 0 or end < 0:
     raise SystemExit('Could not locate startup data loader in index.html')
 end += len(end_marker)
-loader = "let d;try{let raw='';try{raw=window.AndroidBridge&&AndroidBridge.loadData?AndroidBridge.loadData():''}catch(e){}if(!raw){let keys=[KEY,'star_communication_final_v2','star_communication_final_v1','star_communication'];for(let k of keys){try{raw=localStorage.getItem(k)||localStorage.getItem(k+'_backup')||''}catch(e){}if(raw)break}}d=raw?JSON.parse(raw):null}catch(e){d=null}if(!d)d=JSON.parse(JSON.stringify(DEF));"
+
+# Always inspect every known storage key and choose the dataset with the most
+# customer records. This prevents an empty newer key from hiding an older key.
+loader = "let d;try{let best=null,bestCount=-1,raws=[];try{let n=window.AndroidBridge&&AndroidBridge.loadData?AndroidBridge.loadData():'';if(n)raws.push(n)}catch(e){}let keys=[KEY,'star_communication_final_v2','star_communication_final_v1','star_communication','star_communication_data','star_communication_db'];for(let k of keys){try{let r=localStorage.getItem(k)||localStorage.getItem(k+'_backup')||'';if(r)raws.push(r)}catch(e){}}for(let r of raws){try{let x=JSON.parse(r),cnt=Array.isArray(x&&x.customers)?x.customers.length:-1;if(cnt>bestCount){best=x;bestCount=cnt}}catch(e){}}d=best}catch(e){d=null}if(!d)d=JSON.parse(JSON.stringify(DEF));"
 s = s[:start] + loader + s[end:]
 
-# Persist to both localStorage and native app-private storage. APK updates keep
-# app-private files, so customer data survives future installs/updates.
 ss = s.find('function save(){')
 if ss < 0:
     raise SystemExit('Could not locate save() in index.html')
@@ -23,7 +22,7 @@ se = s.find('}', ss)
 if se < 0:
     raise SystemExit('Could not locate end of save() in index.html')
 se += 1
-save = "function save(){let z=JSON.stringify(d);try{localStorage.setItem(KEY,z);localStorage.setItem(KEY+'_backup',z)}catch(e){}try{if(window.AndroidBridge&&AndroidBridge.saveData)AndroidBridge.saveData(z)}catch(e){}}"
+save = "function save(){let z=JSON.stringify(d);try{localStorage.setItem(KEY,z);localStorage.setItem(KEY+'_backup',z);localStorage.setItem('star_communication_final_v1',z)}catch(e){}try{if(window.AndroidBridge&&AndroidBridge.saveData)AndroidBridge.saveData(z)}catch(e){}}"
 s = s[:ss] + save + s[se:]
 html.write_text(s, encoding='utf-8')
 
@@ -48,4 +47,4 @@ if 'star_customer_data.json' not in j:
     j = j.replace(needle, methods, 1)
 
 java.write_text(j, encoding='utf-8')
-print('Update data migration patch fixed')
+print('Universal update-safe data migration patch applied')
