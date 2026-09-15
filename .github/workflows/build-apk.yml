@@ -65,6 +65,7 @@ jobs:
           python3 tools/patch_sms_method_reference.py
           python3 tools/patch_active_line_growth_monitor.py
           python3 tools/patch_customer_actions_20260915.py
+          python3 tools/patch_webview_back_20260915.py
       - name: Build Debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace --warning-mode all
       - name: Verify APK exists
