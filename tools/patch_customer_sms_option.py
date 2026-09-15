@@ -1,104 +1,52 @@
 from pathlib import Path
 
-# This patch adds/keeps the customer SMS tools, puts the general Message Center
-# beside the Customer tools (NOT inside Billing/Payment), fixes customer search,
-# and adds on-demand Customer CSV/PDF export through the Android bridge.
+html = Path('app/src/main/assets/index.html')
+s = html.read_text(encoding='utf-8')
 
-html=Path("app/src/main/assets/index.html")
-s=html.read_text(encoding="utf-8")
-D=chr(36)
-cid=D+"{c.id}"
-escp=D+"{esc(c.phone)}"
-old1='<button class="small view" onclick="go(\\'details\\',{id:\\''+cid+'\\'})">Details</button>'
+# Keep per-customer SMS buttons without touching Payment -> Send SMS / Payment Link SMS.
+cid = "${c.id}"
+escp = "${esc(c.phone)}"
+old1 = "<button class=\"small view\" onclick=\"go('details',{id:'" + cid + "'})\">Details</button>"
+if "function smsCustomer(id)" not in s and old1 in s:
+    s = s.replace(old1, old1 + "<button class=\"small view\" onclick=\"smsCustomer('" + cid + "')\">📩 SMS</button>", 1)
+old2 = "<button class=\"small wa\" onclick=\"waCustomer('" + escp + "')\">WhatsApp</button>"
+if "function smsCustomer(id)" not in s and old2 in s:
+    s = s.replace(old2, old2 + "<button class=\"small view\" onclick=\"smsCustomer('" + cid + "')\">📩 SMS</button>", 1)
 if "function smsCustomer(id)" not in s:
-    if old1 in s:
-        s=s.replace(old1, old1+'<button class="small view" onclick="smsCustomer(\\''+cid+'\\')">📩 SMS</button>',1)
-old2='<button class="small wa" onclick="waCustomer(\\''+escp+'\\')">WhatsApp</button>'
-if "function smsCustomer(id)" not in s:
-    if old2 in s:
-        s=s.replace(old2, old2+'<button class="small view" onclick="smsCustomer(\\''+cid+'\\')">📩 SMS</button>',1)
-if "function smsCustomer(id)" not in s:
-    anchor="function callCustomer(n){"
+    anchor = 'function callCustomer(n){'
     if anchor in s:
-        fn=r'''function smsCustomer(id){let c=d.customers.find(x=>String(x.id)===String(id));if(!c){toast('Customer not found');return}openSheet('<h3>📩 Send SMS</h3><div class=muted>To: '+esc(c.phone||'')+' • '+esc(c.name||'Customer')+'</div><textarea id="smsmsg" class="input" rows="6" placeholder="Write message"></textarea><button class="btn dark full" onclick="sendCustomerSms(\''+c.id+'\')">📨 Send SMS</button>');}function sendCustomerSms(id){let c=d.customers.find(x=>String(x.id)===String(id));if(!c){toast('Customer not found');return}let el=document.getElementById('smsmsg'),m=el?el.value.trim():'';if(!m){toast('Write a message first');return}if(window.AndroidBridge&&AndroidBridge.sendSms){AndroidBridge.sendSms(String(c.phone||''),m);closeSheet()}else{location.href='sms:'+String(c.phone||'')+'?body='+encodeURIComponent(m);}}'''
-        s=s.replace(anchor,fn+anchor,1)
+        fn = '''function smsCustomer(id){let c=d.customers.find(x=>String(x.id)===String(id));if(!c){toast('Customer not found');return}openSheet('<h3>📩 Send SMS</h3><div class=muted>To: '+esc(c.phone||'')+' • '+esc(c.name||'Customer')+'</div><textarea id="smsmsg" class="input" rows="6" placeholder="Write message"></textarea><button class="btn dark full" onclick="sendCustomerSms(\\''+c.id+'\\')">📨 Send SMS</button>');}function sendCustomerSms(id){let c=d.customers.find(x=>String(x.id)===String(id));if(!c){toast('Customer not found');return}let el=document.getElementById('smsmsg'),m=el?el.value.trim():'';if(!m){toast('Write a message first');return}if(window.AndroidBridge&&AndroidBridge.sendSms){AndroidBridge.sendSms(String(c.phone||''),m);closeSheet()}else{location.href='sms:'+String(c.phone||'')+'?body='+encodeURIComponent(m);}}'''
+        s = s.replace(anchor, fn + anchor, 1)
 
-# General customer tools. Deliberately NOT added to Billing/Payment.
+# Separate Customer Tools section: NOT inside Billing/Payment.
 if 'function starCustomerTools' not in s:
-    script=r'''<script>
+    script = r'''<script>
 (function(){
-  function payLink(c){
-    var q=new URLSearchParams();
-    q.set('code',String(c.clientCode||c.id||''));q.set('name',String(c.name||'Customer'));
-    q.set('location',String(c.address||c.location||''));q.set('package',String(c.pkg||c.packageName||''));
-    q.set('bill',String(Number(c.fee||c.monthlyFee||0)));q.set('prev',String(Number(c.prevDue||c.previousDue||0)));
-    q.set('total',String(typeof due==='function'?due(c):Number(c.prevDue||c.previousDue||0)+Number(c.fee||c.monthlyFee||0)));
-    q.set('merchant',String((d.settings&&d.settings.merchantNumber)||'01897-099850'));
-    return 'https://rezaulfahim806-sys.github.io/STAR-COMMUNICATION95/pay.html?'+q.toString();
-  }
-  window.starCustomerTools=function(){openSheet('<h3>👥 Customer Tools</h3><button class="btn dark full" onclick="starMessageCenter()">💬 Send Message</button><button class="btn green full" style="margin-top:7px" onclick="starAllPaymentLinkSms()">🔗 Send Payment Link SMS</button><button class="btn light full" style="margin-top:7px" onclick="exportCustomersCSV()">📊 Download Customer CSV</button><button class="btn light full" style="margin-top:7px" onclick="exportCustomersPDF()">📄 Download Customer PDF</button>');};
-  window.starMessageCenter=function(){openSheet('<h3>💬 Send Message</h3><div class="muted">সাধারণ SMS — Customer, Unpaid বা Expired বেছে নিয়ে পাঠাতে পারবেন।</div><textarea id="smmsg" class="input" rows="5" placeholder="Write message"></textarea><button class="btn dark full" onclick="starBulk(\\'all\\',smmsg.value)">📨 Send to All Customers</button><button class="btn dark full" style="margin-top:7px" onclick="starBulk(\\'unpaid\\',smmsg.value)">💰 Send to Unpaid</button><button class="btn red full" style="margin-top:7px" onclick="starBulk(\\'expired\\',smmsg.value)">⏰ Send to Expired</button>');};
-  window.starAllPaymentLinkSms=function(){var list=(window.d&&Array.isArray(d.customers))?d.customers.filter(function(c){return c&&c.phone;}):[];if(!list.length){toast('No customer mobile numbers found');return}openSheet('<h3>🔗 Send Payment Link SMS</h3><div class="muted">প্রত্যেক Customer-এর নিজের Payment Link যাবে।</div><textarea id="allPaySms" class="input" rows="7">STAR COMMUNICATION\nপ্রিয় {name}, আপনার মোট বকেয়া {due}। বিল পরিশোধ করতে নিচের Payment Link ব্যবহার করুন:\n{link}\nধন্যবাদ।</textarea><button class="btn green full" onclick="sendAllPaymentLinkSms()">📨 Send Payment Link to All</button><button class="btn light full" style="margin-top:7px" onclick="closeSheet()">Cancel</button>');};
-  window.sendAllPaymentLinkSms=function(){var el=document.getElementById('allPaySms'),tpl=el?el.value.trim():'';if(!tpl){toast('Write a message first');return}var list=(window.d&&Array.isArray(d.customers))?d.customers.filter(function(c){return c&&c.phone;}):[];closeSheet();var i=0;function next(){if(i>=list.length){toast('All payment link SMS finished');return}var c=list[i++],total=typeof due==='function'?due(c):Number(c.prevDue||c.previousDue||0)+Number(c.fee||c.monthlyFee||0),msg=tpl.replace(/\{name\}/g,String(c.name||'Customer')).replace(/\{due\}/g,money(total)).replace(/\{link\}/g,payLink(c));try{if(window.AndroidBridge&&AndroidBridge.sendSms)AndroidBridge.sendSms(String(c.phone).trim(),msg);else location.href='smsto:'+encodeURIComponent(String(c.phone).trim())+'?body='+encodeURIComponent(msg)}catch(e){}setTimeout(next,500)}next();};
-  window.exportCustomersCSV=function(){var a=(window.d&&Array.isArray(d.customers))?d.customers:[];if(!a.length){toast('No customers to export');return}var rows=[['Client Code','Name','Mobile','Address','Package','Monthly Fee','Previous Due','Total Due','Status','Connection Date','Expiry Date']];a.forEach(function(c){rows.push([c.clientCode||c.id||'',c.name||'',c.phone||'',c.address||c.location||'',c.pkg||c.packageName||'',Number(c.fee||c.monthlyFee||0),Number(c.prevDue||c.previousDue||0),typeof due==='function'?due(c):Number(c.prevDue||c.previousDue||0)+Number(c.fee||c.monthlyFee||0),c.status||'',c.createdAt||c.connectionDate||'',c.expiry||c.expiryDate||''])});var csv=rows.map(function(r){return r.map(function(v){v=String(v==null?'':v).replace(/"/g,'""');return '"'+v+'"'}).join(',')}).join('\n');if(window.AndroidBridge&&AndroidBridge.saveTextFile)AndroidBridge.saveTextFile('STAR_COMMUNICATION_Customers.csv',csv,'text/csv');else{var blob=new Blob([csv],{type:'text/csv'}),u=URL.createObjectURL(blob),x=document.createElement('a');x.href=u;x.download='STAR_COMMUNICATION_Customers.csv';x.click();setTimeout(function(){URL.revokeObjectURL(u)},1000)}};
-  window.exportCustomersPDF=function(){var a=(window.d&&Array.isArray(d.customers))?d.customers:[];if(!a.length){toast('No customers to export');return}var lines=['STAR COMMUNICATION','CUSTOMER LIST','Generated: '+(typeof today==='function'?today():new Date().toISOString().slice(0,10)),'','Total Customers: '+a.length,''];a.forEach(function(c,i){lines.push((i+1)+'. '+(c.clientCode||c.id||'')+' | '+(c.name||'Customer'));lines.push('Mobile: '+(c.phone||''));lines.push('Address: '+(c.address||c.location||''));lines.push('Package: '+(c.pkg||c.packageName||'')+' | Fee: '+money(c.fee||c.monthlyFee||0));lines.push('Previous Due: '+money(c.prevDue||c.previousDue||0)+' | Total Due: '+money(typeof due==='function'?due(c):Number(c.prevDue||c.previousDue||0)+Number(c.fee||c.monthlyFee||0)));lines.push('Status: '+(c.status||'')+' | Expiry: '+(c.expiry||c.expiryDate||''));lines.push('----------------------------------------')});var text=lines.join('\n');if(window.AndroidBridge&&AndroidBridge.saveCustomerPdf)AndroidBridge.saveCustomerPdf('STAR_COMMUNICATION_Customers.pdf',text);else{window.print()}};
-  function searchFix(){if(page!=='customers')return;var content=document.getElementById('content');if(!content)return;var old=document.getElementById('starCustomerSearch');if(!old){var box=document.createElement('div');box.className='section';box.id='starCustomerSearch';box.innerHTML='<h3>🔎 Customer Search</h3><input id="starSearchInput" class="input" placeholder="Search name, mobile, Client Code, address..." autocomplete="off"><div class="muted">টাইপ করলেই Customer filter হবে</div><div class="row" style="margin-top:6px"><button class="btn dark" onclick="starCustomerTools()">💬 Message / Export</button><button class="btn light" onclick="document.getElementById(\'starSearchInput\').value=\'\';starSearchCustomers()">Clear</button></div>';content.insertBefore(box,content.firstChild);document.getElementById('starSearchInput').addEventListener('input',starSearchCustomers)} }
-  window.starSearchCustomers=function(){var q=((document.getElementById('starSearchInput')||{}).value||'').toLowerCase().trim();var cards=document.querySelectorAll('.customer');cards.forEach(function(el){el.style.display=!q||el.textContent.toLowerCase().indexOf(q)>=0?'':'none'});};
-  var oldRender=window.render;if(oldRender&&!window.__starCustomerToolsRender){window.__starCustomerToolsRender=true;window.render=function(){oldRender();setTimeout(function(){searchFix();starSearchCustomers()},80)}};
-  setTimeout(function(){try{searchFix();starSearchCustomers()}catch(e){}},300);
+function payLink(c){var q=new URLSearchParams();q.set('code',String(c.clientCode||c.id||''));q.set('name',String(c.name||'Customer'));q.set('location',String(c.address||c.location||''));q.set('package',String(c.pkg||c.packageName||''));q.set('bill',String(Number(c.fee||c.monthlyFee||0)));q.set('prev',String(Number(c.prevDue||c.previousDue||0)));q.set('total',String(typeof due==='function'?due(c):Number(c.prevDue||c.previousDue||0)+Number(c.fee||c.monthlyFee||0)));q.set('merchant',String((d.settings&&d.settings.merchantNumber)||'01897-099850'));return 'https://rezaulfahim806-sys.github.io/STAR-COMMUNICATION95/pay.html?'+q.toString();}
+window.starCustomerTools=function(){openSheet('<h3>👥 Customer Tools</h3><button class="btn dark full" onclick="starMessageCenter()">💬 Send Message</button><button class="btn green full" style="margin-top:7px" onclick="starAllPaymentLinkSms()">🔗 Send Payment Link SMS</button><button class="btn light full" style="margin-top:7px" onclick="exportCustomersCSV()">📊 Download Customer CSV</button><button class="btn light full" style="margin-top:7px" onclick="exportCustomersPDF()">📄 Download Customer PDF</button>');};
+window.starMessageCenter=function(){openSheet('<h3>💬 Send Message</h3><div class="muted">General SMS — All, Unpaid or Expired customers.</div><textarea id="smmsg" class="input" rows="5" placeholder="Write message"></textarea><button class="btn dark full" onclick="starBulk(\\'all\\',smmsg.value)">📨 Send to All Customers</button><button class="btn dark full" style="margin-top:7px" onclick="starBulk(\\'unpaid\\',smmsg.value)">💰 Send to Unpaid</button><button class="btn red full" style="margin-top:7px" onclick="starBulk(\\'expired\\',smmsg.value)">⏰ Send to Expired</button>');};
+window.starAllPaymentLinkSms=function(){var list=(window.d&&Array.isArray(d.customers))?d.customers.filter(function(c){return c&&c.phone;}):[];if(!list.length){toast('No customer mobile numbers found');return}openSheet('<h3>🔗 Send Payment Link SMS</h3><div class="muted">Each customer receives their own Payment Link. This is separate from Payment -> Send SMS.</div><textarea id="allPaySms" class="input" rows="7">STAR COMMUNICATION\nপ্রিয় {name}, আপনার মোট বকেয়া {due}। বিল পরিশোধ করতে নিচের Payment Link ব্যবহার করুন:\n{link}\nধন্যবাদ।</textarea><button class="btn green full" onclick="sendAllPaymentLinkSms()">📨 Send Payment Link to All</button><button class="btn light full" style="margin-top:7px" onclick="closeSheet()">Cancel</button>');};
+window.sendAllPaymentLinkSms=function(){var el=document.getElementById('allPaySms'),tpl=el?el.value.trim():'';if(!tpl){toast('Write a message first');return}var list=(window.d&&Array.isArray(d.customers))?d.customers.filter(function(c){return c&&c.phone;}):[];closeSheet();var i=0;function next(){if(i>=list.length){toast('All payment link SMS finished');return}var c=list[i++],total=typeof due==='function'?due(c):Number(c.prevDue||c.previousDue||0)+Number(c.fee||c.monthlyFee||0),msg=tpl.replace(/\{name\}/g,String(c.name||'Customer')).replace(/\{due\}/g,money(total)).replace(/\{link\}/g,payLink(c));try{if(window.AndroidBridge&&AndroidBridge.sendSms)AndroidBridge.sendSms(String(c.phone).trim(),msg);else location.href='smsto:'+encodeURIComponent(String(c.phone).trim())+'?body='+encodeURIComponent(msg)}catch(e){}setTimeout(next,500)}next();};
+window.exportCustomersCSV=function(){var a=(window.d&&Array.isArray(d.customers))?d.customers:[];if(!a.length){toast('No customers to export');return}var rows=[['Client Code','Name','Mobile','Address','Package','Monthly Fee','Previous Due','Total Due','Status','Connection Date','Expiry Date']];a.forEach(function(c){rows.push([c.clientCode||c.id||'',c.name||'',c.phone||'',c.address||c.location||'',c.pkg||c.packageName||'',Number(c.fee||c.monthlyFee||0),Number(c.prevDue||c.previousDue||0),typeof due==='function'?due(c):Number(c.prevDue||c.previousDue||0)+Number(c.fee||c.monthlyFee||0),c.status||'',c.createdAt||c.connectionDate||'',c.expiry||c.expiryDate||''])});var csv=rows.map(function(r){return r.map(function(v){return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'}).join(',')}).join('\n');if(window.AndroidBridge&&AndroidBridge.saveTextFile)AndroidBridge.saveTextFile('STAR_COMMUNICATION_Customers.csv',csv,'text/csv');else{var blob=new Blob([csv],{type:'text/csv'}),u=URL.createObjectURL(blob),x=document.createElement('a');x.href=u;x.download='STAR_COMMUNICATION_Customers.csv';x.click();setTimeout(function(){URL.revokeObjectURL(u)},1000)}};
+window.exportCustomersPDF=function(){var a=(window.d&&Array.isArray(d.customers))?d.customers:[];if(!a.length){toast('No customers to export');return}var lines=['STAR COMMUNICATION','CUSTOMER LIST','Generated: '+(typeof today==='function'?today():new Date().toISOString().slice(0,10)),'','Total Customers: '+a.length,''];a.forEach(function(c,i){lines.push((i+1)+'. '+(c.clientCode||c.id||'')+' | '+(c.name||'Customer'));lines.push('Mobile: '+(c.phone||''));lines.push('Address: '+(c.address||c.location||''));lines.push('Package: '+(c.pkg||c.packageName||'')+' | Fee: '+money(c.fee||c.monthlyFee||0));lines.push('Previous Due: '+money(c.prevDue||c.previousDue||0)+' | Total Due: '+money(typeof due==='function'?due(c):Number(c.prevDue||c.previousDue||0)+Number(c.fee||c.monthlyFee||0)));lines.push('Status: '+(c.status||'')+' | Expiry: '+(c.expiry||c.expiryDate||''));lines.push('----------------------------------------')});if(window.AndroidBridge&&AndroidBridge.saveCustomerPdf)AndroidBridge.saveCustomerPdf('STAR_COMMUNICATION_Customers.pdf',lines.join('\n'));else window.print();};
+function searchFix(){if(typeof page!=='undefined'&&page!=='customers')return;var content=document.getElementById('content');if(!content)return;var old=document.getElementById('starCustomerSearch');if(!old){var box=document.createElement('div');box.className='section';box.id='starCustomerSearch';box.innerHTML='<h3>🔎 Customer Search</h3><input id="starSearchInput" class="input" placeholder="Search name, mobile, Client Code, address..." autocomplete="off"><div class="muted">Type to filter customers</div><div class="row" style="margin-top:6px"><button class="btn dark" onclick="starCustomerTools()">💬 Message / Export</button><button class="btn light" onclick="document.getElementById(\'starSearchInput\').value=\'\';starSearchCustomers()">Clear</button></div>';content.insertBefore(box,content.firstChild);document.getElementById('starSearchInput').addEventListener('input',starSearchCustomers)}}
+window.starSearchCustomers=function(){var q=((document.getElementById('starSearchInput')||{}).value||'').toLowerCase().trim();document.querySelectorAll('.customer').forEach(function(el){el.style.display=!q||el.textContent.toLowerCase().indexOf(q)>=0?'':'none'});};
+var oldRender=window.render;if(oldRender&&!window.__starCustomerToolsRender){window.__starCustomerToolsRender=true;window.render=function(){oldRender();setTimeout(function(){try{searchFix();starSearchCustomers()}catch(e){}},80)}}
+setTimeout(function(){try{searchFix();starSearchCustomers()}catch(e){}},300);
 })();
 </script>
 '''
-    s=s.replace('</body>',script+'</body>',1)
+    s = s.replace('</body>', script + '</body>', 1)
 
-# Remove the older billing-only injection if a previous build patch left it behind.
-start=s.find("<script>(function(){function paymentLink(c){")
-if start>=0:
-    end=s.find("</script>",start)
-    if end>=0:
-        block=s[start:end+9]
-        if 'allPaymentLinkSmsBtn' in block:
-            s=s[:start]+s[end+9:]
-
-html.write_text(s,encoding='utf-8')
-
-# Android bridge: save CSV in Downloads and generate a simple readable PDF in Downloads.
-java=Path("app/src/main/java/com/starcommunication/isp/MainActivity.java")
-j=java.read_text(encoding='utf-8')
+# Android bridge for Downloads/STAR COMMUNICATION.
+java = Path('app/src/main/java/com/starcommunication/isp/MainActivity.java')
+j = java.read_text(encoding='utf-8')
 if 'saveTextFile(String fileName' not in j:
-    anchor='        @JavascriptInterface public void scheduleExpiry(String phone,String name,String expiry){AutoMessageReceiver.scheduleExpiry(MainActivity.this,phone,name,expiry);}'
-    methods=r'''        @JavascriptInterface public void saveTextFile(String fileName,String content,String mime){
-            try{
-                if(Build.VERSION.SDK_INT>=29){
-                    android.content.ContentValues v=new android.content.ContentValues();
-                    v.put(android.provider.MediaStore.Downloads.DISPLAY_NAME,fileName);
-                    v.put(android.provider.MediaStore.Downloads.MIME_TYPE,mime==null?"text/plain":mime);
-                    v.put(android.provider.MediaStore.Downloads.RELATIVE_PATH,"Download/STAR COMMUNICATION");
-                    android.net.Uri u=getContentResolver().insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,v);
-                    if(u!=null){java.io.OutputStream os=getContentResolver().openOutputStream(u);os.write((content==null?"":content).getBytes(java.nio.charset.StandardCharsets.UTF_8));os.close();runOnUiThread(()->Toast.makeText(MainActivity.this,"CSV saved in Downloads/STAR COMMUNICATION",Toast.LENGTH_LONG).show());}
-                }
-            }catch(Exception e){runOnUiThread(()->Toast.makeText(MainActivity.this,"CSV save failed",Toast.LENGTH_LONG).show());}
-        }
-        @JavascriptInterface public void saveCustomerPdf(String fileName,String text){
-            try{
-                android.graphics.pdf.PdfDocument pdf=new android.graphics.pdf.PdfDocument();
-                android.graphics.Paint p=new android.graphics.Paint();p.setColor(Color.BLACK);p.setTextSize(10f);
-                String[] lines=(text==null?"":text).split("\\n",-1);int pageNo=1, y=35;android.graphics.pdf.PdfDocument.Page page=null;android.graphics.Canvas canvas=null;
-                for(int i=0;i<lines.length;i++){
-                    if(page==null||y>800){if(page!=null)pdf.finishPage(page);page=pdf.startPage(new android.graphics.pdf.PdfDocument.PageInfo.Builder(595,842,pageNo++).create());canvas=page.getCanvas();y=35;}
-                    String line=lines[i];if(line.length()>88)line=line.substring(0,88);canvas.drawText(line,28,y,p);y+=15;
-                }
-                if(page!=null)pdf.finishPage(page);
-                if(Build.VERSION.SDK_INT>=29){
-                    android.content.ContentValues v=new android.content.ContentValues();v.put(android.provider.MediaStore.Downloads.DISPLAY_NAME,fileName);v.put(android.provider.MediaStore.Downloads.MIME_TYPE,"application/pdf");v.put(android.provider.MediaStore.Downloads.RELATIVE_PATH,"Download/STAR COMMUNICATION");
-                    android.net.Uri u=getContentResolver().insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,v);if(u!=null){java.io.OutputStream os=getContentResolver().openOutputStream(u);pdf.writeTo(os);os.close();runOnUiThread(()->Toast.makeText(MainActivity.this,"PDF saved in Downloads/STAR COMMUNICATION",Toast.LENGTH_LONG).show());}
-                }
-                pdf.close();
-            }catch(Exception e){runOnUiThread(()->Toast.makeText(MainActivity.this,"PDF save failed",Toast.LENGTH_LONG).show());}
-        }
-'''
-    if anchor not in j: raise SystemExit('scheduleExpiry anchor not found')
-    j=j.replace(anchor,methods+anchor,1)
-    java.write_text(j,encoding='utf-8')
+    anchor = '        @JavascriptInterface public void scheduleExpiry(String phone,String name,String expiry){AutoMessageReceiver.scheduleExpiry(MainActivity.this,phone,name,expiry);}'
+    methods = '''        @JavascriptInterface public void saveTextFile(String fileName,String content,String mime){try{if(Build.VERSION.SDK_INT>=29){android.content.ContentValues v=new android.content.ContentValues();v.put(android.provider.MediaStore.Downloads.DISPLAY_NAME,fileName);v.put(android.provider.MediaStore.Downloads.MIME_TYPE,mime==null?"text/plain":mime);v.put(android.provider.MediaStore.Downloads.RELATIVE_PATH,"Download/STAR COMMUNICATION");android.net.Uri u=getContentResolver().insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,v);if(u!=null){java.io.OutputStream os=getContentResolver().openOutputStream(u);os.write((content==null?"":content).getBytes(java.nio.charset.StandardCharsets.UTF_8));os.close();runOnUiThread(()->Toast.makeText(MainActivity.this,"CSV saved in Downloads/STAR COMMUNICATION",Toast.LENGTH_LONG).show());}}}catch(Exception e){runOnUiThread(()->Toast.makeText(MainActivity.this,"CSV save failed",Toast.LENGTH_LONG).show());}}\n        @JavascriptInterface public void saveCustomerPdf(String fileName,String text){try{android.graphics.pdf.PdfDocument pdf=new android.graphics.pdf.PdfDocument();android.graphics.Paint p=new android.graphics.Paint();p.setColor(Color.BLACK);p.setTextSize(10f);String[] lines=(text==null?"":text).split("\\\\n",-1);android.graphics.pdf.PdfDocument.Page page=null;android.graphics.Canvas canvas=null;int no=1,y=35;for(String line:lines){if(page==null||y>800){if(page!=null)pdf.finishPage(page);page=pdf.startPage(new android.graphics.pdf.PdfDocument.PageInfo.Builder(595,842,no++).create());canvas=page.getCanvas();y=35;}canvas.drawText(line.length()>88?line.substring(0,88):line,28,y,p);y+=15;}if(page!=null)pdf.finishPage(page);if(Build.VERSION.SDK_INT>=29){android.content.ContentValues v=new android.content.ContentValues();v.put(android.provider.MediaStore.Downloads.DISPLAY_NAME,fileName);v.put(android.provider.MediaStore.Downloads.MIME_TYPE,"application/pdf");v.put(android.provider.MediaStore.Downloads.RELATIVE_PATH,"Download/STAR COMMUNICATION");android.net.Uri u=getContentResolver().insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,v);if(u!=null){java.io.OutputStream os=getContentResolver().openOutputStream(u);pdf.writeTo(os);os.close();runOnUiThread(()->Toast.makeText(MainActivity.this,"PDF saved in Downloads/STAR COMMUNICATION",Toast.LENGTH_LONG).show());}}pdf.close();}catch(Exception e){runOnUiThread(()->Toast.makeText(MainActivity.this,"PDF save failed",Toast.LENGTH_LONG).show());}}\n'''
+    if anchor not in j:
+        raise SystemExit('scheduleExpiry anchor not found')
+    j = j.replace(anchor, methods + anchor, 1)
+    java.write_text(j, encoding='utf-8')
 
-print('Customer Message Center, search fix, CSV/PDF export and Android file bridge patched')
+print('Customer tools patch fixed')
