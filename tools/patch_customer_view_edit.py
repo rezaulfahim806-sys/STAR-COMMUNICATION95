@@ -3,16 +3,14 @@ from pathlib import Path
 p = Path('app/src/main/assets/index.html')
 s = p.read_text(encoding='utf-8')
 
-# Extend the existing customer card with per-customer payment-link actions.
 s = s.replace(
 '''<button class="small" style="background:#1677d2;color:#fff" onclick="sendCustomerSMS('${c.id}')">📨 Send SMS</button>${dv>0?`<button class="small pay" onclick="payCustomer('${c.id}')">Pay</button>`:''}''',
 '''<button class="small" style="background:#1677d2;color:#fff" onclick="sendCustomerSMS('${c.id}')">📨 Send SMS</button><button class="small" style="background:#7656d6;color:#fff" onclick="generatePaymentLink('${c.id}')">🔗 Payment Link</button>${dv>0?`<button class="small pay" onclick="payCustomer('${c.id}')">Pay</button>`:''}''')
 
-# Add link UI/functions to the existing injected customer tools.
 insert = r'''<script>
 (function(){
+  var PAYMENT_BASE='https://rezaulfahim806-sys.github.io/STAR-COMMUNICATION95/pay.html';
   function paymentLinkFor(c){
-    var base=location.origin + location.pathname.replace(/[^/]*$/, '') + 'pay.html';
     var q=new URLSearchParams();
     q.set('code',String(c.clientCode||c.id||''));
     q.set('name',String(c.name||''));
@@ -22,7 +20,7 @@ insert = r'''<script>
     q.set('previousDue',String(Number(c.prevDue||0)));
     q.set('totalDue',String(typeof due==='function'?due(c):Number(c.prevDue||0)+Number(c.fee||0)));
     q.set('merchant',String((d.settings&&d.settings.merchantNumber)||'01897-099850'));
-    return base+'?'+q.toString();
+    return PAYMENT_BASE+'?'+q.toString();
   }
   window.customerPaymentLink=paymentLinkFor;
   window.generatePaymentLink=function(id){
@@ -55,7 +53,5 @@ insert = r'''<script>
 if 'window.customerPaymentLink=paymentLinkFor' not in s:
     s=s.replace('</body>',insert+'</body>',1)
 
-# Keep the existing Customer View/Edit + SMS implementation intact.
-# The patch is intentionally additive to avoid replacing the working customer UI.
 p.write_text(s,encoding='utf-8')
 print('Customer payment link generate/copy/SMS actions added')
