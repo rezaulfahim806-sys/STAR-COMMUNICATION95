@@ -33,6 +33,7 @@ jobs:
           mkdir -p public
           cp pay.html public/pay.html
           cp pay.html public/index.html
+          cp app/src/main/assets/logo.svg public/logo.svg
           touch public/.nojekyll
           echo 'STAR COMMUNICATION customer payment page prepared.'
           ls -lh public
