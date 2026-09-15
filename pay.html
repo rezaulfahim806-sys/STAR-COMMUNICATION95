@@ -5,17 +5,24 @@
 <meta name="theme-color" content="#07111f">
 <title>STAR COMMUNICATION Bill Payment Link</title>
 <style>
-*{box-sizing:border-box}body{margin:0;min-height:100vh;background:linear-gradient(150deg,#06101d 0%,#102943 48%,#07111f 100%);font-family:Arial,sans-serif;color:#172033}.wrap{max-width:520px;margin:auto;padding:18px 14px 30px}.hero{text-align:center;color:#fff;padding:10px 8px 20px}.logo{width:84px;height:84px;object-fit:contain;background:#fff;padding:5px;border-radius:24px;box-shadow:0 12px 35px #0007}.brand{font-size:25px;font-weight:900;letter-spacing:.6px;margin-top:11px}.tag{margin-top:4px;color:#b9c9dc;font-size:13px}.card{background:#fff;border-radius:23px;padding:20px;margin:13px 0;box-shadow:0 14px 38px #0005}.heading{font-size:18px;font-weight:800;margin:0 0 14px}.rows{border:1px solid #e9edf3;border-radius:16px;overflow:hidden}.row{display:flex;justify-content:space-between;gap:16px;padding:13px 14px;border-bottom:1px solid #e9edf3;font-size:14px}.row:last-child{border-bottom:0}.label{color:#718096}.value{text-align:right;font-weight:700;overflow-wrap:anywhere}.total{background:#fff3f6}.total .label{font-weight:800;color:#4a5568}.total .value{font-size:22px;color:#d51f55}.pay{background:linear-gradient(135deg,#fff0f7,#fff9fc);border:1px solid #ffd0e3}.bkash{font-size:12px;color:#7a8494}.number{font-size:25px;font-weight:900;color:#c91561;letter-spacing:1px;margin:7px 0 5px}.hint{font-size:13px;line-height:1.55;color:#687386}.btn{width:100%;border:0;border-radius:14px;padding:15px;margin-top:13px;background:#e2136e;color:#fff;font-size:16px;font-weight:800;box-shadow:0 8px 20px #e2136e44}.status{text-align:center;font-size:13px;margin-top:10px;min-height:18px;color:#087443;font-weight:700}.footer{text-align:center;color:#aebed1;font-size:11px;padding:8px}.error{background:#fff5f5;color:#a61b1b;border-radius:15px;padding:18px;text-align:center}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:linear-gradient(150deg,#06101d 0%,#102943 48%,#07111f 100%);font-family:Arial,sans-serif;color:#172033}.wrap{max-width:520px;margin:auto;padding:18px 14px 30px}.hero{text-align:center;color:#fff;padding:10px 8px 20px}.logo{width:84px;height:84px;object-fit:contain;background:#fff;padding:5px;border-radius:24px;box-shadow:0 12px 35px #0007}.brand{font-size:25px;font-weight:900;letter-spacing:.6px;margin-top:11px}.tag{margin-top:4px;color:#b9c9dc;font-size:13px}.card{background:#fff;border-radius:23px;padding:20px;margin:13px 0;box-shadow:0 14px 38px #0005}.heading{font-size:18px;font-weight:800;margin:0 0 14px}.rows{border:1px solid #e9edf3;border-radius:16px;overflow:hidden}.row{display:flex;justify-content:space-between;gap:16px;padding:13px 14px;border-bottom:1px solid #e9edf3;font-size:14px}.row:last-child{border-bottom:0}.label{color:#718096}.value{text-align:right;font-weight:700;overflow-wrap:anywhere}.total{background:#fff3f6}.total .label{font-weight:800;color:#4a5568}.total .value{font-size:22px;color:#d51f55}.pay{background:linear-gradient(135deg,#fff0f7,#fff9fc);border:1px solid #ffd0e3}.bkash{font-size:12px;color:#7a8494}.number{font-size:25px;font-weight:900;color:#c91561;letter-spacing:1px;margin:7px 0 5px}.hint{font-size:13px;line-height:1.55;color:#687386}.btn{width:100%;border:0;border-radius:14px;padding:15px;margin-top:13px;background:#e2136e;color:#fff;font-size:16px;font-weight:800;box-shadow:0 8px 20px #e2136e44}.btn.secondary{background:#f1f4f8;color:#24344d;box-shadow:none}.status{text-align:center;font-size:13px;margin-top:10px;min-height:18px;color:#087443;font-weight:700}.footer{text-align:center;color:#aebed1;font-size:11px;padding:8px}.error{background:#fff5f5;color:#a61b1b;border-radius:15px;padding:18px;text-align:center}.secure{margin-top:12px;text-align:center;color:#64748b;font-size:11px}.spinner{display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;vertical-align:-2px;animation:spin .7s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body><div class="wrap">
 <header class="hero"><img class="logo" src="logo.svg" alt="STAR COMMUNICATION" onerror="this.style.display='none'"><div class="brand">STAR COMMUNICATION</div><div class="tag">Customer Bill Payment Link</div></header>
 <main id="app"></main><div class="footer">STAR COMMUNICATION • Internet Service Provider</div></div>
 <script>
-const q=new URLSearchParams(location.search);const code=(q.get('code')||'').trim();const merchant=(q.get('merchant')||'01897-099850').trim();
-const c={name:q.get('name')||'Customer',location:q.get('location')||'-',package:q.get('package')||'-',bill:Number(q.get('bill')||0),previousDue:Number(q.get('prev')||0),totalDue:Number(q.get('total')||0)};const app=document.getElementById('app');
-const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));const money=n=>'৳'+Number(n||0).toLocaleString('en-BD');
-if(!code){app.innerHTML='<section class="card"><div class="error"><h2>Invalid Payment Link</h2><p>Please open the payment link provided by STAR COMMUNICATION.</p></div></section>'}else{app.innerHTML=`
+const q=new URLSearchParams(location.search);
+const code=(q.get('code')||'').trim();
+const merchant=(q.get('merchant')||'01897-099850').trim();
+const apiBase=(q.get('api')||'').trim().replace(/\/$/,'');
+const c={name:q.get('name')||'Customer',location:q.get('location')||'-',package:q.get('package')||'-',bill:Number(q.get('bill')||0),previousDue:Number(q.get('prev')||0),totalDue:Number(q.get('total')||0)};
+const app=document.getElementById('app');
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const money=n=>'৳'+Number(n||0).toLocaleString('en-BD');
+if(!code){app.innerHTML='<section class="card"><div class="error"><h2>Invalid Payment Link</h2><p>Please open the payment link provided by STAR COMMUNICATION.</p></div></section>'}
+else{
+app.innerHTML=`
 <section class="card"><h2 class="heading">📄 Bill Details</h2><div class="rows">
 <div class="row"><span class="label">Customer ID</span><span class="value">${esc(code)}</span></div>
 <div class="row"><span class="label">Customer Name</span><span class="value">${esc(c.name)}</span></div>
@@ -24,7 +31,26 @@ if(!code){app.innerHTML='<section class="card"><div class="error"><h2>Invalid Pa
 <div class="row"><span class="label">Monthly Bill</span><span class="value">${money(c.bill)}</span></div>
 <div class="row"><span class="label">Previous Due</span><span class="value">${money(c.previousDue)}</span></div>
 <div class="row total"><span class="label">Total Due</span><span class="value">${money(c.totalDue)}</span></div></div></section>
-<section class="card pay"><h2 class="heading">💳 bKash Merchant Payment</h2><div class="bkash">bKash Merchant Number</div><div class="number">${esc(merchant)}</div><div class="hint">Send your bill payment to the <b>bKash Merchant Number</b> above. Use <b>${esc(code)}</b> as your payment reference.</div><button class="btn" id="copy">Copy bKash Merchant Number</button><div class="status" id="status"></div></section>`;
-document.getElementById('copy').onclick=()=>{const s=document.getElementById('status');if(navigator.clipboard){navigator.clipboard.writeText(merchant).then(()=>s.textContent='✓ bKash Merchant Number copied').catch(()=>fallback(s))}else fallback(s)};}
+<section class="card pay"><h2 class="heading">💳 Pay with bKash</h2><div class="bkash">bKash Merchant</div><div class="number">${esc(merchant)}</div><div class="hint">Your payment will be linked to <b>${esc(code)}</b>. The real checkout will verify the amount and return a transaction status.</div>
+<button class="btn" id="payNow">Pay with bKash</button>
+<button class="btn secondary" id="copy">Copy bKash Merchant Number</button>
+<div class="status" id="status"></div><div class="secure">🔒 Secure checkout • Amount: <b>${money(c.totalDue)}</b></div></section>`;
+
+document.getElementById('payNow').onclick=startPayment;
+document.getElementById('copy').onclick=()=>{const s=document.getElementById('status');if(navigator.clipboard){navigator.clipboard.writeText(merchant).then(()=>s.textContent='✓ bKash Merchant Number copied').catch(()=>fallback(s))}else fallback(s)};
+}
+async function startPayment(){
+ const btn=document.getElementById('payNow'),s=document.getElementById('status');
+ if(!apiBase){s.textContent='Real checkout backend is not connected yet.';return}
+ const amount=Number(c.totalDue||0);
+ if(!Number.isFinite(amount)||amount<=0){s.textContent='No payable amount found.';return}
+ btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Connecting to bKash...';s.textContent='';
+ try{
+   const r=await fetch(apiBase+'/api/bkash/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customerCode:code,customerName:c.name,amount:amount,merchantInvoiceNumber:'SC-'+code+'-'+Date.now()})});
+   const data=await r.json().catch(()=>({}));
+   if(!r.ok||!data.bkashURL)throw new Error(data.error||'Unable to start bKash checkout');
+   location.href=data.bkashURL;
+ }catch(e){s.textContent=e.message||'Payment service unavailable.';btn.disabled=false;btn.textContent='Pay with bKash'}
+}
 function fallback(s){const t=document.createElement('textarea');t.value=merchant;document.body.appendChild(t);t.select();try{document.execCommand('copy');s.textContent='✓ bKash Merchant Number copied'}catch(e){s.textContent='bKash Merchant: '+merchant}t.remove()}
 </script></body></html>
