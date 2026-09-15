@@ -52,6 +52,7 @@ jobs:
           python3 tools/patch_final_customer_fix.py
           python3 tools/patch_growth_expectation.py
           python3 tools/patch_customer_view_edit.py
+          python3 tools/patch_payment_link_actions.py
           python3 tools/patch_sms_csv_import.py
           python3 tools/patch_native_storage.py
           python3 tools/patch_update_data_migration.py
