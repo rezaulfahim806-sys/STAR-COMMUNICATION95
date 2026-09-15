@@ -16,6 +16,7 @@ const q=new URLSearchParams(location.search);
 const code=(q.get('code')||'').trim();
 const merchant=(q.get('merchant')||'01897-099850').trim();
 const apiBase=(q.get('api')||'').trim().replace(/\/$/,'');
+const customerMobile=(q.get('mobile')||'').trim();
 const c={name:q.get('name')||'Customer',location:q.get('location')||'-',package:q.get('package')||'-',bill:Number(q.get('bill')||0),previousDue:Number(q.get('prev')||0),totalDue:Number(q.get('total')||0)};
 const app=document.getElementById('app');
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -31,7 +32,7 @@ app.innerHTML=`
 <div class="row"><span class="label">Monthly Bill</span><span class="value">${money(c.bill)}</span></div>
 <div class="row"><span class="label">Previous Due</span><span class="value">${money(c.previousDue)}</span></div>
 <div class="row total"><span class="label">Total Due</span><span class="value">${money(c.totalDue)}</span></div></div></section>
-<section class="card pay"><h2 class="heading">💳 Pay with bKash</h2><div class="bkash">bKash Merchant</div><div class="number">${esc(merchant)}</div><div class="hint">Your payment will be linked to <b>${esc(code)}</b>. The real checkout will verify the amount and return a transaction status.</div>
+<section class="card pay"><h2 class="heading">💳 Pay with bKash</h2><div class="bkash">bKash Merchant</div><div class="number">${esc(merchant)}</div><div class="hint">Your payment will be linked to <b>${esc(code)}</b>. After bKash verifies a successful payment, the customer confirmation SMS can be sent automatically.</div>
 <button class="btn" id="payNow">Pay with bKash</button>
 <button class="btn secondary" id="copy">Copy bKash Merchant Number</button>
 <div class="status" id="status"></div><div class="secure">🔒 Secure checkout • Amount: <b>${money(c.totalDue)}</b></div></section>`;
@@ -46,7 +47,7 @@ async function startPayment(){
  if(!Number.isFinite(amount)||amount<=0){s.textContent='No payable amount found.';return}
  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Connecting to bKash...';s.textContent='';
  try{
-   const r=await fetch(apiBase+'/api/bkash/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customerCode:code,customerName:c.name,amount:amount,merchantInvoiceNumber:'SC-'+code+'-'+Date.now()})});
+   const r=await fetch(apiBase+'/api/bkash/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customerCode:code,customerName:c.name,customerMobile:customerMobile,amount:amount,merchantInvoiceNumber:'SC-'+code+'-'+Date.now()})});
    const data=await r.json().catch(()=>({}));
    if(!r.ok||!data.bkashURL)throw new Error(data.error||'Unable to start bKash checkout');
    location.href=data.bkashURL;
