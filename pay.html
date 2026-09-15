@@ -1,22 +1,14 @@
 <!doctype html>
-<html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b2145"><title>STAR COMMUNICATION - Customer Payment</title>
-<style>body{margin:0;background:#f4f7fb;font-family:Arial,sans-serif;color:#172033}.wrap{max-width:480px;margin:auto;padding:18px}.card{background:#fff;border-radius:18px;padding:20px;margin:12px 0;box-shadow:0 4px 18px #00000012}.logoBox{width:76px;height:76px;margin:auto;border-radius:18px;background:#0b2145;color:#fff;display:flex;align-items:center;justify-content:center;font-size:25px;font-weight:900}.brand{text-align:center}.brand h1{font-size:22px;margin:8px 0 3px}.muted{color:#718096;font-size:14px}.row{display:flex;justify-content:space-between;gap:16px;padding:11px 0;border-bottom:1px solid #edf0f5}.row:last-child{border-bottom:0}.row b{text-align:right}.due{font-size:22px;color:#c62828}.bkash{background:#fdf1f7}.btn{width:100%;border:0;border-radius:12px;padding:14px;font-size:16px;font-weight:700;background:#e2136e;color:#fff;margin-top:10px}.note{font-size:13px;line-height:1.5;color:#687386}</style></head>
-<body><div class="wrap"><div class="card brand"><div class="logoBox">SC</div><h1>STAR COMMUNICATION</h1><div class="muted">Customer Bill Payment</div></div><div id="app"></div>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>STAR COMMUNICATION - Customer Payment</title>
+<style>body{margin:0;background:#f4f7fb;font-family:Arial,sans-serif;color:#172033}.wrap{max-width:480px;margin:auto;padding:18px}.card{background:#fff;border-radius:18px;padding:20px;margin:12px 0;box-shadow:0 4px 18px #00000012}.logo{width:76px;height:76px;display:block;margin:auto;border-radius:18px}.brand{text-align:center}.brand h1{font-size:22px;margin:8px 0 3px}.muted{color:#718096;font-size:14px}.row{display:flex;justify-content:space-between;gap:16px;padding:11px 0;border-bottom:1px solid #edf0f5}.row:last-child{border-bottom:0}.row b{text-align:right}.due{font-size:22px;color:#c62828}.bkash{background:#fdf1f7}.btn{width:100%;border:0;border-radius:12px;padding:14px;font-size:16px;font-weight:700;background:#e2136e;color:#fff;margin-top:10px}.note{font-size:13px;line-height:1.5;color:#687386}</style></head>
+<body><div class="wrap"><div class="card brand"><img class="logo" src="logo.svg" onerror="this.style.display='none'"><h1>STAR COMMUNICATION</h1><div class="muted">Customer Bill Payment</div></div><div id="app"></div></div>
 <script>
-const p=new URLSearchParams(location.search);
-const code=(p.get('code')||'').trim();
-const name=p.get('name')||'Customer';
-const loc=p.get('location')||'-';
-const pkg=p.get('package')||'-';
-const bill=Number(p.get('bill')||0);
-const previousDue=Number(p.get('previousDue')||0);
-const totalDue=Number(p.get('totalDue')||0);
-const merchant=p.get('merchant')||'01897-099850';
-const app=document.getElementById('app');
-function esc(s){return String(s).replace(/[&<>\"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[m]));}
-function money(n){return '৳'+Number(n||0).toLocaleString('en-BD');}
-if(!code){app.innerHTML='<div class="card"><h2>Invalid payment link</h2><p class="muted">Please contact STAR COMMUNICATION.</p></div>'}
-else{app.innerHTML='<div class="card"><div class="row"><span>Client Code</span><b>'+esc(code)+'</b></div><div class="row"><span>Customer Name</span><b>'+esc(name)+'</b></div><div class="row"><span>Location</span><b>'+esc(loc)+'</b></div><div class="row"><span>Package</span><b>'+esc(pkg)+'</b></div><div class="row"><span>Monthly Bill</span><b>'+money(bill)+'</b></div><div class="row"><span>Previous Due</span><b>'+money(previousDue)+'</b></div><div class="row"><span>Total Due</span><b class="due">'+money(totalDue)+'</b></div></div><div class="card bkash"><h3>💳 bKash Payment</h3><div class="row"><span>Payment Number</span><b>'+esc(merchant)+'</b></div><p class="note">Send your payment to the number above and use your Client Code as reference.</p><button class="btn" onclick="pay()">Copy bKash Number</button></div>'}
-function pay(){if(navigator.clipboard)navigator.clipboard.writeText(merchant).then(()=>alert('bKash payment number copied.'));else alert('bKash: '+merchant);}
-</script></div></body></html>
+const q=new URLSearchParams(location.search), code=(q.get('code')||'').trim();
+const c={name:q.get('name')||'Customer',location:q.get('location')||'',package:q.get('package')||'-',bill:Number(q.get('bill')||0),previousDue:Number(q.get('prev')||0),totalDue:Number(q.get('total')||0)};
+const merchant=q.get('merchant')||'01897-099850'; const app=document.getElementById('app');
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const money=n=>'৳'+Number(n||0).toLocaleString('en-BD');
+if(!code){app.innerHTML='<div class="card"><h2>Payment link invalid</h2><p class="muted">Please use the payment link sent by STAR COMMUNICATION.</p></div>'}
+else {app.innerHTML=`<div class="card"><div class="row"><span>Client Code</span><b>${esc(code)}</b></div><div class="row"><span>Customer Name</span><b>${esc(c.name)}</b></div><div class="row"><span>Location</span><b>${esc(c.location||'-')}</b></div><div class="row"><span>Package</span><b>${esc(c.package)}</b></div><div class="row"><span>Monthly Bill</span><b>${money(c.bill)}</b></div><div class="row"><span>Previous Due</span><b>${money(c.previousDue)}</b></div><div class="row"><span>Total Due</span><b class="due">${money(c.totalDue)}</b></div></div><div class="card bkash"><h3>💳 bKash Payment</h3><div class="row"><span>Payment Number</span><b>${esc(merchant)}</b></div><p class="note">Send your payment to the number above and use your Client Code as reference.</p><button class="btn" onclick="pay()">Copy bKash Number</button></div>`}
+function pay(){if(navigator.clipboard){navigator.clipboard.writeText(merchant).then(()=>alert('bKash payment number copied.'))}else alert('bKash: '+merchant)}
+</script></body></html>
