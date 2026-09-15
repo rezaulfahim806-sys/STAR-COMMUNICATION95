@@ -54,9 +54,25 @@ public class MainActivity extends Activity {
         webView.setWebViewClient(new WebViewClient(){
             @Override public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r){return handleUrl(r.getUrl().toString());}
             @Override public boolean shouldOverrideUrlLoading(WebView v,String u){return handleUrl(u);}
-            @Override public void onPageFinished(WebView v,String u){super.onPageFinished(v,u);injectFeatures();}
+            @Override public void onPageFinished(WebView v,String u){super.onPageFinished(v,u);migrateStorage(v);injectFeatures();}
         });
         webView.loadUrl("file:///android_asset/index.html");
+    }
+
+    private void migrateStorage(WebView v){
+        String js="javascript:(function(){try{"+
+                "if(localStorage.getItem('star_communication_migration_v1_v2_done')==='1')return;"+
+                "var oldRaw=localStorage.getItem('star_communication_final_v1');if(!oldRaw)return;"+
+                "var oldData=JSON.parse(oldRaw),newRaw=localStorage.getItem('star_communication_final_v2'),newData=null;"+
+                "try{newData=newRaw?JSON.parse(newRaw):null}catch(e){newData=null}"+
+                "if(!newData||!Array.isArray(newData.customers)||newData.customers.length===0){localStorage.setItem('star_communication_final_v2',oldRaw)}else{"+
+                "['customers','payments','expenses','pending','history'].forEach(function(k){var a=Array.isArray(newData[k])?newData[k]:[],b=Array.isArray(oldData[k])?oldData[k]:[],seen={};a.forEach(function(x){if(x&&x.id!=null)seen[String(x.id)]=1});b.forEach(function(x){if(!x||x.id==null||!seen[String(x.id)]){a.push(x);if(x&&x.id!=null)seen[String(x.id)]=1}});newData[k]=a});"+
+                "newData.settings=Object.assign({},oldData.settings||{},newData.settings||{});"+
+                "if(oldData.settings&&oldData.settings.olt)newData.settings.olt=Object.assign({},oldData.settings.olt||{},(newData.settings||{}).olt||{});"+
+                "localStorage.setItem('star_communication_final_v2',JSON.stringify(newData));}"+
+                "localStorage.setItem('star_communication_migration_v1_v2_done','1');location.reload();"+
+                "}catch(e){console.log('STAR migration failed',e)}})();";
+        v.evaluateJavascript(js,null);
     }
 
     private boolean handleUrl(String u){
