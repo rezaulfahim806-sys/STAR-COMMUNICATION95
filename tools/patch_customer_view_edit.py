@@ -3,58 +3,59 @@ from pathlib import Path
 p = Path('app/src/main/assets/index.html')
 s = p.read_text(encoding='utf-8')
 
-js = r'''<script>
-(function(){
-window.card=function(c){
-  var dv=due(c), num=esc(c.phone||'');
-  return `<div class="customer"><div class="cmain"><div class="avatar">${esc((c.name||'?')[0].toUpperCase())}</div><div class="grow"><div class="name">${esc(c.name||'')}</div><div class="muted">${esc(c.clientCode||'')} • ${num} • ${esc(c.pkg||'')}</div></div><span class="badge ${c.status}">${String(c.status||'').toUpperCase()}</span></div><div class="actions">${billBadge(c)}</div><div class="detail"><span>Monthly Bill</span><b>${money(c.fee)}</b></div><div class="detail"><span>Total Due</span><b>${money(dv)}</b></div><div class="actions"><button class="small view" onclick="go('details',{id:'${c.id}'})">👁 View</button><button class="small btn light" onclick="editCustomer('${c.id}')">✏️ Edit</button><button class="small call" onclick="callCustomer('${num}')">📞 Call</button><button class="small wa" onclick="waCustomer('${num}')">WhatsApp</button><button class="small" style="background:#1677d2;color:#fff" onclick="sendCustomerSMS('${c.id}')">📨 Send SMS</button>${dv>0?`<button class="small pay" onclick="payCustomer('${c.id}')">Pay</button>`:''}</div></div>`;
-};
-window.sendCustomerSMS=function(id){
-  var c=d.customers.find(function(x){return String(x.id)===String(id);});
-  if(!c){toast('Customer not found');return;}
-  if(!c.phone){toast('Customer mobile number নেই');return;}
-  openSheet(`<h3>📨 Send SMS</h3><div class="muted"><b>${esc(c.name||'Customer')}</b> • ${esc(c.phone)}</div><textarea id="singleSmsMsg" class="input" rows="5" placeholder="Write SMS message"></textarea><button class="btn full" style="margin-top:6px" onclick="sendSingleCustomerSMS('${c.id}')">📨 Send SMS from SIM 2</button><button class="btn light full" style="margin-top:7px" onclick="closeSheet()">Cancel</button>`);
-};
-window.sendSingleCustomerSMS=function(id){
-  var c=d.customers.find(function(x){return String(x.id)===String(id);});
-  var msg=(document.getElementById('singleSmsMsg')||{}).value||'';
-  if(!c||!c.phone){toast('Customer mobile number নেই');return;}
-  if(!msg.trim()){toast('Write a message first');return;}
-  try{
-    if(window.AndroidBridge && AndroidBridge.sendSmsFromSim2){AndroidBridge.sendSmsFromSim2(String(c.phone),String(msg));}
-    else if(window.AndroidBridge && AndroidBridge.sendSms){AndroidBridge.sendSms(String(c.phone),String(msg));}
-    else {toast('SIM SMS is not available');return;}
-    d.smsSentCount=Number(d.smsSentCount||0)+1;save();closeSheet();toast('SMS sent from SIM 2');
-  }catch(e){toast('SMS failed: '+(e.message||'unknown error'));}
-};
-window.editCustomer=function(id){
-  var c=d.customers.find(function(x){return String(x.id)===String(id);});
-  if(!c){toast('Customer not found');return;}
-  openSheet(`<h3>✏️ Edit Customer</h3><input id="encc" class="input" value="${esc(c.clientCode||'')}" placeholder="Client Code"><input id="enn" class="input" value="${esc(c.name||'')}" placeholder="Customer name"><input id="enp" class="input" value="${esc(c.phone||'')}" placeholder="Mobile / WhatsApp"><input id="ena" class="input" value="${esc(c.address||'')}" placeholder="Address"><input id="enpkg" class="input" value="${esc(c.pkg||'')}" placeholder="Package / Mbps"><input id="enfee" class="input" type="number" value="${Number(c.fee||0)}" placeholder="Monthly fee"><input id="enpp" class="input" value="${esc(c.pppoeUser||c.pppoe||'')}" placeholder="PPPoE username"><input id="enpw" class="input" value="${esc(c.pppoePass||c.pppoePassword||'')}" placeholder="PPPoE password"><input id="enonu" class="input" value="${esc(c.onu||'')}" placeholder="ONU ID"><label class="muted">Connection Date</label><input id="encd" class="input" type="date" value="${esc(c.connectionDate||'')}"><label class="muted">Expiry Date</label><input id="enex" class="input" type="date" value="${esc(c.expiry||'')}"><input id="enprev" class="input" type="number" value="${Number(c.prevDue||0)}" placeholder="Previous due"><select id="enst" class="select"><option value="active" ${c.status==='active'?'selected':''}>Active</option><option value="inactive" ${c.status==='inactive'?'selected':''}>Inactive</option><option value="expired" ${c.status==='expired'?'selected':''}>Expired</option></select><button class="btn green full" onclick="saveCustomerEdit('${c.id}')">Save Changes</button><button class="btn light full" onclick="closeSheet()">Cancel</button>`);
-};
-window.saveCustomerEdit=function(id){
-  var c=d.customers.find(function(x){return String(x.id)===String(id);});
-  if(!c)return;
-  var val=function(id){var e=document.getElementById(id);return e?e.value:'';};
-  var code=val('encc').trim().toUpperCase(), name=val('enn').trim(), phone=val('enp').trim();
-  if(!name||!phone){toast('Name and mobile required');return;}
-  if(!code)code=c.clientCode||('SC'+String(d.customers.indexOf(c)+1).padStart(3,'0'));
-  var dup=d.customers.some(function(x){return String(x.id)!==String(c.id)&&String(x.clientCode||'').toUpperCase()===code;});
-  if(dup){toast('Client Code already exists');return;}
-  c.clientCode=code;c.name=name;c.phone=phone;c.address=val('ena').trim();c.pkg=val('enpkg').trim();c.fee=Number(val('enfee')||0);c.pppoeUser=val('enpp').trim();c.pppoePass=val('enpw');c.onu=val('enonu').trim();c.connectionDate=val('encd')||c.connectionDate||today();c.expiry=val('enex');c.prevDue=Number(val('enprev')||0);c.status=val('enst')||'active';if(c.expiry&&c.expiry<today())c.status='expired';save();closeSheet();toast('Customer updated');render();
-};
-window.details=function(){
-  var c=d.customers.find(function(x){return String(x.id)===String(opts.id);});
-  if(!c){go('customers');return;}
-  var hist=(d.payments||[]).filter(function(x){return String(x.customer)===String(c.id);}).sort(function(a,b){return String(b.date).localeCompare(String(a.date));});
-  return `<h1 class="title">Customer Details</h1><div class="actions"><button class="small view" onclick="go('customers')">← Back</button><button class="small btn light" onclick="editCustomer('${c.id}')">✏️ Edit Customer</button></div><div class="customer"><div class="cmain"><div class="avatar">${esc((c.name||'?')[0].toUpperCase())}</div><div class="grow"><div class="name">${esc(c.name||'')}</div><div class="muted">Client Code: ${esc(c.clientCode||'—')} • ${esc(c.phone||'')}</div></div><span class="badge ${c.status}">${String(c.status||'').toUpperCase()}</span></div><div class="detail"><span>Client Code</span><b>${esc(c.clientCode||'—')}</b></div><div class="detail"><span>Mobile / WhatsApp</span><b>${esc(c.phone||'—')}</b></div><div class="detail"><span>Address</span><b>${esc(c.address||'—')}</b></div><div class="detail"><span>Package / Mbps</span><b>${esc(c.pkg||'—')}</b></div><div class="detail"><span>Monthly Bill</span><b>${money(c.fee)}</b></div><div class="detail"><span>PPPoE Username</span><b>${esc(c.pppoeUser||c.pppoe||'—')}</b></div><div class="detail"><span>PPPoE Password</span><b>${esc(c.pppoePass||c.pppoePassword||'—')}</b></div><div class="detail"><span>ONU ID</span><b>${esc(c.onu||'—')}</b></div><div class="detail"><span>Connection Date</span><b>${esc(c.connectionDate||'—')}</b></div><div class="detail"><span>Expiry Date</span><b>${esc(c.expiry||'—')}</b></div><div class="detail"><span>Previous Due</span><b>${money(c.prevDue)}</b></div><div class="detail"><span>Running Bill</span><b>${money(billDue(c))}</b></div><div class="detail"><span>Total Due</span><b>${money(due(c))}</b></div><div class="actions"><button class="small call" onclick="callCustomer('${esc(c.phone||'')}')">📞 Call</button><button class="small wa" onclick="waCustomer('${esc(c.phone||'')}')">WhatsApp</button><button class="small" style="background:#1677d2;color:#fff" onclick="sendCustomerSMS('${c.id}')">📨 Send SMS</button>${due(c)>0?`<button class="small pay" onclick="payCustomer('${c.id}')">Customer Bill Payment</button>`:''}</div></div><div class="section"><h3>Payment History</h3>${hist.length?hist.map(function(x){return `<div class="detail"><span>${esc(x.date||'')} • ${esc(x.month||'')} • ${esc(x.source||'manual')}</span><b>${money(x.amount)}</b></div>`;}).join(''):'<div class="muted">No payments yet.</div>'}</div>`;
-};
-})();
-</script>'''
+# Extend the existing customer card with per-customer payment-link actions.
+s = s.replace(
+'''<button class="small" style="background:#1677d2;color:#fff" onclick="sendCustomerSMS('${c.id}')">📨 Send SMS</button>${dv>0?`<button class="small pay" onclick="payCustomer('${c.id}')">Pay</button>`:''}''',
+'''<button class="small" style="background:#1677d2;color:#fff" onclick="sendCustomerSMS('${c.id}')">📨 Send SMS</button><button class="small" style="background:#7656d6;color:#fff" onclick="generatePaymentLink('${c.id}')">🔗 Payment Link</button>${dv>0?`<button class="small pay" onclick="payCustomer('${c.id}')">Pay</button>`:''}''')
 
-if 'window.sendCustomerSMS=function(id)' not in s:
-    s=s.replace('</body>',js+'</body>',1)
-    print('Customer View/Edit + Send SMS patch applied')
-else:
-    print('Customer View/Edit + Send SMS patch already present')
+# Add link UI/functions to the existing injected customer tools.
+insert = r'''<script>
+(function(){
+  function paymentLinkFor(c){
+    var base=location.origin + location.pathname.replace(/[^/]*$/, '') + 'pay.html';
+    var q=new URLSearchParams();
+    q.set('code',String(c.clientCode||c.id||''));
+    q.set('name',String(c.name||''));
+    q.set('location',String(c.address||c.location||''));
+    q.set('package',String(c.pkg||c.packageName||''));
+    q.set('bill',String(Number(c.fee||c.monthlyFee||0)));
+    q.set('previousDue',String(Number(c.prevDue||0)));
+    q.set('totalDue',String(typeof due==='function'?due(c):Number(c.prevDue||0)+Number(c.fee||0)));
+    q.set('merchant',String((d.settings&&d.settings.merchantNumber)||'01897-099850'));
+    return base+'?'+q.toString();
+  }
+  window.customerPaymentLink=paymentLinkFor;
+  window.generatePaymentLink=function(id){
+    var c=d.customers.find(function(x){return String(x.id)===String(id);});
+    if(!c){toast('Customer not found');return;}
+    var link=paymentLinkFor(c);
+    openSheet('<h3>🔗 Customer Payment Link</h3><div class="muted">'+esc(c.clientCode||'')+' • '+esc(c.name||'')+'</div><input id="customerPayLink" class="input" readonly value="'+esc(link)+'"><button class="btn full" onclick="copyCustomerPaymentLink()">📋 Copy Link</button><button class="btn green full" style="margin-top:7px" onclick="sendPaymentLinkSMS(\''+String(c.id).replace(/'/g,"\\'")+"\')">📨 Send Payment Link SMS</button><button class="btn light full" style="margin-top:7px" onclick="closeSheet()">Close</button>');
+  };
+  window.copyCustomerPaymentLink=function(){
+    var e=document.getElementById('customerPayLink');if(!e)return;
+    if(navigator.clipboard){navigator.clipboard.writeText(e.value).then(function(){toast('Payment link copied');});}
+    else {e.select();document.execCommand('copy');toast('Payment link copied');}
+  };
+  window.sendPaymentLinkSMS=function(id){
+    var c=d.customers.find(function(x){return String(x.id)===String(id);});
+    if(!c||!c.phone){toast('Customer mobile number নেই');return;}
+    var link=paymentLinkFor(c);
+    var total=typeof due==='function'?due(c):Number(c.prevDue||0)+Number(c.fee||0);
+    var msg='STAR COMMUNICATION: '+(c.name||'Customer')+' আপনার বিল পরিশোধ করুন। Client Code: '+(c.clientCode||c.id)+'. Total Due: '+money(total)+'. Payment Link: '+link;
+    try{
+      if(window.AndroidBridge&&AndroidBridge.sendSmsFromSim2)AndroidBridge.sendSmsFromSim2(String(c.phone),msg);
+      else if(window.AndroidBridge&&AndroidBridge.sendSms)AndroidBridge.sendSms(String(c.phone),msg);
+      else {toast('SIM SMS is not available');return;}
+      d.smsSentCount=Number(d.smsSentCount||0)+1;save();closeSheet();toast('Payment link SMS sent');
+    }catch(e){toast('SMS failed: '+(e.message||'unknown error'));}
+  };
+})();
+</script>
+'''
+if 'window.customerPaymentLink=paymentLinkFor' not in s:
+    s=s.replace('</body>',insert+'</body>',1)
+
+# Keep the existing Customer View/Edit + SMS implementation intact.
+# The patch is intentionally additive to avoid replacing the working customer UI.
 p.write_text(s,encoding='utf-8')
+print('Customer payment link generate/copy/SMS actions added')
