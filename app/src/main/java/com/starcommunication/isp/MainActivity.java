@@ -166,9 +166,8 @@ public class MainActivity extends Activity {
                 try {
                     JSONObject packet=new JSONObject(payload==null?"{}":payload);
                     String title=packet.optString("title","Customer List");
-                    JSONArray arr=packet.optJSONArray("rows");
-                    if(arr==null) arr=new JSONArray();
-                    String safe=(title==null||title.trim().isEmpty()?"Customer List":title).replaceAll("[^A-Za-z0-9 _-]","_");
+                    JSONArray arr=packet.optJSONArray("rows"); if(arr==null) arr=new JSONArray();
+                    String safe=title.replaceAll("[^A-Za-z0-9 _-]","_");
                     String stamp=new SimpleDateFormat("yyyyMMdd_HHmmss",Locale.US).format(new Date());
                     ContentValues values=new ContentValues();
                     values.put(MediaStore.Downloads.DISPLAY_NAME,"STAR-COMMUNICATION-"+safe+"-"+stamp+".pdf");
@@ -178,80 +177,63 @@ public class MainActivity extends Activity {
                     if(uri==null) throw new Exception("PDF file could not be created");
 
                     PdfDocument doc=new PdfDocument();
-                    final int W=842,H=595, PER_PAGE=20;
-                    Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
-                    Paint bold=new Paint(Paint.ANTI_ALIAS_FLAG);
+                    final int W=842,H=595,PER_PAGE=20;
+                    Paint p=new Paint(Paint.ANTI_ALIAS_FLAG), bold=new Paint(Paint.ANTI_ALIAS_FLAG);
                     bold.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
                     int totalPages=Math.max(1,(arr.length()+PER_PAGE-1)/PER_PAGE);
+
+                    // 13 separate columns: every requested customer field is visible.
+                    String[] heads={"#","NAME","LOCATION","PACKAGE","BILL","CODE","NUMBER","PPPoE USER","PPPoE PASS","ONU MAC","PREV DUE","TOTAL DUE","STATUS"};
+                    int[] x={20,43,103,177,231,273,315,367,431,495,560,630,705};
 
                     for(int pageNo=0;pageNo<totalPages;pageNo++){
                         PdfDocument.Page page=doc.startPage(new PdfDocument.PageInfo.Builder(W,H,pageNo+1).create());
                         android.graphics.Canvas cv=page.getCanvas();
+                        p.setStyle(Paint.Style.FILL); p.setColor(Color.rgb(11,33,69)); cv.drawRect(0,0,W,68,p);
+                        bold.setColor(Color.WHITE); bold.setTextSize(20); cv.drawText("STAR COMMUNICATION",20,27,bold);
+                        bold.setTextSize(10); cv.drawText(title,20,47,bold);
+                        p.setColor(Color.rgb(22,119,210)); cv.drawRoundRect(700,15,822,51,16,16,p);
+                        bold.setColor(Color.WHITE); bold.setTextSize(9); cv.drawText("PAGE "+(pageNo+1)+" / "+totalPages,716,37,bold);
 
-                        // Header
-                        p.setStyle(Paint.Style.FILL); p.setColor(Color.rgb(11,33,69)); cv.drawRect(0,0,W,70,p);
-                        bold.setColor(Color.WHITE); bold.setTextSize(21); cv.drawText("STAR COMMUNICATION",24,29,bold);
-                        bold.setTextSize(11); cv.drawText(title,24,50,bold);
-                        p.setColor(Color.rgb(22,119,210)); cv.drawRoundRect(690,16,818,53,18,18,p);
-                        bold.setColor(Color.WHITE); bold.setTextSize(10); cv.drawText("PAGE "+(pageNo+1)+" / "+totalPages,711,39,bold);
+                        int top=80,left=14,right=828;
+                        p.setColor(Color.rgb(226,235,246)); cv.drawRoundRect(left,top,right,top+27,5,5,p);
+                        bold.setColor(Color.rgb(11,50,90)); bold.setTextSize(6.8f);
+                        for(int k=0;k<heads.length;k++) cv.drawText(heads[k],x[k],top+17,bold);
 
-                        // Table header
-                        int top=84, left=18, right=824;
-                        p.setColor(Color.rgb(226,235,246)); cv.drawRoundRect(left,top,right,top+28,6,6,p);
-                        bold.setColor(Color.rgb(11,50,90)); bold.setTextSize(8);
-                        int[] x={22,48,130,220,300,375,450,535,625,700};
-                        String[] heads={"#","CUSTOMER NAME","LOCATION","PACKAGE","BILL","CLIENT CODE","NUMBER","PREV DUE","TOTAL DUE","STATUS"};
-                        for(int k=0;k<heads.length;k++) cv.drawText(heads[k],x[k],top+18,bold);
-
-                        int start=pageNo*PER_PAGE;
-                        int end=Math.min(arr.length(),start+PER_PAGE);
-                        int rowY=top+34;
+                        int start=pageNo*PER_PAGE,end=Math.min(arr.length(),start+PER_PAGE),rowY=top+32;
                         for(int j=start;j<end;j++){
                             JSONObject o=arr.getJSONObject(j);
-                            boolean alt=((j-start)%2)==1;
-                            p.setColor(alt?Color.rgb(249,251,253):Color.WHITE); cv.drawRect(left,rowY,right,rowY+23,p);
-                            p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(0.6f); p.setColor(Color.rgb(220,226,234)); cv.drawRect(left,rowY,right,rowY+23,p); p.setStyle(Paint.Style.FILL);
-                            p.setColor(Color.rgb(25,40,60)); p.setTextSize(7.5f);
-                            bold.setColor(Color.rgb(25,40,60)); bold.setTextSize(7.5f);
-                            cv.drawText(String.format(Locale.US,"%02d",j+1),24,rowY+15,bold);
-                            cv.drawText(shortText(o.optString("name","—"),13),48,rowY+15,bold);
-                            cv.drawText(shortText(o.optString("address","—"),14),130,rowY+15,p);
-                            cv.drawText(shortText(o.optString("pkg","—"),10),220,rowY+15,p);
-                            cv.drawText("৳"+String.format(Locale.US,"%,.0f",o.optDouble("fee",0)),300,rowY+15,p);
-                            cv.drawText(shortText(o.optString("id","—"),10),375,rowY+15,p);
-                            cv.drawText(shortText(o.optString("phone","—"),12),450,rowY+15,p);
-                            cv.drawText("৳"+String.format(Locale.US,"%,.0f",o.optDouble("prevDue",0)),535,rowY+15,p);
-                            bold.setColor(Color.rgb(185,28,28)); cv.drawText("৳"+String.format(Locale.US,"%,.0f",o.optDouble("totalDue",0)),625,rowY+15,bold);
-                            String status=o.optString("status","").toUpperCase();
-                            String t=title.toLowerCase(Locale.US);
-                            if(t.contains("unpaid")) status="UNPAID"; else if(t.contains("expired")) status="EXPIRED"; else if(t.contains("paid")) status="PAID";
-                            if(status.length()==0) status="—";
+                            p.setColor(((j-start)%2)==1?Color.rgb(249,251,253):Color.WHITE); cv.drawRect(left,rowY,right,rowY+23,p);
+                            p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(.5f); p.setColor(Color.rgb(220,226,234)); cv.drawRect(left,rowY,right,rowY+23,p); p.setStyle(Paint.Style.FILL);
+                            bold.setColor(Color.rgb(25,40,60)); bold.setTextSize(6.5f); p.setColor(Color.rgb(25,40,60)); p.setTextSize(6.5f);
+                            cv.drawText(String.format(Locale.US,"%02d",j+1),20,rowY+15,bold);
+                            cv.drawText(shortText(o.optString("name","—"),10),43,rowY+15,bold);
+                            cv.drawText(shortText(o.optString("address","—"),12),103,rowY+15,p);
+                            cv.drawText(shortText(o.optString("pkg","—"),9),177,rowY+15,p);
+                            cv.drawText("৳"+String.format(Locale.US,"%,.0f",o.optDouble("fee",0)),231,rowY+15,p);
+                            cv.drawText(shortText(o.optString("id","—"),7),273,rowY+15,p);
+                            cv.drawText(shortText(o.optString("phone","—"),11),315,rowY+15,p);
+                            cv.drawText(shortText(o.optString("pppoe","—"),10),367,rowY+15,p);
+                            cv.drawText(shortText(o.optString("pppoePassword","—"),10),431,rowY+15,p);
+                            cv.drawText(shortText(o.optString("onu","—"),10),495,rowY+15,p);
+                            cv.drawText("৳"+String.format(Locale.US,"%,.0f",o.optDouble("prevDue",0)),560,rowY+15,p);
+                            bold.setColor(Color.rgb(185,28,28)); cv.drawText("৳"+String.format(Locale.US,"%,.0f",o.optDouble("totalDue",0)),630,rowY+15,bold);
+                            String status=o.optString("status","").toUpperCase(),tt=title.toLowerCase(Locale.US);
+                            if(tt.contains("unpaid"))status="UNPAID";else if(tt.contains("expired"))status="EXPIRED";else if(tt.contains("paid"))status="PAID";
                             bold.setColor(status.equals("PAID")?Color.rgb(22,125,70):status.equals("EXPIRED")?Color.rgb(185,28,28):Color.rgb(190,110,15));
-                            cv.drawText(status,700,rowY+15,bold);
-                            rowY+=23;
+                            cv.drawText(shortText(status,10),705,rowY+15,bold); rowY+=23;
                         }
-
-                        // Footer / summary
                         p.setColor(Color.rgb(241,245,249)); cv.drawRect(left,555,right,577,p);
-                        p.setColor(Color.rgb(90,105,125)); p.setTextSize(7.5f);
-                        cv.drawText("Customers on this page: "+(end-start)+"   •   Total customers: "+arr.length(),24,569,p);
+                        p.setColor(Color.rgb(90,105,125));p.setTextSize(7);cv.drawText("Customers on this page: "+(end-start)+"   •   Total customers: "+arr.length(),20,569,p);
                         cv.drawText("Generated: "+new SimpleDateFormat("dd MMM yyyy, hh:mm a",Locale.US).format(new Date()),560,569,p);
                         doc.finishPage(page);
                     }
-
-                    OutputStream out=getContentResolver().openOutputStream(uri);
-                    if(out==null) throw new Exception("PDF output unavailable");
-                    doc.writeTo(out); out.close(); doc.close();
-
-                    Intent view=new Intent(Intent.ACTION_VIEW);
-                    view.setDataAndType(uri,"application/pdf");
-                    view.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_ACTIVITY_NEW_TASK);
-                    try{startActivity(view);}
-                    catch(Exception ex){Intent share=new Intent(Intent.ACTION_SEND);share.setType("application/pdf");share.putExtra(Intent.EXTRA_STREAM,uri);share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(share,"Open / Share PDF"));}
+                    OutputStream out=getContentResolver().openOutputStream(uri); if(out==null)throw new Exception("PDF output unavailable");
+                    doc.writeTo(out);out.close();doc.close();
+                    Intent view=new Intent(Intent.ACTION_VIEW);view.setDataAndType(uri,"application/pdf");view.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_ACTIVITY_NEW_TASK);
+                    try{startActivity(view);}catch(Exception ex){Intent share=new Intent(Intent.ACTION_SEND);share.setType("application/pdf");share.putExtra(Intent.EXTRA_STREAM,uri);share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(share,"Open / Share PDF"));}
                     Toast.makeText(MainActivity.this,"PDF saved: 20 customers per page",Toast.LENGTH_LONG).show();
-                }catch(Exception ex){
-                    Toast.makeText(MainActivity.this,"PDF তৈরি করতে সমস্যা হয়েছে: "+ex.getMessage(),Toast.LENGTH_LONG).show();
-                }
+                }catch(Exception ex){Toast.makeText(MainActivity.this,"PDF তৈরি করতে সমস্যা হয়েছে: "+ex.getMessage(),Toast.LENGTH_LONG).show();}
             });
         }
         private String shortText(String s,int max){
