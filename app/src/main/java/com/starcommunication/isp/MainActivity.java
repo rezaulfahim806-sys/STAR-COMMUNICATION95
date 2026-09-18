@@ -206,7 +206,7 @@ public class MainActivity extends Activity {
                         p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(1.2f); p.setColor(Color.rgb(215,222,232)); cv.drawRoundRect(22,98,820,570,12,12,p); p.setStyle(Paint.Style.FILL);
 
                         bold.setColor(Color.rgb(23,37,58)); bold.setTextSize(19); cv.drawText(o.optString("name","Customer"),40,128,bold);
-                        p.setTextSize(11); p.setColor(Color.rgb(105,117,136)); cv.drawText("Client ID: "+o.optString("id","—"),40,148,p);
+                        p.setTextSize(11); p.setColor(Color.rgb(105,117,136)); cv.drawText("Client Code: "+o.optString("id","—"),40,148,p);
                         String status=o.optString("status","").toUpperCase(Locale.US);
                         int sc=Color.rgb(21,128,61);
                         if("EXPIRED".equals(status)) sc=Color.rgb(185,28,28);
@@ -222,12 +222,12 @@ public class MainActivity extends Activity {
                         cv.drawRoundRect(430,202,804,324,8,8,p);
                         bold.setColor(Color.rgb(23,37,58)); bold.setTextSize(10);
                         p.setColor(Color.rgb(23,37,58)); p.setTextSize(10);
-                        cv.drawText("Mobile / WhatsApp",52,220,bold); cv.drawText(o.optString("phone","—"),52,237,p);
-                        cv.drawText("Address",52,257,bold); cv.drawText(o.optString("address","—"),52,274,p);
-                        cv.drawText("Package",52,294,bold); cv.drawText(o.optString("pkg","—"),52,311,p);
-                        cv.drawText("Monthly Bill",444,220,bold); cv.drawText("৳"+String.format(Locale.US,"%,.0f",o.optDouble("fee",0)),444,237,p);
-                        cv.drawText("Connection Date",444,257,bold); cv.drawText(o.optString("connectionDate","—"),444,274,p);
-                        cv.drawText("Expiry Date",444,294,bold); cv.drawText(o.optString("expiry","—"),444,311,p);
+                        cv.drawText("CUSTOMER NUMBER",52,220,bold); cv.drawText(o.optString("phone","—"),52,237,p);
+                        cv.drawText("LOCATION / ADDRESS",52,257,bold); cv.drawText(o.optString("address","—"),52,274,p);
+                        cv.drawText("PACKAGE",52,294,bold); cv.drawText(o.optString("pkg","—"),52,311,p);
+                        cv.drawText("MONTHLY BILL",444,220,bold); cv.drawText("৳"+String.format(Locale.US,"%,.0f",o.optDouble("fee",0)),444,237,p);
+                        cv.drawText("CONNECTION DATE",444,257,bold); cv.drawText(o.optString("connectionDate","—"),444,274,p);
+                        cv.drawText("EXPIRY DATE",444,294,bold); cv.drawText(o.optString("expiry","—"),444,311,p);
 
                         p.setColor(Color.rgb(242,246,250)); cv.drawRoundRect(38,336,804,361,7,7,p);
                         bold.setColor(Color.rgb(11,79,145)); bold.setTextSize(11); cv.drawText("INTERNET / ONU INFORMATION",50,353,bold);
