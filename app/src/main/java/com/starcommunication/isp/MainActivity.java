@@ -21,6 +21,8 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 import android.telephony.SmsManager;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import android.view.Gravity;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebResourceRequest;
@@ -165,42 +167,95 @@ public class MainActivity extends Activity {
                     values.put(MediaStore.Downloads.RELATIVE_PATH,Environment.DIRECTORY_DOWNLOADS+"/STAR COMMUNICATION");
                     Uri uri=getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,values);
                     if(uri==null) throw new Exception("PDF file could not be created");
+
                     PdfDocument doc=new PdfDocument();
-                    Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG); paint.setTextSize(8f); paint.setColor(Color.BLACK);
-                    Paint head=new Paint(Paint.ANTI_ALIAS_FLAG); head.setTextSize(16f); head.setTypeface(android.graphics.Typeface.DEFAULT_BOLD); head.setColor(Color.rgb(11,33,69));
-                    int pageNo=1; PdfDocument.Page page=null; android.graphics.Canvas canvas=null; float y=0;
-                    String[] lines=(body==null?"":body).split("\\\\n",-1);
-                    for(int i=0;i<lines.length;i++){
-                        if(page==null){
-                            page=doc.startPage(new PdfDocument.PageInfo.Builder(842,595,pageNo++).create());
-                            canvas=page.getCanvas(); y=28;
-                            canvas.drawText("STAR COMMUNICATION",24,y,head); y+=18;
-                            canvas.drawText(title==null?"Customer List":title,24,y,head); y+=18;
+                    JSONArray arr=new JSONArray(body==null?"[]":body);
+                    final int W=842,H=595;
+                    Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
+                    Paint bold=new Paint(Paint.ANTI_ALIAS_FLAG);
+                    Paint white=new Paint(Paint.ANTI_ALIAS_FLAG);
+                    bold.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+                    white.setColor(Color.WHITE);
+
+                    for(int i=0;i<Math.max(1,arr.length());i++){
+                        PdfDocument.Page page=doc.startPage(new PdfDocument.PageInfo.Builder(W,H,i+1).create());
+                        android.graphics.Canvas cv=page.getCanvas();
+
+                        // Professional header
+                        p.setColor(Color.rgb(11,33,69)); cv.drawRect(0,0,W,82,p);
+                        bold.setColor(Color.WHITE); bold.setTextSize(24); cv.drawText("STAR COMMUNICATION",28,34,bold);
+                        bold.setTextSize(12); cv.drawText(title==null?"Customer List":title,28,57,bold);
+                        p.setColor(Color.rgb(22,119,210)); cv.drawRect(650,18,814,64,p);
+                        bold.setColor(Color.WHITE); bold.setTextSize(14); cv.drawText("CUSTOMER #"+String.format(Locale.US,"%03d",i+1),672,47,bold);
+
+                        if(arr.length()==0){
+                            p.setColor(Color.DKGRAY); p.setTextSize(16); cv.drawText("No customers found.",30,125,p);
+                            doc.finishPage(page); continue;
                         }
-                        String line=lines[i]==null?"":lines[i];
-                        if(line.length()==0){y+=8; continue;}
-                        int start=0;
-                        while(start<line.length()){
-                            int end=start, last=start;
-                            while(end<line.length()){
-                                if(end-start>=125){break;}
-                                String part=line.substring(start,end+1);
-                                if(paint.measureText(part)>790)break;
-                                last=end+1; end++;
-                            }
-                            if(last<=start) last=Math.min(start+1,line.length());
-                            String part=line.substring(start,last);
-                            if(y>575){doc.finishPage(page); page=null; continue;}
-                            canvas.drawText(part,24,y,paint); y+=11; start=last;
-                        }
+
+                        JSONObject o=arr.getJSONObject(i);
+                        p.setColor(Color.WHITE); cv.drawRect(22,98,820,570,p);
+                        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(1.2f); p.setColor(Color.rgb(215,222,232)); cv.drawRoundRect(22,98,820,570,12,12,p); p.setStyle(Paint.Style.FILL);
+
+                        bold.setColor(Color.rgb(23,37,58)); bold.setTextSize(19); cv.drawText(o.optString("name","Customer"),40,128,bold);
+                        p.setTextSize(11); p.setColor(Color.rgb(105,117,136)); cv.drawText("Client ID: "+o.optString("id","—"),40,148,p);
+                        String status=o.optString("status","").toUpperCase(Locale.US);
+                        int sc=Color.rgb(21,128,61);
+                        if("EXPIRED".equals(status)) sc=Color.rgb(185,28,28);
+                        else if("INACTIVE".equals(status)) sc=Color.rgb(71,85,105);
+                        else if("UNPAID".equals(status)) sc=Color.rgb(194,65,12);
+                        p.setColor(sc); cv.drawRoundRect(690,112,802,145,16,16,p);
+                        bold.setColor(Color.WHITE); bold.setTextSize(10); cv.drawText(status,710,133,bold);
+
+                        // Section helper
+                        p.setColor(Color.rgb(242,246,250)); cv.drawRoundRect(38,166,804,191,7,7,p);
+                        bold.setColor(Color.rgb(11,79,145)); bold.setTextSize(11); cv.drawText("CUSTOMER INFORMATION",50,183,bold);
+                        p.setColor(Color.rgb(242,246,250)); cv.drawRoundRect(38,202,418,324,8,8,p);
+                        cv.drawRoundRect(430,202,804,324,8,8,p);
+                        bold.setColor(Color.rgb(23,37,58)); bold.setTextSize(10);
+                        p.setColor(Color.rgb(23,37,58)); p.setTextSize(10);
+                        cv.drawText("Mobile / WhatsApp",52,220,bold); cv.drawText(o.optString("phone","—"),52,237,p);
+                        cv.drawText("Address",52,257,bold); cv.drawText(o.optString("address","—"),52,274,p);
+                        cv.drawText("Package",52,294,bold); cv.drawText(o.optString("pkg","—"),52,311,p);
+                        cv.drawText("Monthly Bill",444,220,bold); cv.drawText("৳"+String.format(Locale.US,"%,.0f",o.optDouble("fee",0)),444,237,p);
+                        cv.drawText("Connection Date",444,257,bold); cv.drawText(o.optString("connectionDate","—"),444,274,p);
+                        cv.drawText("Expiry Date",444,294,bold); cv.drawText(o.optString("expiry","—"),444,311,p);
+
+                        p.setColor(Color.rgb(242,246,250)); cv.drawRoundRect(38,336,804,361,7,7,p);
+                        bold.setColor(Color.rgb(11,79,145)); bold.setTextSize(11); cv.drawText("INTERNET / ONU INFORMATION",50,353,bold);
+                        p.setColor(Color.rgb(242,246,250)); cv.drawRoundRect(38,372,804,431,8,8,p);
+                        p.setColor(Color.rgb(23,37,58)); p.setTextSize(10);
+                        cv.drawText("PPPoE Username",52,392,bold); cv.drawText(o.optString("pppoe","—"),52,408,p);
+                        cv.drawText("PPPoE Password",300,392,bold); cv.drawText(o.optString("pppoePassword","—"),300,408,p);
+                        cv.drawText("ONU ID",600,392,bold); cv.drawText(o.optString("onu","—"),600,408,p);
+
+                        p.setColor(Color.rgb(242,246,250)); cv.drawRoundRect(38,443,804,468,7,7,p);
+                        bold.setColor(Color.rgb(11,79,145)); bold.setTextSize(11); cv.drawText("BILLING SUMMARY",50,460,bold);
+                        p.setColor(Color.rgb(255,248,235)); cv.drawRoundRect(38,479,280,548,8,8,p);
+                        p.setColor(Color.rgb(239,246,255)); cv.drawRoundRect(292,479,534,548,8,8,p);
+                        p.setColor(Color.rgb(254,242,242)); cv.drawRoundRect(546,479,804,548,8,8,p);
+                        p.setColor(Color.rgb(23,37,58)); p.setTextSize(10);
+                        cv.drawText("Previous Due",52,499,bold); cv.drawText("৳"+String.format(Locale.US,"%,.0f",o.optDouble("prevDue",0)),52,524,bold);
+                        cv.drawText("Running Bill",306,499,bold); cv.drawText("৳"+String.format(Locale.US,"%,.0f",o.optDouble("runningBill",0)),306,524,bold);
+                        bold.setColor(Color.rgb(185,28,28)); cv.drawText("TOTAL DUE",560,499,bold); cv.drawText("৳"+String.format(Locale.US,"%,.0f",o.optDouble("totalDue",0)),560,524,bold);
+                        p.setColor(Color.rgb(105,117,136)); p.setTextSize(8); cv.drawText("Generated: "+new SimpleDateFormat("dd MMM yyyy, hh:mm a",Locale.US).format(new Date()),40,563,p);
+                        cv.drawText("Page "+(i+1)+" / "+Math.max(1,arr.length()),744,563,p);
+                        doc.finishPage(page);
                     }
-                    if(page!=null) doc.finishPage(page);
-                    OutputStream out=getContentResolver().openOutputStream(uri); if(out==null) throw new Exception("PDF output unavailable");
+
+                    OutputStream out=getContentResolver().openOutputStream(uri);
+                    if(out==null) throw new Exception("PDF output unavailable");
                     doc.writeTo(out); out.close(); doc.close();
-                    Intent view=new Intent(Intent.ACTION_VIEW); view.setDataAndType(uri,"application/pdf"); view.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_ACTIVITY_NEW_TASK);
-                    try{startActivity(view);}catch(Exception e){Intent share=new Intent(Intent.ACTION_SEND);share.setType("application/pdf");share.putExtra(Intent.EXTRA_STREAM,uri);share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(share,"Open / Share PDF"));}
-                    Toast.makeText(MainActivity.this,"PDF saved in Downloads / STAR COMMUNICATION",Toast.LENGTH_LONG).show();
-                }catch(Exception e){ Toast.makeText(MainActivity.this,"PDF তৈরি করতে সমস্যা হয়েছে: "+e.getMessage(),Toast.LENGTH_LONG).show(); }
+
+                    Intent view=new Intent(Intent.ACTION_VIEW);
+                    view.setDataAndType(uri,"application/pdf");
+                    view.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_ACTIVITY_NEW_TASK);
+                    try{startActivity(view);}
+                    catch(Exception ex){Intent share=new Intent(Intent.ACTION_SEND);share.setType("application/pdf");share.putExtra(Intent.EXTRA_STREAM,uri);share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(share,"Open / Share PDF"));}
+                    Toast.makeText(MainActivity.this,"Professional PDF saved in Downloads / STAR COMMUNICATION",Toast.LENGTH_LONG).show();
+                }catch(Exception ex){
+                    Toast.makeText(MainActivity.this,"PDF তৈরি করতে সমস্যা হয়েছে: "+ex.getMessage(),Toast.LENGTH_LONG).show();
+                }
             });
         }
         @JavascriptInterface public void printPage(String title){ runOnUiThread(() -> { try { PrintManager pm=(PrintManager)getSystemService(PRINT_SERVICE); PrintDocumentAdapter adapter=webView.createPrintDocumentAdapter(title==null?"STAR COMMUNICATION":title); pm.print(title==null?"STAR COMMUNICATION":title,adapter,new PrintAttributes.Builder().setMediaSize(PrintAttributes.MediaSize.ISO_A4).setMinMargins(PrintAttributes.Margins.NO_MARGINS).build()); } catch(Exception e){ Toast.makeText(MainActivity.this,"PDF/Print failed. Please try again.",Toast.LENGTH_LONG).show(); } }); }
