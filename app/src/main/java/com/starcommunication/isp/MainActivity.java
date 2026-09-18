@@ -149,6 +149,10 @@ public class MainActivity extends Activity {
             final int count=sent;
             runOnUiThread(()->Toast.makeText(MainActivity.this,"SIM SMS send started: "+count+" messages",Toast.LENGTH_LONG).show());
         }
+        @JavascriptInterface public void saveCustomerPdf(String fileName,String body){
+            String title=fileName==null?"Customer List":fileName.replace("STAR_COMMUNICATION_","").replace(".pdf","").replace("_"," ");
+            createCustomerPdf(title,body);
+        }
         @JavascriptInterface public void createCustomerPdf(String title,String body){
             runOnUiThread(() -> {
                 if (Build.VERSION.SDK_INT < 29) { printPage(title); return; }
