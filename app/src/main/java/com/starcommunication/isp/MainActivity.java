@@ -199,8 +199,8 @@ public class MainActivity extends Activity {
                         int top=84, left=18, right=824;
                         p.setColor(Color.rgb(226,235,246)); cv.drawRoundRect(left,top,right,top+28,6,6,p);
                         bold.setColor(Color.rgb(11,50,90)); bold.setTextSize(8);
-                        int[] x={24,50,145,255,390,485,560,650,748};
-                        String[] heads={"#","CUSTOMER NAME","LOCATION / ADDRESS","PACKAGE","MONTHLY BILL","CLIENT CODE","NUMBER","PREVIOUS DUE","TOTAL DUE"};
+                        int[] x={22,48,130,220,300,375,450,535,625,700};
+                        String[] heads={"#","CUSTOMER NAME","LOCATION","PACKAGE","BILL","CLIENT CODE","NUMBER","PREV DUE","TOTAL DUE","STATUS"};
                         for(int k=0;k<heads.length;k++) cv.drawText(heads[k],x[k],top+18,bold);
 
                         int start=pageNo*PER_PAGE;
@@ -214,14 +214,20 @@ public class MainActivity extends Activity {
                             p.setColor(Color.rgb(25,40,60)); p.setTextSize(7.5f);
                             bold.setColor(Color.rgb(25,40,60)); bold.setTextSize(7.5f);
                             cv.drawText(String.format(Locale.US,"%02d",j+1),24,rowY+15,bold);
-                            cv.drawText(shortText(o.optString("name","—"),16),50,rowY+15,bold);
-                            cv.drawText(shortText(o.optString("address","—"),20),145,rowY+15,p);
-                            cv.drawText(shortText(o.optString("pkg","—"),12),255,rowY+15,p);
-                            cv.drawText("৳"+String.format(Locale.US,"%,.0f",o.optDouble("fee",0)),390,rowY+15,p);
-                            cv.drawText(shortText(o.optString("id","—"),12),485,rowY+15,p);
-                            cv.drawText(shortText(o.optString("phone","—"),14),560,rowY+15,p);
-                            cv.drawText("৳"+String.format(Locale.US,"%,.0f",o.optDouble("prevDue",0)),650,rowY+15,p);
-                            bold.setColor(Color.rgb(185,28,28)); cv.drawText("৳"+String.format(Locale.US,"%,.0f",o.optDouble("totalDue",0)),748,rowY+15,bold);
+                            cv.drawText(shortText(o.optString("name","—"),13),48,rowY+15,bold);
+                            cv.drawText(shortText(o.optString("address","—"),14),130,rowY+15,p);
+                            cv.drawText(shortText(o.optString("pkg","—"),10),220,rowY+15,p);
+                            cv.drawText("৳"+String.format(Locale.US,"%,.0f",o.optDouble("fee",0)),300,rowY+15,p);
+                            cv.drawText(shortText(o.optString("id","—"),10),375,rowY+15,p);
+                            cv.drawText(shortText(o.optString("phone","—"),12),450,rowY+15,p);
+                            cv.drawText("৳"+String.format(Locale.US,"%,.0f",o.optDouble("prevDue",0)),535,rowY+15,p);
+                            bold.setColor(Color.rgb(185,28,28)); cv.drawText("৳"+String.format(Locale.US,"%,.0f",o.optDouble("totalDue",0)),625,rowY+15,bold);
+                            String status=o.optString("status","").toUpperCase();
+                            String t=title.toLowerCase(Locale.US);
+                            if(t.contains("unpaid")) status="UNPAID"; else if(t.contains("expired")) status="EXPIRED"; else if(t.contains("paid")) status="PAID";
+                            if(status.length()==0) status="—";
+                            bold.setColor(status.equals("PAID")?Color.rgb(22,125,70):status.equals("EXPIRED")?Color.rgb(185,28,28):Color.rgb(190,110,15));
+                            cv.drawText(status,700,rowY+15,bold);
                             rowY+=23;
                         }
 
