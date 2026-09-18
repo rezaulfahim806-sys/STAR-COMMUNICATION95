@@ -3,14 +3,23 @@ package com.starcommunication.isp;
 import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.ContentValues;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.print.PrintAttributes;
 import android.print.PrintDocumentAdapter;
 import android.print.PrintManager;
+import android.graphics.Paint;
+import android.graphics.pdf.PdfDocument;
+import android.provider.MediaStore;
+import java.io.OutputStream;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 import android.telephony.SmsManager;
 import android.view.Gravity;
 import android.webkit.JavascriptInterface;
@@ -139,6 +148,56 @@ public class MainActivity extends Activity {
             }
             final int count=sent;
             runOnUiThread(()->Toast.makeText(MainActivity.this,"SIM SMS send started: "+count+" messages",Toast.LENGTH_LONG).show());
+        }
+        @JavascriptInterface public void createCustomerPdf(String title,String body){
+            runOnUiThread(() -> {
+                if (Build.VERSION.SDK_INT < 29) { printPage(title); return; }
+                try {
+                    String safe=(title==null||title.trim().isEmpty()?"Customer List":title).replaceAll("[^A-Za-z0-9 _-]","_");
+                    String stamp=new SimpleDateFormat("yyyyMMdd_HHmmss",Locale.US).format(new Date());
+                    ContentValues values=new ContentValues();
+                    values.put(MediaStore.Downloads.DISPLAY_NAME,"STAR-COMMUNICATION-"+safe+"-"+stamp+".pdf");
+                    values.put(MediaStore.Downloads.MIME_TYPE,"application/pdf");
+                    values.put(MediaStore.Downloads.RELATIVE_PATH,Environment.DIRECTORY_DOWNLOADS+"/STAR COMMUNICATION");
+                    Uri uri=getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,values);
+                    if(uri==null) throw new Exception("PDF file could not be created");
+                    PdfDocument doc=new PdfDocument();
+                    Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG); paint.setTextSize(8f); paint.setColor(Color.BLACK);
+                    Paint head=new Paint(Paint.ANTI_ALIAS_FLAG); head.setTextSize(16f); head.setTypeface(android.graphics.Typeface.DEFAULT_BOLD); head.setColor(Color.rgb(11,33,69));
+                    int pageNo=1; PdfDocument.Page page=null; android.graphics.Canvas canvas=null; float y=0;
+                    String[] lines=(body==null?"":body).split("\\\\n",-1);
+                    for(int i=0;i<lines.length;i++){
+                        if(page==null){
+                            page=doc.startPage(new PdfDocument.PageInfo.Builder(842,595,pageNo++).create());
+                            canvas=page.getCanvas(); y=28;
+                            canvas.drawText("STAR COMMUNICATION",24,y,head); y+=18;
+                            canvas.drawText(title==null?"Customer List":title,24,y,head); y+=18;
+                        }
+                        String line=lines[i]==null?"":lines[i];
+                        if(line.length()==0){y+=8; continue;}
+                        int start=0;
+                        while(start<line.length()){
+                            int end=start, last=start;
+                            while(end<line.length()){
+                                if(end-start>=125){break;}
+                                String part=line.substring(start,end+1);
+                                if(paint.measureText(part)>790)break;
+                                last=end+1; end++;
+                            }
+                            if(last<=start) last=Math.min(start+1,line.length());
+                            String part=line.substring(start,last);
+                            if(y>575){doc.finishPage(page); page=null; continue;}
+                            canvas.drawText(part,24,y,paint); y+=11; start=last;
+                        }
+                    }
+                    if(page!=null) doc.finishPage(page);
+                    OutputStream out=getContentResolver().openOutputStream(uri); if(out==null) throw new Exception("PDF output unavailable");
+                    doc.writeTo(out); out.close(); doc.close();
+                    Intent view=new Intent(Intent.ACTION_VIEW); view.setDataAndType(uri,"application/pdf"); view.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_ACTIVITY_NEW_TASK);
+                    try{startActivity(view);}catch(Exception e){Intent share=new Intent(Intent.ACTION_SEND);share.setType("application/pdf");share.putExtra(Intent.EXTRA_STREAM,uri);share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(share,"Open / Share PDF"));}
+                    Toast.makeText(MainActivity.this,"PDF saved in Downloads / STAR COMMUNICATION",Toast.LENGTH_LONG).show();
+                }catch(Exception e){ Toast.makeText(MainActivity.this,"PDF তৈরি করতে সমস্যা হয়েছে: "+e.getMessage(),Toast.LENGTH_LONG).show(); }
+            });
         }
         @JavascriptInterface public void printPage(String title){ runOnUiThread(() -> { try { PrintManager pm=(PrintManager)getSystemService(PRINT_SERVICE); PrintDocumentAdapter adapter=webView.createPrintDocumentAdapter(title==null?"STAR COMMUNICATION":title); pm.print(title==null?"STAR COMMUNICATION":title,adapter,new PrintAttributes.Builder().setMediaSize(PrintAttributes.MediaSize.ISO_A4).setMinMargins(PrintAttributes.Margins.NO_MARGINS).build()); } catch(Exception e){ Toast.makeText(MainActivity.this,"PDF/Print failed. Please try again.",Toast.LENGTH_LONG).show(); } }); }
         @JavascriptInterface public void scheduleExpiry(String phone,String name,String expiry){AutoMessageReceiver.scheduleExpiry(MainActivity.this,phone,name,expiry);}
