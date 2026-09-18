@@ -101,7 +101,6 @@ inject = r"""
  try{mo.observe(document.body,{childList:true,subtree:true})}catch(e){}
 })();
 """
-s2 = s2.replace("</script></body></html>", inject + "
-</script></body></html>")
+s2 = s2.replace("</script></body></html>", inject + "\n</script></body></html>")
 p.write_text(s2, encoding="utf-8")
 print("patched", n)
