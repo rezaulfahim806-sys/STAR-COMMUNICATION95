@@ -153,12 +153,21 @@ public class MainActivity extends Activity {
         }
         @JavascriptInterface public void saveCustomerPdf(String fileName,String body){
             String title=fileName==null?"Customer List":fileName.replace("STAR_COMMUNICATION_","").replace(".pdf","").replace("_"," ");
-            createCustomerPdf(title,body);
+            try{
+                JSONObject packet=new JSONObject();
+                packet.put("title",title);
+                packet.put("rows",new JSONArray(body==null?"[]":body));
+                createCustomerPdf(packet.toString());
+            }catch(Exception e){ Toast.makeText(MainActivity.this,"PDF data error: "+e.getMessage(),Toast.LENGTH_LONG).show(); }
         }
-        @JavascriptInterface public void createCustomerPdf(String title,String body){
+        @JavascriptInterface public void createCustomerPdf(String payload){
             runOnUiThread(() -> {
                 if (Build.VERSION.SDK_INT < 29) { printPage(title); return; }
                 try {
+                    JSONObject packet=new JSONObject(payload==null?"{}":payload);
+                    String title=packet.optString("title","Customer List");
+                    JSONArray arr=packet.optJSONArray("rows");
+                    if(arr==null) arr=new JSONArray();
                     String safe=(title==null||title.trim().isEmpty()?"Customer List":title).replaceAll("[^A-Za-z0-9 _-]","_");
                     String stamp=new SimpleDateFormat("yyyyMMdd_HHmmss",Locale.US).format(new Date());
                     ContentValues values=new ContentValues();
@@ -169,7 +178,6 @@ public class MainActivity extends Activity {
                     if(uri==null) throw new Exception("PDF file could not be created");
 
                     PdfDocument doc=new PdfDocument();
-                    JSONArray arr=new JSONArray(body==null?"[]":body);
                     final int W=842,H=595;
                     Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
                     Paint bold=new Paint(Paint.ANTI_ALIAS_FLAG);
