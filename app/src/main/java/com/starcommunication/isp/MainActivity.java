@@ -162,7 +162,7 @@ public class MainActivity extends Activity {
         }
         @JavascriptInterface public void createCustomerPdf(String payload){
             runOnUiThread(() -> {
-                if (Build.VERSION.SDK_INT < 29) { printPage(title); return; }
+                if (Build.VERSION.SDK_INT < 29) { printPage("STAR COMMUNICATION"); return; }
                 try {
                     JSONObject packet=new JSONObject(payload==null?"{}":payload);
                     String title=packet.optString("title","Customer List");
