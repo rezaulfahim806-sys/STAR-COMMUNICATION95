@@ -29,6 +29,21 @@ async function initDb(){
 function auth(req,res,next){try{const h=req.headers.authorization||'';if(!h.startsWith('Bearer '))throw 0;req.user=jwt.verify(h.slice(7),JWT_SECRET);next()}catch(e){res.status(401).json({error:'Unauthorized'})}}
 function send(res,payload){res.json(payload)}
 app.get('/api/health',(req,res)=>send(res,{ok:true,app:'STAR COMMUNICATION',time:new Date().toISOString(),database:!!db}));
+app.post('/api/auth/register',async(req,res)=>{
+ const {email,password,companyName}=req.body||{};
+ const u=String(email||'').trim().toLowerCase(), p=String(password||''), company=String(companyName||'').trim();
+ if(!/^[^\\s@]+@gmail\\.com$/i.test(u))return res.status(400).json({error:'A valid Gmail address is required'});
+ if(p.length<8)return res.status(400).json({error:'Password must be at least 8 characters'});
+ if(company.length<2||company.length>100)return res.status(400).json({error:'Company name is required'});
+ try{
+  const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
+  if(await ac.findOne({username:u}))return res.status(409).json({error:'This Gmail account is already registered'});
+  const a={username:u,email:u,companyName:company,passwordHash:bcrypt.hashSync(p,12),role:'owner',owner:u,active:true,createdAt:new Date().toISOString()};
+  await ac.insertOne(a);
+  const token=jwt.sign({username:u,role:'owner',owner:u},JWT_SECRET,{expiresIn:'30d'});
+  return send(res,{ok:true,token,expiresIn:30*24*60*60,role:'owner',owner:u,username:u,companyName:company});
+ }catch(e){res.status(500).json({error:'Registration service error'})}
+});
 app.post('/api/auth/login',async(req,res)=>{
  const {username,password}=req.body||{};
  const u=String(username||'').trim(), p=String(password||'');
