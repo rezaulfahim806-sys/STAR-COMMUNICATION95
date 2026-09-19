@@ -38,38 +38,16 @@ jobs:
           test -f app/src/main/res/drawable/star_launcher.xml
           gradle projects --no-daemon
           gradle :app:tasks --all --no-daemon | grep -E 'assembleDebug|assembleRelease' || true
-      - name: Apply app source patches
+      - name: Verify approved source
+        shell: bash
         run: |
-          python3 tools/patch_payment_flow.py
-          python3 tools/patch_compact_ui.py
-          python3 tools/patch_web_payment.py
-          python3 tools/patch_customer_persistence.py
-          python3 tools/patch_customer_add_status.py
-          python3 tools/patch_ui_layout.py
-          python3 tools/patch_main_activity.py
-          python3 tools/patch_final_customer_fix.py
-          python3 tools/patch_growth_expectation.py
-          python3 tools/patch_customer_view_edit.py
-          python3 tools/patch_payment_link_actions.py
-          python3 tools/patch_sms_csv_import.py
-          python3 tools/patch_native_storage.py
-          python3 tools/patch_update_data_migration.py
-          python3 tools/patch_sim2_sms.py
-          python3 tools/patch_sms_permission_fix.py
-          python3 tools/patch_default_sms_handler.py
-          python3 tools/patch_billing_expiry_activation.py
-          python3 tools/patch_expired_paid_active.py
-          python3 tools/patch_sms_dedupe.py
-          python3 tools/patch_sms_method_reference.py
-          python3 tools/patch_active_line_growth_monitor.py
-          python3 tools/patch_customer_actions_20260915.py
-          python3 tools/patch_webview_back_20260915.py
-          python3 tools/patch_final_payment_actions_20260915.py
-          python3 tools/patch_customer_sms_option.py
-          python3 tools/patch_sms_customer_list_20260915.py
-          python3 tools/patch_line_off_sms_option.py
-          python3 tools/patch_final_customer_buttons_20260918.py
-          python3 tools/patch_final_pdf_sms_fix_20260918.py
+          set -e
+          grep -q 'final int W=842,H=595,PER_PAGE=25;' app/src/main/java/com/starcommunication/isp/MainActivity.java
+          grep -q 'CUSTOMER' app/src/main/java/com/starcommunication/isp/MainActivity.java
+          grep -q 'PPPoE USER' app/src/main/java/com/starcommunication/isp/MainActivity.java
+          grep -q 'TOTAL DUE' app/src/main/java/com/starcommunication/isp/MainActivity.java
+          grep -q 'android:allowBackup="false"' app/src/main/AndroidManifest.xml
+          grep -q 'android:usesCleartextTraffic="false"' app/src/main/AndroidManifest.xml
       - name: Build Debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace --warning-mode all
       - name: Verify APK exists
