@@ -51,6 +51,7 @@ jobs:
           python3 tools/patch_payment_link_lookup_fix_20260915.py || true
           python3 tools/patch_line_off_sms_option.py || true
           python3 tools/patch_customer_sms_option.py || true
+          python3 tools/patch_pdf_lock_20260919.py
       - name: Build Debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace --warning-mode all
       - name: Verify APK
