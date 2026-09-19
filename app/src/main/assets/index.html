@@ -31,7 +31,7 @@ async function cloudSync(pushLocal){
  cloudBusy=true;
  try{
   let r=await fetch(String(cfg.apiUrl).replace(/\/$/,'')+'/api/sync',{headers:cloudHeaders()});
-  if(r.status===401)throw new Error('Cloud session expired');
+  if(r.status===401){if(d.settings&&d.settings.cloud){d.settings.cloud.token='';}save(false);throw new Error('Cloud session expired — please Login & Sync again')}
   if(!r.ok)throw new Error('Cloud sync read failed');
   let x=await r.json();
   if(x.data&&Array.isArray(x.data.customers)){
