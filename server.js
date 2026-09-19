@@ -24,7 +24,7 @@ async function initDb(){
 function auth(req,res,next){try{const h=req.headers.authorization||'';if(!h.startsWith('Bearer '))throw 0;req.user=jwt.verify(h.slice(7),JWT_SECRET);next()}catch(e){res.status(401).json({error:'Unauthorized'})}}
 function send(res,payload){res.json(payload)}
 app.get('/api/health',(req,res)=>send(res,{ok:true,app:'STAR COMMUNICATION',time:new Date().toISOString(),database:!!db}));
-app.post('/api/auth/login',(req,res)=>{const {username,password}=req.body||{};if(username!==ADMIN_USER||!bcrypt.compareSync(String(password||''),ADMIN_HASH))return res.status(401).json({error:'Invalid username or password'});send(res,{token:jwt.sign({username},JWT_SECRET,{expiresIn:'30d'})})});
+app.post('/api/auth/login',(req,res)=>{const {username,password}=req.body||{};if(username!==ADMIN_USER||!bcrypt.compareSync(String(password||''),ADMIN_HASH))return res.status(401).json({error:'Invalid username or password'});const token=jwt.sign({username},JWT_SECRET,{expiresIn:'30d'});send(res,{token,expiresIn:30*24*60*60})});
 
 // Minimal production API storage. If MongoDB is not configured, data lives in memory for testing only.
 const mem={customers:[],payments:[],history:[],bkash:[],ledger:[]};
