@@ -54,6 +54,7 @@ jobs:
           python3 tools/patch_pdf_lock_20260919.py
           python3 tools/patch_security_hardening_20260919.py
           python3 tools/patch_staff_accounts_complaints.py
+          python3 tools/patch_account_sms_payment_final.py
       - name: Build Debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace --warning-mode all
       - name: Verify APK
@@ -62,6 +63,3 @@ jobs:
         with:
           name: STAR-COMMUNICATION-secure-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
-
-      - name: Apply final account and SMS patch
-        run: python3 tools/patch_account_sms_final.py
