@@ -3,9 +3,9 @@ p=Path("app/src/main/assets/index.html")
 s=p.read_text(encoding="utf-8")
 D=chr(36)
 
-anchor = '<button class="small view" onclick="go(\\'details\\',{id:' + D + '{c.id}})">Details</button>'
-insert = anchor + '<button class="small view" onclick="sendOneSms(\\'' + D + '{num}\\',\\'' + D + '{esc(c.name)}\\')">📩 SMS</button><button class="small" style="background:#7656d6;color:#fff" onclick="customerPaymentLink(\\'' + D + '{c.id}\\')">🔗 Payment Link</button>'
-if 'customerPaymentLink(\\'' + D + '{c.id}\\')' not in s:
+anchor = "<button class=\"small view\" onclick=\"go('details',{id:" + D + "{c.id}})\">Details</button>"
+insert = anchor + "<button class=\"small view\" onclick=\"sendOneSms('" + D + "{num}','" + D + "{esc(c.name)}')\">📩 SMS</button><button class=\"small\" style=\"background:#7656d6;color:#fff\" onclick=\"customerPaymentLink('" + D + "{c.id}')\">🔗 Payment Link</button>"
+if "customerPaymentLink('" + D + "{c.id}')" not in s:
     if anchor not in s:
         raise SystemExit("Details anchor not found")
     s=s.replace(anchor,insert,1)
