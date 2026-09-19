@@ -188,90 +188,116 @@ public class MainActivity extends Activity {
                         PdfDocument.Page page=doc.startPage(new PdfDocument.PageInfo.Builder(W,H,pageNo+1).create());
                         android.graphics.Canvas cv=page.getCanvas();
 
-                        // Header
-                        p.setColor(Color.rgb(8,55,112)); cv.drawRect(0,0,W,72,p);
-                        p.setColor(Color.rgb(24,190,86)); cv.drawRect(0,67,W,72,p);
-                        bold.setColor(Color.WHITE); bold.setTextSize(21); cv.drawText("STAR COMMUNICATION",20,29,bold);
-                        bold.setTextSize(9); cv.drawText("ISP CUSTOMER LIST  •  "+title.toUpperCase(Locale.US),20,49,bold);
-                        p.setColor(Color.rgb(20,119,210)); cv.drawRoundRect(700,15,824,52,18,18,p);
-                        bold.setColor(Color.WHITE); bold.setTextSize(8); cv.drawText("PAGE "+(pageNo+1)+" / "+totalPages,719,38,bold);
+                        // Professional blue/green header.
+                        p.setColor(Color.rgb(7,66,128)); cv.drawRect(0,0,W,70,p);
+                        p.setColor(Color.rgb(37,197,92)); cv.drawRect(0,66,W,70,p);
+                        bold.setColor(Color.WHITE); bold.setTextSize(22); cv.drawText("STAR COMMUNICATION",20,28,bold);
+                        bold.setTextSize(9); cv.drawText("ISP CUSTOMER LIST  •  "+title.toUpperCase(Locale.US),20,48,bold);
+                        p.setColor(Color.rgb(18,124,215)); cv.drawRoundRect(700,14,824,51,18,18,p);
+                        bold.setColor(Color.WHITE); bold.setTextSize(8); cv.drawText("PAGE "+(pageNo+1)+" / "+totalPages,718,37,bold);
 
-                        // Compact table heading: no split columns, full page width.
-                        p.setColor(Color.rgb(232,242,250)); cv.drawRect(12,76,830,94,p);
-                        bold.setColor(Color.rgb(8,55,112)); bold.setTextSize(6.4f);
-                        cv.drawText("#",20,88,bold);
-                        cv.drawText("CUSTOMER NAME",43,88,bold);
-                        cv.drawText("LOCATION",155,88,bold);
-                        cv.drawText("PACKAGE",285,88,bold);
-                        cv.drawText("BILL",350,88,bold);
-                        cv.drawText("CODE",395,88,bold);
-                        cv.drawText("NUMBER",455,88,bold);
-                        cv.drawText("STATUS",756,88,bold);
-                        p.setColor(Color.rgb(24,170,78)); cv.drawRect(12,92,830,94,p);
+                        // Summary cards.
+                        int all=arr.length(),paid=0,unpaid=0,expired=0,active=0,inactive=0;
+                        for(int q=0;q<all;q++){
+                            JSONObject z=arr.getJSONObject(q);
+                            String st=z.optString("status","").toLowerCase(Locale.US);
+                            double td=z.optDouble("totalDue",0);
+                            if(st.equals("expired")) expired++;
+                            else if(st.equals("inactive")) inactive++;
+                            else if(st.equals("active")) active++;
+                            if(td>0) unpaid++; else paid++;
+                        }
+                        String[] names={"CUSTOMERS","ACTIVE","INACTIVE","EXPIRED","PAID","UNPAID"};
+                        int[] vals={all,active,inactive,expired,paid,unpaid};
+                        int[] cols={Color.rgb(18,124,215),Color.rgb(30,175,82),Color.rgb(230,154,25),Color.rgb(215,55,55),Color.rgb(25,145,215),Color.rgb(125,80,190)};
+                        int cx=16;
+                        for(int q=0;q<6;q++){
+                            int cw=130;
+                            p.setColor(cols[q]); cv.drawRoundRect(cx,78,cx+cw,101,10,10,p);
+                            bold.setColor(Color.WHITE); bold.setTextSize(6.8f); cv.drawText(names[q],cx+9,91,bold);
+                            bold.setTextSize(10); cv.drawText(String.valueOf(vals[q]),cx+cw-25,94,bold);
+                            cx+=136;
+                        }
+
+                        // One full-width table. 25 customers only, with two clear lines per customer.
+                        float top=108;
+                        p.setColor(Color.rgb(7,66,128)); cv.drawRoundRect(10,top,832,top+30,6,6,p);
+                        bold.setColor(Color.WHITE); bold.setTextSize(6.2f);
+                        cv.drawText("#",18,top+11,bold);
+                        cv.drawText("CUSTOMER",42,top+11,bold);
+                        cv.drawText("LOCATION",145,top+11,bold);
+                        cv.drawText("PACKAGE",245,top+11,bold);
+                        cv.drawText("BILL",315,top+11,bold);
+                        cv.drawText("CLIENT CODE",360,top+11,bold);
+                        cv.drawText("MOBILE",445,top+11,bold);
+                        cv.drawText("STATUS",760,top+11,bold);
+                        cv.drawText("PPPoE USER",42,top+23,bold);
+                        cv.drawText("PPPoE PASS",180,top+23,bold);
+                        cv.drawText("ONU MAC",305,top+23,bold);
+                        cv.drawText("PREV DUE",435,top+23,bold);
+                        cv.drawText("RUNNING",505,top+23,bold);
+                        cv.drawText("TOTAL DUE",575,top+23,bold);
+                        cv.drawText("CONNECTION / EXPIRY",650,top+23,bold);
 
                         int start=pageNo*PER_PAGE,end=Math.min(arr.length(),start+PER_PAGE);
-                        float y=96;
+                        float y=141;
                         for(int j=start;j<end;j++){
                             JSONObject o=arr.getJSONObject(j);
-                            int accent=((j%2)==0)?Color.rgb(22,119,210):Color.rgb(24,170,78);
-                            p.setColor((j%2)==0?Color.WHITE:Color.rgb(247,251,254));
-                            cv.drawRoundRect(12,y,830,y+18.2f,4,4,p);
-                            p.setColor(accent); cv.drawRoundRect(12,y,17,y+18.2f,2,2,p);
+                            int accent=(j%2==0)?Color.rgb(20,120,205):Color.rgb(26,175,84);
+                            p.setColor(j%2==0?Color.WHITE:Color.rgb(239,249,244));
+                            cv.drawRoundRect(10,y,832,y+17.3f,4,4,p);
+                            p.setColor(accent); cv.drawRoundRect(10,y,15,y+17.3f,2,2,p);
 
-                            String name=shortText(o.optString("name","—"),20);
-                            String address=shortText(o.optString("address","—"),22);
-                            String pkg=shortText(o.optString("pkg","—"),10);
-                            String code=shortText(o.optString("id","—"),11);
-                            String phone=shortText(o.optString("phone","—"),15);
-                            String user=shortText(o.optString("pppoe","—"),18);
-                            String pass=shortText(o.optString("pppoePassword","—"),15);
-                            String onu=shortText(o.optString("onu","—"),18);
-                            String conn=shortText(o.optString("connectionDate","—"),11);
-                            String exp=shortText(o.optString("expiry","—"),11);
-
+                            String name=shortText(o.optString("name","—"),17);
+                            String address=shortText(o.optString("address","—"),17);
+                            String pkg=shortText(o.optString("pkg","—"),9);
+                            String code=shortText(o.optString("id","—"),10);
+                            String phone=shortText(o.optString("phone","—"),14);
+                            String user=shortText(o.optString("pppoe","—"),15);
+                            String pass=shortText(o.optString("pppoePassword","—"),13);
+                            String onu=shortText(o.optString("onu","—"),15);
+                            String conn=shortText(o.optString("connectionDate","—"),10);
+                            String exp=shortText(o.optString("expiry","—"),10);
                             String status=o.optString("status","").toUpperCase(Locale.US);
                             String tt=title.toLowerCase(Locale.US);
                             if(tt.contains("unpaid")) status="UNPAID";
                             else if(tt.contains("expired")) status="EXPIRED";
                             else if(tt.contains("paid")) status="PAID";
 
-                            // Line 1: main customer information.
-                            bold.setColor(Color.rgb(20,45,75)); bold.setTextSize(7.0f);
-                            cv.drawText(String.format(Locale.US,"%02d",j+1),20,y+7.8f,bold);
-                            cv.drawText(name,43,y+7.8f,bold);
-                            p.setColor(Color.rgb(55,72,92)); p.setTextSize(6.4f);
-                            cv.drawText(address,155,y+7.8f,p);
-                            cv.drawText(pkg,285,y+7.8f,p);
-                            cv.drawText("৳"+String.format(Locale.US,"%.0f",o.optDouble("fee",0)),350,y+7.8f,p);
-                            cv.drawText(code,395,y+7.8f,p);
-                            cv.drawText(phone,455,y+7.8f,p);
+                            bold.setColor(Color.rgb(15,45,75)); bold.setTextSize(6.7f);
+                            cv.drawText(String.format(Locale.US,"%02d",j+1),18,y+7.3f,bold);
+                            cv.drawText(name,42,y+7.3f,bold);
+                            p.setColor(Color.rgb(45,65,85)); p.setTextSize(6.1f);
+                            cv.drawText(address,145,y+7.3f,p);
+                            cv.drawText(pkg,245,y+7.3f,p);
+                            cv.drawText("৳"+String.format(Locale.US,"%.0f",o.optDouble("fee",0)),315,y+7.3f,p);
+                            cv.drawText(code,360,y+7.3f,p);
+                            cv.drawText(phone,445,y+7.3f,p);
 
-                            int sc=status.equals("PAID")?Color.rgb(22,145,215):status.equals("EXPIRED")?Color.rgb(215,55,55):status.equals("UNPAID")?Color.rgb(230,126,20):Color.rgb(24,170,78);
-                            p.setColor(sc); cv.drawRoundRect(752,y+2,824,y+15.8f,7,7,p);
-                            bold.setColor(Color.WHITE); bold.setTextSize(5.6f); cv.drawText(shortText(status,10),760,y+10.8f,bold);
+                            int sc=status.equals("PAID")?Color.rgb(20,145,215):status.equals("EXPIRED")?Color.rgb(215,55,55):status.equals("UNPAID")?Color.rgb(235,130,20):Color.rgb(25,175,82);
+                            p.setColor(sc); cv.drawRoundRect(760,y+2,824,y+14.8f,7,7,p);
+                            bold.setColor(Color.WHITE); bold.setTextSize(5.2f); cv.drawText(shortText(status,9),766,y+10.5f,bold);
 
-                            // Line 2: all remaining details, still on the same customer row.
-                            p.setColor(Color.rgb(70,85,105)); p.setTextSize(6.0f);
-                            cv.drawText("PPPoE User: "+user,43,y+15.4f,p);
-                            cv.drawText("Pass: "+pass,190,y+15.4f,p);
-                            cv.drawText("ONU MAC: "+onu,305,y+15.4f,p);
-                            cv.drawText("Prev: ৳"+String.format(Locale.US,"%.0f",o.optDouble("prevDue",0)),440,y+15.4f,p);
-                            cv.drawText("Running: ৳"+String.format(Locale.US,"%.0f",o.optDouble("runningBill",0)),500,y+15.4f,p);
-                            cv.drawText("Total: ৳"+String.format(Locale.US,"%.0f",o.optDouble("totalDue",0)),590,y+15.4f,p);
-                            cv.drawText("Conn: "+conn,665,y+15.4f,p);
-                            cv.drawText("Exp: "+exp,745,y+15.4f,p);
-                            y+=19.0f;
+                            p.setColor(Color.rgb(60,78,98)); p.setTextSize(5.9f);
+                            cv.drawText(user,42,y+14.2f,p);
+                            cv.drawText(pass,180,y+14.2f,p);
+                            cv.drawText(onu,305,y+14.2f,p);
+                            cv.drawText("৳"+String.format(Locale.US,"%.0f",o.optDouble("prevDue",0)),435,y+14.2f,p);
+                            cv.drawText("৳"+String.format(Locale.US,"%.0f",o.optDouble("runningBill",0)),505,y+14.2f,p);
+                            cv.drawText("৳"+String.format(Locale.US,"%.0f",o.optDouble("totalDue",0)),575,y+14.2f,p);
+                            cv.drawText(conn+" / "+exp,650,y+14.2f,p);
+                            y+=17.65f;
                         }
 
-                        p.setColor(Color.rgb(8,55,112)); cv.drawRect(0,575,W,595,p);
-                        bold.setColor(Color.WHITE); bold.setTextSize(6.5f);
-                        cv.drawText("STAR COMMUNICATION  •  ISP MANAGER  •  25 CUSTOMERS / PAGE",20,588,bold);
-                        cv.drawText("Total: "+arr.length()+"  |  Page "+(pageNo+1)+" of "+totalPages,690,588,bold);
+                        p.setColor(Color.rgb(7,66,128)); cv.drawRect(0,573,W,595,p);
+                        bold.setColor(Color.WHITE); bold.setTextSize(6.3f);
+                        cv.drawText("STAR COMMUNICATION  •  ISP MANAGER  •  25 CUSTOMERS / PAGE",18,586,bold);
+                        cv.drawText("TOTAL "+arr.length()+"  |  PAGE "+(pageNo+1)+" OF "+totalPages,705,586,bold);
                         doc.finishPage(page);
                     }
 
                     OutputStream out=getContentResolver().openOutputStream(uri);
-                    if(out==null)throw new Exception("PDF output unavailable");
+                    if(out==null) throw new Exception("PDF output unavailable");
                     doc.writeTo(out); out.close(); doc.close();
 
                     Intent view=new Intent(Intent.ACTION_VIEW);
@@ -285,7 +311,7 @@ public class MainActivity extends Activity {
                         share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                         startActivity(Intent.createChooser(share,"Open / Share PDF"));
                     }
-                    Toast.makeText(MainActivity.this,"PDF ready: 25 customers, full-width details",Toast.LENGTH_LONG).show();
+                    Toast.makeText(MainActivity.this,"PDF ready: clear 25-customer full-width list",Toast.LENGTH_LONG).show();
                 }catch(Exception ex){
                     Toast.makeText(MainActivity.this,"PDF তৈরি করতে সমস্যা হয়েছে: "+ex.getMessage(),Toast.LENGTH_LONG).show();
                 }
