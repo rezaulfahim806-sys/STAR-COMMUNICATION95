@@ -47,8 +47,8 @@ old="function render(){fix();let html=page==='dashboard'?dashboard():page==='cus
 new="function render(){fix();if(cloudConfig().role==='worker'){document.getElementById('content').innerHTML=workerPage();return}let html=page==='dashboard'?dashboard():page==='customers'?customers():page==='details'?details():page==='billing'?billing():page==='analytics'?analytics():page==='accounts'?accounts():page==='monitor'?monitor():dashboard();document.getElementById('content').innerHTML=html;setNav()}"
 if old not in s: raise SystemExit("render marker missing")
 s=s.replace(old,new,1)
-old="<button class=\\"btn light full\\" style=\\"margin-top:7px\\" onclick=\\"cloudLogout()\\">Logout Cloud Account</button>"
-new=old+"<button class=\\"btn dark full\\" style=\\"margin-top:7px\\" onclick=\\"staffPanel()\\">👷 Staff & Complaint Box</button>"
+old='<button class="btn light full" style="margin-top:7px" onclick="cloudLogout()">Logout Cloud Account</button>'
+new=old+'<button class="btn dark full" style="margin-top:7px" onclick="staffPanel()">👷 Staff & Complaint Box</button>'
 if old not in s: raise SystemExit("settings button marker missing")
 s=s.replace(old,new,1)
 p.write_text(s)
