@@ -124,18 +124,19 @@ public class MainActivity extends Activity {
     }
 
     public class AppBridge {
-        @JavascriptInterface public void sendSms(String phone,String message){
-            if(phone==null||phone.trim().isEmpty()||message==null||message.trim().isEmpty())return;
+        @JavascriptInterface public boolean sendSms(String phone,String message){
+            if(phone==null||phone.trim().isEmpty()||message==null||message.trim().isEmpty())return false;
             if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
-                runOnUiThread(() -> { Toast.makeText(MainActivity.this,"SMS permission is required for SIM SMS.",Toast.LENGTH_LONG).show(); requestSmsPermission(); });
-                return;
+                runOnUiThread(() -> { Toast.makeText(MainActivity.this,"SMS permission required. Allow it, then press Send SMS again.",Toast.LENGTH_LONG).show(); requestSmsPermission(); });
+                return false;
             }
             try{
                 SmsManager sms = SmsManager.getDefault();
                 sms.sendTextMessage(phone.trim(),null,message,null,null);
                 runOnUiThread(()->Toast.makeText(MainActivity.this,"SMS sent using SIM balance",Toast.LENGTH_SHORT).show());
-            }catch(SecurityException e){runOnUiThread(()->Toast.makeText(MainActivity.this,"SMS permission denied by Android",Toast.LENGTH_LONG).show());}
-            catch(Exception e){runOnUiThread(()->Toast.makeText(MainActivity.this,"SMS failed: check SIM/network/balance",Toast.LENGTH_LONG).show());}
+                return true;
+            }catch(SecurityException e){runOnUiThread(()->Toast.makeText(MainActivity.this,"SMS permission denied by Android",Toast.LENGTH_LONG).show());return false;}
+            catch(Exception e){runOnUiThread(()->Toast.makeText(MainActivity.this,"SMS failed: check SIM/network/balance",Toast.LENGTH_LONG).show());return false;}
         }
         @JavascriptInterface public void sendBulk(String lines,String message){
             if(lines==null||message==null||message.trim().isEmpty())return;
