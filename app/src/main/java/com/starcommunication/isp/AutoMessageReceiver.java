@@ -12,6 +12,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.telephony.SmsManager;
+import android.net.Uri;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
@@ -23,6 +24,7 @@ public class AutoMessageReceiver extends BroadcastReceiver {
     public static final String TYPE = "type";
     public static final String PHONE = "phone";
     public static final String NAME = "name";
+    public static final String CODE = "code", LOCATION="location", PKG="pkg", BILL="bill", PREV="prev";
     private static final String CHANNEL = "star_customer_messages";
 
     @Override public void onReceive(Context context, Intent intent) {
@@ -35,7 +37,7 @@ public class AutoMessageReceiver extends BroadcastReceiver {
         String customer = (name == null || name.trim().isEmpty()) ? "Customer" : name.trim();
         String msg;
         if ("expiry".equals(type)) {
-            msg = "প্রিয় " + customer + ", আপনার ইন্টারনেট সংযোগের মেয়াদ শেষ হয়েছে। অনুগ্রহ করে বিল/রিনিউ করে সংযোগ চালু রাখুন। — STAR COMMUNICATION";
+            String code=intent.getStringExtra(CODE); String location=intent.getStringExtra(LOCATION); String pkg=intent.getStringExtra(PKG); String bill=intent.getStringExtra(BILL); String prev=intent.getStringExtra(PREV); String link="https://rezaulfahim806-sys.github.io/STAR-COMMUNICATION95/pay.html?code="+Uri.encode(code==null?"":code)+"&name="+Uri.encode(customer)+"&location="+Uri.encode(location==null?"-":location)+"&package="+Uri.encode(pkg==null?"":pkg)+"&bill="+Uri.encode(bill==null?"0":bill)+"&prev="+Uri.encode(prev==null?"0":prev); msg = "প্রিয় " + customer + ", আপনার ইন্টারনেট সংযোগের মেয়াদ শেষ হয়েছে। বিল পরিশোধ করতে Payment Link: " + link + " — STAR COMMUNICATION";
         } else {
             msg = "প্রিয় " + customer + ", নতুন মাসের ইন্টারনেট বিল শুরু হয়েছে। অনুগ্রহ করে সময়মতো বিল পরিশোধ করুন। — STAR COMMUNICATION";
         }
@@ -67,12 +69,14 @@ public class AutoMessageReceiver extends BroadcastReceiver {
         } catch (Exception ignored) {}
     }
 
-    public static void scheduleExpiry(Context c, String phone, String name, String expiry) {
+    public static void scheduleExpiry(Context c, String phone, String name, String expiry) { scheduleExpiry(c,phone,name,expiry,phone,"-","", "0","0"); }
+
+    public static void scheduleExpiry(Context c, String phone, String name, String expiry, String code, String location, String pkg, String bill, String prevDue) {
         try {
             Date d = new SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(expiry);
             if (d == null) return;
             Calendar cal = Calendar.getInstance(); cal.setTime(d); cal.add(Calendar.DAY_OF_MONTH, 1); cal.set(Calendar.HOUR_OF_DAY, 9); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0);
-            schedule(c, phone, name, "expiry", cal.getTimeInMillis());
+            schedule(c, phone, name, "expiry", cal.getTimeInMillis(), code, location, pkg, bill, prevDue);
         } catch (Exception ignored) {}
     }
 
@@ -83,11 +87,14 @@ public class AutoMessageReceiver extends BroadcastReceiver {
         schedule(c, phone, name, "month_end", cal.getTimeInMillis());
     }
 
-    private static void schedule(Context c, String phone, String name, String type, long when) {
+    public static void cancelExpiry(Context c,String phone){ try{ AlarmManager am=(AlarmManager)c.getSystemService(Context.ALARM_SERVICE); Intent i=new Intent(c,AutoMessageReceiver.class); i.setAction(ACTION); i.putExtra(PHONE,phone); i.putExtra(TYPE,"expiry"); int code=(phone+"expiry").hashCode(); PendingIntent pi=PendingIntent.getBroadcast(c,code,i,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE); if(am!=null) am.cancel(pi); }catch(Exception ignored){} }
+
+    private static void schedule(Context c, String phone, String name, String type, long when) { schedule(c,phone,name,type,when,phone,"-","", "0","0"); }
+    private static void schedule(Context c, String phone, String name, String type, long when, String codeExtra, String locationExtra, String pkgExtra, String billExtra, String prevExtra) {
         if (when <= System.currentTimeMillis()) return;
         try {
             AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE); if (am == null) return;
-            Intent i = new Intent(c, AutoMessageReceiver.class); i.setAction(ACTION); i.putExtra(PHONE, phone); i.putExtra(NAME, name); i.putExtra(TYPE, type);
+            Intent i = new Intent(c, AutoMessageReceiver.class); i.setAction(ACTION); i.putExtra(PHONE, phone); i.putExtra(NAME, name); i.putExtra(TYPE, type); if("expiry".equals(type)){i.putExtra(CODE,codeExtra);i.putExtra(LOCATION,locationExtra);i.putExtra(PKG,pkgExtra);i.putExtra(BILL,billExtra);i.putExtra(PREV,prevExtra);}
             int code = (phone + type).hashCode(); PendingIntent pi = PendingIntent.getBroadcast(c, code, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             if (Build.VERSION.SDK_INT >= 23) { try { am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, when, pi); } catch (SecurityException e) { am.set(AlarmManager.RTC_WAKEUP, when, pi); } }
             else am.setExact(AlarmManager.RTC_WAKEUP, when, pi);
