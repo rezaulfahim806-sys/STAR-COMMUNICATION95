@@ -10,32 +10,46 @@ async function cloudLogin(api,user,pass){
  d.settings.cloud={apiUrl:api,username:user,token:x.token};save(false);return x
 }
 function dataCount(x){return ['customers','payments','expenses','pending','history'].reduce((n,k)=>n+(Array.isArray(x[k])?x[k].length:0),0)}
+function mergeRows(localRows,cloudRows){
+ let out=[],map=new Map();
+ (localRows||[]).forEach(x=>{let k=String(x.id??x._id??'');if(k){map.set(k,x)}else{out.push(x)}});
+ (cloudRows||[]).forEach(x=>{let k=String(x.id??x._id??'');if(!k){out.push(x);return}let old=map.get(k);if(!old){map.set(k,x);return}let ot=Date.parse(old.updatedAt||old.createdAt||'')||0,nt=Date.parse(x.updatedAt||x.createdAt||'')||0;if(nt>ot)map.set(k,x)});
+ return out.concat(Array.from(map.values()))
+}
+function mergeState(local,cloud){
+ return {
+  customers:mergeRows(local.customers,cloud.customers),
+  payments:mergeRows(local.payments,cloud.payments),
+  expenses:mergeRows(local.expenses,cloud.expenses),
+  pending:mergeRows(local.pending,cloud.pending),
+  history:mergeRows(local.history,cloud.history),
+  settings:Object.assign({},local.settings||{},cloud.settings||{})
+ }
+}
 async function cloudSync(pushLocal){
  let cfg=cloudConfig();if(!cfg.apiUrl||!cfg.token||cloudBusy)return false;
  cloudBusy=true;
  try{
-  let r=await fetch(String(cfg.apiUrl).replace(/\\/$/,'')+'/api/sync',{headers:cloudHeaders()});
+  let r=await fetch(String(cfg.apiUrl).replace(/\/$/,'')+'/api/sync',{headers:cloudHeaders()});
   if(r.status===401)throw new Error('Cloud session expired');
   if(!r.ok)throw new Error('Cloud sync read failed');
   let x=await r.json();
   if(x.data&&Array.isArray(x.data.customers)){
     let localCount=dataCount(d),cloudCount=dataCount(x.data);
-    if(cloudCount===0&&localCount>0&&!pushLocal){
-      toast('Cloud is empty — local data kept safe');
-      return false;
-    }
-    if(pushLocal&&cloudCount>0&&localCount>0){
+    if(cloudCount===0&&localCount>0&&!pushLocal){toast('Cloud is empty — local data kept safe');return false}
+    if(localCount>0&&cloudCount>0){
+      let merged=mergeState(d,x.data);
+      d.customers=merged.customers;d.payments=merged.payments;d.expenses=merged.expenses;d.pending=merged.pending;d.history=merged.history;
       await cloudPush();
-      return true;
+      localStorage.setItem(KEY,JSON.stringify(d));localStorage.setItem(KEY+'_last_backup',JSON.stringify({savedAt:new Date().toISOString(),data:d}));
+      render();toast('Cloud + local data merged safely');
+    }else{
+      d.customers=x.data.customers||[];d.payments=x.data.payments||[];d.expenses=x.data.expenses||[];d.pending=x.data.pending||[];d.history=x.data.history||[];
+      if(x.data.settings)d.settings=Object.assign({},d.settings,x.data.settings,{cloud:cfg});
+      localStorage.setItem(KEY,JSON.stringify(d));localStorage.setItem(KEY+'_last_backup',JSON.stringify({savedAt:new Date().toISOString(),data:d}));
+      render();toast('Cloud data loaded');
     }
-    d.customers=x.data.customers||[];d.payments=x.data.payments||[];d.expenses=x.data.expenses||[];d.pending=x.data.pending||[];d.history=x.data.history||[];
-    if(x.data.settings)d.settings=Object.assign({},d.settings,x.data.settings,{cloud:cfg});
-    localStorage.setItem(KEY,JSON.stringify(d));
-    localStorage.setItem(KEY+'_last_backup',JSON.stringify({savedAt:new Date().toISOString(),data:d}));
-    render();toast('Cloud data loaded');
-  }else if(pushLocal){
-    await cloudPush();
-  }
+  }else if(pushLocal){await cloudPush()}
   return true
  }catch(e){try{toast('Cloud sync: '+e.message)}catch(_){ }return false}
 }
