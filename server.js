@@ -14,6 +14,11 @@ const PORT=process.env.PORT||10000;
 const JWT_SECRET=process.env.JWT_SECRET||'';
 const ADMIN_USER=process.env.ADMIN_USER||'';
 const ADMIN_HASH=process.env.ADMIN_PASSWORD_HASH||((process.env.ADMIN_PASSWORD)?bcrypt.hashSync(process.env.ADMIN_PASSWORD,10):'');
+const ACCOUNT_COLLECTION='accounts';
+function ownerOf(u){return String(u&&u.owner||u&&u.username||'')}
+function isOwner(u){return String(u&&u.role||'owner')==='owner'}
+function publicAccount(a){return {username:a.username,role:a.role,owner:a.owner,active:a.active!==false}}
+
 let db=null;
 async function initDb(){
  if(!process.env.MONGODB_URI)throw new Error('MONGODB_URI is required for live deployment');
@@ -24,7 +29,25 @@ async function initDb(){
 function auth(req,res,next){try{const h=req.headers.authorization||'';if(!h.startsWith('Bearer '))throw 0;req.user=jwt.verify(h.slice(7),JWT_SECRET);next()}catch(e){res.status(401).json({error:'Unauthorized'})}}
 function send(res,payload){res.json(payload)}
 app.get('/api/health',(req,res)=>send(res,{ok:true,app:'STAR COMMUNICATION',time:new Date().toISOString(),database:!!db}));
-app.post('/api/auth/login',(req,res)=>{const {username,password}=req.body||{};if(username!==ADMIN_USER||!bcrypt.compareSync(String(password||''),ADMIN_HASH))return res.status(401).json({error:'Invalid username or password'});const token=jwt.sign({username},JWT_SECRET,{expiresIn:'30d'});send(res,{token,expiresIn:30*24*60*60})});
+app.post('/api/auth/login',async(req,res)=>{
+ const {username,password}=req.body||{};
+ const u=String(username||'').trim(), p=String(password||'');
+ if(!u||!p)return res.status(400).json({error:'Username and password are required'});
+ try{
+  let account=null;
+  const ac=col(ACCOUNT_COLLECTION);
+  if(ac)account=await ac.findOne({username:u});
+  if(account){
+   if(account.active===false||!bcrypt.compareSync(p,account.passwordHash))return res.status(401).json({error:'Invalid username or password'});
+   const claims={username:account.username,role:account.role||'worker',owner:account.owner||account.username};
+   const token=jwt.sign(claims,JWT_SECRET,{expiresIn:'30d'});
+   return send(res,{token,expiresIn:30*24*60*60,role:claims.role,owner:claims.owner,username:claims.username});
+  }
+  if(u!==ADMIN_USER||!ADMIN_HASH||!bcrypt.compareSync(p,ADMIN_HASH))return res.status(401).json({error:'Invalid username or password'});
+  const token=jwt.sign({username:u,role:'owner',owner:u},JWT_SECRET,{expiresIn:'30d'});
+  send(res,{token,expiresIn:30*24*60*60,role:'owner',owner:u,username:u});
+ }catch(e){res.status(500).json({error:'Login service error'})}
+});
 
 // Minimal production API storage. If MongoDB is not configured, data lives in memory for testing only.
 const mem={customers:[],payments:[],history:[],bkash:[],ledger:[]};
@@ -33,12 +56,57 @@ async function list(name){const c=col(name);return c?c.find({}).sort({createdAt:
 async function insert(name,obj){const c=col(name);if(c){const r=await c.insertOne(obj);return {...obj,id:String(r.insertedId)}} mem[name].push(obj);return obj}
 async function update(name,id,patch){const c=col(name);if(c){const {ObjectId}=require('mongodb');let q;try{q={_id:new ObjectId(id)}}catch{q={id}};await c.updateOne(q,{$set:patch});return}const x=mem[name].find(v=>String(v.id)===String(id));if(x)Object.assign(x,patch)}
 async function remove(name,id){const c=col(name);if(c){const {ObjectId}=require('mongodb');let q;try{q={_id:new ObjectId(id)}}catch{q={id}};await c.deleteOne(q);return}mem[name].splice(mem[name].findIndex(v=>String(v.id)===String(id)),1)}
+// Staff accounts: owner can create worker logins. Workers share the owner's customer cloud but are restricted to expired clients and complaints.
+app.post('/api/accounts',auth,async(req,res)=>{
+ if(!isOwner(req.user))return res.status(403).json({error:'Owner access required'});
+ const {username,password}=req.body||{}, role=String(req.body&&req.body.role||'worker');
+ const u=String(username||'').trim(), p=String(password||'');
+ if(!/^[A-Za-z0-9_.-]{3,32}$/.test(u)||p.length<8)return res.status(400).json({error:'Username 3-32 chars and password at least 8 chars required'});
+ if(role!=='worker')return res.status(400).json({error:'Only worker sub-accounts can be created'});
+ const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
+ if(await ac.findOne({username:u}))return res.status(409).json({error:'Username already exists'});
+ const a={username:u,passwordHash:bcrypt.hashSync(p,12),role:'worker',owner:ownerOf(req.user),active:true,createdAt:new Date().toISOString()};
+ await ac.insertOne(a);send(res,{ok:true,account:publicAccount(a)});
+});
+app.get('/api/accounts',auth,async(req,res)=>{
+ if(!isOwner(req.user))return res.status(403).json({error:'Owner access required'});
+ const ac=col(ACCOUNT_COLLECTION);if(!ac)return send(res,{ok:true,accounts:[]});
+ send(res,{ok:true,accounts:(await ac.find({owner:ownerOf(req.user)}).sort({createdAt:-1}).toArray()).map(publicAccount)});
+});
+app.post('/api/accounts/:username/toggle',auth,async(req,res)=>{
+ if(!isOwner(req.user))return res.status(403).json({error:'Owner access required'});
+ const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
+ const a=await ac.findOne({username:req.params.username,owner:ownerOf(req.user)});
+ if(!a)return res.status(404).json({error:'Account not found'});
+ await ac.updateOne({_id:a._id},{$set:{active:a.active===false}});
+ send(res,{ok:true,active:a.active===false});
+});
+app.post('/api/complaints',auth,async(req,res)=>{
+ const c=col('complaints');if(!c)return res.status(503).json({error:'Cloud database is not configured'});
+ const b=req.body||{};const x={id:Date.now().toString(),owner:ownerOf(req.user),createdBy:req.user.username,customerId:String(b.customerId||''),customerName:String(b.customerName||''),type:String(b.type||'General'),message:String(b.message||'').trim(),status:'OPEN',createdAt:new Date().toISOString()};
+ if(!x.message)return res.status(400).json({error:'Complaint message is required'});
+ await c.insertOne(x);send(res,{ok:true,complaint:x});
+});
+app.get('/api/complaints',auth,async(req,res)=>{
+ const c=col('complaints');if(!c)return send(res,{ok:true,complaints:[]});
+ const q={owner:ownerOf(req.user)};if(!isOwner(req.user))q.createdBy=req.user.username;
+ send(res,{ok:true,complaints:await c.find(q).sort({createdAt:-1}).limit(200).toArray()});
+});
+app.post('/api/complaints/:id/status',auth,async(req,res)=>{
+ if(!isOwner(req.user))return res.status(403).json({error:'Owner access required'});
+ const c=col('complaints');if(!c)return res.status(503).json({error:'Cloud database is not configured'});
+ await c.updateOne({id:String(req.params.id),owner:ownerOf(req.user)},{$set:{status:String(req.body&&req.body.status||'OPEN'),updatedAt:new Date().toISOString(),handledBy:req.user.username}});
+ send(res,{ok:true});
+});
 // Cloud sync: one account can use the same data on multiple devices.
 app.get('/api/sync',auth,async(req,res)=>{
  const c=col('app_state');
  if(!c)return send(res,{ok:true,data:null});
- const state=await c.findOne({owner:req.user.username});
- send(res,{ok:true,data:state?state.data:null,updatedAt:state?state.updatedAt:null});
+ const state=await c.findOne({owner:ownerOf(req.user)});
+ if(!state)return send(res,{ok:true,data:null,updatedAt:null,role:req.user.role||'owner',owner:ownerOf(req.user)});
+ if(isOwner(req.user))return send(res,{ok:true,data:state.data,updatedAt:state.updatedAt,role:'owner',owner:ownerOf(req.user)});
+ const safe={customers:(state.data.customers||[]).filter(x=>String(x.status||'').toLowerCase()==='expired'),payments:[],expenses:[],pending:[],history:[],settings:{cloud:{}}};
+ send(res,{ok:true,data:safe,updatedAt:state.updatedAt,role:'worker',owner:ownerOf(req.user)});
 });
 app.post('/api/sync',auth,async(req,res)=>{
  const data=req.body&&req.body.data;
@@ -55,7 +123,8 @@ app.post('/api/sync',auth,async(req,res)=>{
  const c=col('app_state');
  if(!c)return res.status(503).json({error:'Cloud database is not configured'});
  const now=new Date().toISOString();
- const owner=req.user.username;
+ const owner=ownerOf(req.user);
+ if(!isOwner(req.user))return res.status(403).json({error:'Workers cannot upload company data'});
  // Reject stale device writes; clients should sync/merge before retrying.
  const incomingUpdatedAt=String(req.body.updatedAt||'');
  const existing=await c.findOne({owner});
@@ -72,6 +141,7 @@ app.post('/api/sync',auth,async(req,res)=>{
  send(res,{ok:true,updatedAt:now,backupCreated:!!existing});
 });
 app.get('/api/sync/backups',auth,async(req,res)=>{
+ if(!isOwner(req.user))return res.status(403).json({error:'Owner access required'});
  const c=db&&db.collection('app_state_backups');
  if(!c)return send(res,{ok:true,backups:[]});
  const rows=await c.find({owner:req.user.username},{projection:{data:0}}).sort({savedAt:-1}).limit(20).toArray();
