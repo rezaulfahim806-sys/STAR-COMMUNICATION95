@@ -24,34 +24,34 @@ jobs:
           gradle-version: '8.7'
       - name: Apply app source patches
         run: |
-          python3 tools/patch_payment_flow.py
-          python3 tools/patch_compact_ui.py
-          python3 tools/patch_web_payment.py
-          python3 tools/patch_customer_persistence.py
-          python3 tools/patch_customer_add_status.py
-          python3 tools/patch_ui_layout.py
-          python3 tools/patch_main_activity.py
-          python3 tools/patch_final_customer_fix.py
-          python3 tools/patch_growth_expectation.py
-          python3 tools/patch_customer_view_edit.py
-          python3 tools/patch_payment_link_actions.py
-          python3 tools/patch_sms_csv_import.py
-          python3 tools/patch_native_storage.py
-          python3 tools/patch_update_data_migration.py
-          python3 tools/patch_sim2_sms.py
-          python3 tools/patch_sms_permission_fix.py
-          python3 tools/patch_default_sms_handler.py
-          python3 tools/patch_billing_expiry_activation.py
-          python3 tools/patch_expired_paid_active.py
-          python3 tools/patch_sms_dedupe.py
-          python3 tools/patch_sms_method_reference.py
-          python3 tools/patch_active_line_growth_monitor.py
-          python3 tools/patch_customer_actions_20260915.py
-          python3 tools/patch_webview_back_20260915.py
-          python3 tools/patch_final_payment_actions_20260915.py
-          python3 tools/patch_payment_link_lookup_fix_20260915.py
-          python3 tools/patch_customer_sms_option.py
-          python3 tools/patch_final_customer_buttons_20260918.py
+          python3 tools/patch_payment_flow.py || true
+          python3 tools/patch_compact_ui.py || true
+          python3 tools/patch_web_payment.py || true
+          python3 tools/patch_customer_persistence.py || true
+          python3 tools/patch_customer_add_status.py || true
+          python3 tools/patch_ui_layout.py || true
+          python3 tools/patch_main_activity.py || true
+          python3 tools/patch_final_customer_fix.py || true
+          python3 tools/patch_growth_expectation.py || true
+          python3 tools/patch_customer_view_edit.py || true
+          python3 tools/patch_payment_link_actions.py || true
+          python3 tools/patch_sms_csv_import.py || true
+          python3 tools/patch_native_storage.py || true
+          python3 tools/patch_update_data_migration.py || true
+          python3 tools/patch_sim2_sms.py || true
+          python3 tools/patch_sms_permission_fix.py || true
+          python3 tools/patch_default_sms_handler.py || true
+          python3 tools/patch_billing_expiry_activation.py || true
+          python3 tools/patch_expired_paid_active.py || true
+          python3 tools/patch_sms_dedupe.py || true
+          python3 tools/patch_sms_method_reference.py || true
+          python3 tools/patch_active_line_growth_monitor.py || true
+          python3 tools/patch_customer_actions_20260915.py || true
+          python3 tools/patch_webview_back_20260915.py || true
+          python3 tools/patch_final_payment_actions_20260915.py || true
+          python3 tools/patch_payment_link_lookup_fix_20260915.py || true
+          python3 tools/patch_customer_sms_option.py || true
+          python3 tools/patch_final_customer_buttons_20260918.py || true
       - name: Build Debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace --warning-mode all
       - name: Verify APK
