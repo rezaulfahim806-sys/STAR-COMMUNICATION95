@@ -24,7 +24,6 @@ new='''@JavascriptInterface public boolean sendSms(String phone,String message){
             }
         }'''
 
-# Replace any existing sendSms method inside AppBridge.
 pat=re.compile(r'@JavascriptInterface public boolean sendSms\(String phone,String message\)\{.*?\n        \}\n        @JavascriptInterface public void sendBulk',re.S)
 m=pat.search(s)
 if m:
@@ -32,20 +31,18 @@ if m:
 elif new not in s:
     raise SystemExit("sendSms method not found")
 
-# Allow SMS schemes if the URL handler is present; tolerate earlier handler variants.
 if 'u.startsWith("sms:")||u.startsWith("smsto:")' not in s:
     marker='if(u.startsWith("tel:")'
     pos=s.find(marker)
     if pos>=0:
-        end=s.find('))',pos)
-        # Simpler targeted replacement of the known first condition line.
         line_start=s.rfind('\n',0,pos)+1
         line_end=s.find('\n',pos)
+        if line_end<0: line_end=len(s)
         line=s[line_start:line_end]
         line=line.replace('u.startsWith("tel:")','u.startsWith("tel:")||u.startsWith("sms:")||u.startsWith("smsto:")',1)
         s=s[:line_start]+line+s[line_end:]
     else:
-        raise SystemExit("handleUrl condition not found")
+        print("handleUrl SMS scheme patch skipped; direct bridge handles SMS")
 
 p.write_text(s,encoding="utf-8")
 print("SMS button hardened")
