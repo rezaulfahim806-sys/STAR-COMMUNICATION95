@@ -62,3 +62,6 @@ jobs:
         with:
           name: STAR-COMMUNICATION-secure-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Apply final account and SMS patch
+        run: python3 tools/patch_account_sms_final.py
