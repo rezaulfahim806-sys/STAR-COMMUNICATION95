@@ -56,7 +56,12 @@ app.post('/api/sync',auth,async(req,res)=>{
  if(!c)return res.status(503).json({error:'Cloud database is not configured'});
  const now=new Date().toISOString();
  const owner=req.user.username;
+ // Reject stale device writes; clients should sync/merge before retrying.
+ const incomingUpdatedAt=String(req.body.updatedAt||'');
  const existing=await c.findOne({owner});
+ if(existing&&incomingUpdatedAt&&existing.updatedAt&&incomingUpdatedAt<existing.updatedAt){
+   return res.status(409).json({error:'Cloud data changed on another device; sync before upload',updatedAt:existing.updatedAt,data:existing.data});
+ }
  if(existing&&existing.data){
    const backups=db.collection('app_state_backups');
    await backups.insertOne({owner,sourceUpdatedAt:existing.updatedAt||null,savedAt:now,data:existing.data});
