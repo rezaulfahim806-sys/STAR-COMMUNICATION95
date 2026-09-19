@@ -178,14 +178,14 @@ public class MainActivity extends Activity {
                     if(uri==null) throw new Exception("PDF file could not be created");
 
                     PdfDocument doc=new PdfDocument();
-                    final int W=842,H=595,PER_PAGE=20;
+                    final int W=842,H=595,PER_PAGE=50;
                     Paint p=new Paint(Paint.ANTI_ALIAS_FLAG), bold=new Paint(Paint.ANTI_ALIAS_FLAG);
                     bold.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
                     int totalPages=Math.max(1,(arr.length()+PER_PAGE-1)/PER_PAGE);
 
                     // 13 separate columns: every requested customer field is visible.
-                    String[] heads={"#","NAME","LOCATION","PACKAGE","BILL","CODE","NUMBER","PPPoE USER","PPPoE PASS","ONU MAC","PREV DUE","TOTAL DUE","STATUS"};
-                    int[] x={20,43,103,177,231,273,315,367,431,495,560,630,705};
+                    String[] heads={"#","NAME","LOCATION","PACKAGE","BILL","CODE","NUMBER","PPPoE USER","PPPoE PASS","ONU MAC","PREV DUE","RUNNING","TOTAL DUE","STATUS"};
+                    int[] x={14,34,90,160,210,248,286,335,397,459,520,580,640,704};
 
                     for(int pageNo=0;pageNo<totalPages;pageNo++){
                         PdfDocument.Page page=doc.startPage(new PdfDocument.PageInfo.Builder(W,H,pageNo+1).create());
@@ -197,17 +197,17 @@ public class MainActivity extends Activity {
                         bold.setColor(Color.WHITE); bold.setTextSize(9); cv.drawText("PAGE "+(pageNo+1)+" / "+totalPages,716,37,bold);
 
                         int top=80,left=14,right=828;
-                        p.setColor(Color.rgb(226,235,246)); cv.drawRoundRect(left,top,right,top+27,5,5,p);
-                        bold.setColor(Color.rgb(11,50,90)); bold.setTextSize(6.8f);
-                        for(int k=0;k<heads.length;k++) cv.drawText(heads[k],x[k],top+17,bold);
+                        p.setColor(Color.rgb(226,235,246)); cv.drawRoundRect(left,top,right,top+22,5,5,p);
+                        bold.setColor(Color.rgb(11,50,90)); bold.setTextSize(5.6f);
+                        for(int k=0;k<heads.length;k++) cv.drawText(heads[k],x[k],top+14,bold);
 
-                        int start=pageNo*PER_PAGE,end=Math.min(arr.length(),start+PER_PAGE),rowY=top+32;
+                        int start=pageNo*PER_PAGE,end=Math.min(arr.length(),start+PER_PAGE),rowY=top+25;
                         for(int j=start;j<end;j++){
                             JSONObject o=arr.getJSONObject(j);
-                            p.setColor(((j-start)%2)==1?Color.rgb(249,251,253):Color.WHITE); cv.drawRect(left,rowY,right,rowY+23,p);
+                            p.setColor(((j-start)%2)==1?Color.rgb(249,251,253):Color.WHITE); cv.drawRect(left,rowY,right,rowY+10,p);
                             p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(.5f); p.setColor(Color.rgb(220,226,234)); cv.drawRect(left,rowY,right,rowY+23,p); p.setStyle(Paint.Style.FILL);
-                            bold.setColor(Color.rgb(25,40,60)); bold.setTextSize(6.5f); p.setColor(Color.rgb(25,40,60)); p.setTextSize(6.5f);
-                            cv.drawText(String.format(Locale.US,"%02d",j+1),20,rowY+15,bold);
+                            bold.setColor(Color.rgb(25,40,60)); bold.setTextSize(4.8f); p.setColor(Color.rgb(25,40,60)); p.setTextSize(4.8f);
+                            cv.drawText(String.format(Locale.US,"%02d",j+1),20,rowY+7,bold);
                             cv.drawText(shortText(o.optString("name","—"),10),43,rowY+15,bold);
                             cv.drawText(shortText(o.optString("address","—"),12),103,rowY+15,p);
                             cv.drawText(shortText(o.optString("pkg","—"),9),177,rowY+15,p);
@@ -233,7 +233,7 @@ public class MainActivity extends Activity {
                     doc.writeTo(out);out.close();doc.close();
                     Intent view=new Intent(Intent.ACTION_VIEW);view.setDataAndType(uri,"application/pdf");view.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_ACTIVITY_NEW_TASK);
                     try{startActivity(view);}catch(Exception ex){Intent share=new Intent(Intent.ACTION_SEND);share.setType("application/pdf");share.putExtra(Intent.EXTRA_STREAM,uri);share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(share,"Open / Share PDF"));}
-                    Toast.makeText(MainActivity.this,"PDF saved: 20 customers per page",Toast.LENGTH_LONG).show();
+                    Toast.makeText(MainActivity.this,"PDF saved: 50 customers per page",Toast.LENGTH_LONG).show();
                 }catch(Exception ex){Toast.makeText(MainActivity.this,"PDF তৈরি করতে সমস্যা হয়েছে: "+ex.getMessage(),Toast.LENGTH_LONG).show();}
             });
         }
