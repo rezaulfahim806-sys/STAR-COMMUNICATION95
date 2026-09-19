@@ -63,12 +63,12 @@ public class MainActivity extends Activity {
 
     private void openApp() {
         webView = new WebView(this); setContentView(webView);
-        WebSettings s=webView.getSettings(); s.setJavaScriptEnabled(true); s.setDomStorageEnabled(true); s.setDatabaseEnabled(true); s.setAllowFileAccess(true); s.setAllowContentAccess(true);
+        WebSettings s=webView.getSettings(); s.setJavaScriptEnabled(true); s.setDomStorageEnabled(true); s.setDatabaseEnabled(false); s.setAllowFileAccess(true); s.setAllowContentAccess(false); if (Build.VERSION.SDK_INT >= 16) { s.setAllowFileAccessFromFileURLs(false); s.setAllowUniversalAccessFromFileURLs(false); } if (Build.VERSION.SDK_INT >= 26) { s.setSafeBrowsingEnabled(true); }
         webView.addJavascriptInterface(new AppBridge(),"AndroidBridge");
         webView.setWebViewClient(new WebViewClient(){
             @Override public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r){return handleUrl(r.getUrl().toString());}
             @Override public boolean shouldOverrideUrlLoading(WebView v,String u){return handleUrl(u);}
-            @Override public void onPageFinished(WebView v,String u){super.onPageFinished(v,u);migrateStorage(v);injectFeatures();}
+            @Override public void onPageFinished(WebView v,String u){super.onPageFinished(v,u); if(u != null && u.startsWith("file:///android_asset/")) { migrateStorage(v); injectFeatures(); }}
         });
         webView.loadUrl("file:///android_asset/index.html");
     }
@@ -90,7 +90,9 @@ public class MainActivity extends Activity {
     }
 
     private boolean handleUrl(String u){
-        if(u.startsWith("tel:")||u.startsWith("https://wa.me/")||u.startsWith("whatsapp:")){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(u)));}catch(Exception ignored){}return true;} return false;
+        if(u==null) return true;
+        if(u.startsWith("tel:")||u.startsWith("https://wa.me/")||u.startsWith("whatsapp:")||u.startsWith("https://")){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(u)));}catch(Exception ignored){}return true;}
+        return !u.startsWith("file:///android_asset/");
     }
 
     private void requestSmsPermission() {
