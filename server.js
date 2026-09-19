@@ -33,6 +33,31 @@ async function list(name){const c=col(name);return c?c.find({}).sort({createdAt:
 async function insert(name,obj){const c=col(name);if(c){const r=await c.insertOne(obj);return {...obj,id:String(r.insertedId)}} mem[name].push(obj);return obj}
 async function update(name,id,patch){const c=col(name);if(c){const {ObjectId}=require('mongodb');let q;try{q={_id:new ObjectId(id)}}catch{q={id}};await c.updateOne(q,{$set:patch});return}const x=mem[name].find(v=>String(v.id)===String(id));if(x)Object.assign(x,patch)}
 async function remove(name,id){const c=col(name);if(c){const {ObjectId}=require('mongodb');let q;try{q={_id:new ObjectId(id)}}catch{q={id}};await c.deleteOne(q);return}mem[name].splice(mem[name].findIndex(v=>String(v.id)===String(id)),1)}
+// Cloud sync: one account can use the same data on multiple devices.
+app.get('/api/sync',auth,async(req,res)=>{
+ const c=col('app_state');
+ if(!c)return send(res,{ok:true,data:null});
+ const state=await c.findOne({owner:req.user.username});
+ send(res,{ok:true,data:state?state.data:null,updatedAt:state?state.updatedAt:null});
+});
+app.post('/api/sync',auth,async(req,res)=>{
+ const data=req.body&&req.body.data;
+ if(!data||!Array.isArray(data.customers)||!Array.isArray(data.payments)||!Array.isArray(data.expenses)||!Array.isArray(data.pending)||!Array.isArray(data.history))
+   return res.status(400).json({error:'Invalid sync data'});
+ const clean={
+   customers:data.customers,
+   payments:data.payments,
+   expenses:data.expenses,
+   pending:data.pending,
+   history:data.history,
+   settings:data.settings||{}
+ };
+ const c=col('app_state');
+ if(!c)return res.status(503).json({error:'Cloud database is not configured'});
+ const now=new Date().toISOString();
+ await c.updateOne({owner:req.user.username},{$set:{owner:req.user.username,data:clean,updatedAt:now}},{upsert:true});
+ send(res,{ok:true,updatedAt:now});
+});
 app.get('/api/customers',auth,async(req,res)=>send(res,await list('customers')));
 app.post('/api/customers',auth,async(req,res)=>{const b=req.body||{};const x={id:Date.now(),name:b.name,mobile:b.mobile||'',packageName:b.packageName||'',monthlyFee:Number(b.monthlyFee||0),pppoeUsername:b.pppoeUsername||'',pppoePassword:b.pppoePassword||'',onuId:b.onuId||'',expiryDate:b.expiryDate||null,status:b.status||'ACTIVE',previousDue:Number(b.previousDue||0),createdAt:new Date().toISOString()};send(res,await insert('customers',x))});
 app.delete('/api/customers/:id',auth,async(req,res)=>{await remove('customers',req.params.id);send(res,{ok:true})});
