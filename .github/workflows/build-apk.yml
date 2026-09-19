@@ -26,6 +26,8 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
+      - name: Apply approved UI patch
+        run: python3 tools/patch_staff_accounts_complaints.py
       - name: Verify Android project
         shell: bash
         run: |
@@ -48,6 +50,8 @@ jobs:
           grep -q 'TOTAL DUE' app/src/main/java/com/starcommunication/isp/MainActivity.java
           grep -q 'android:allowBackup="false"' app/src/main/AndroidManifest.xml
           grep -q 'android:usesCleartextTraffic="false"' app/src/main/AndroidManifest.xml
+          grep -q 'workerPage' app/src/main/assets/index.html
+          grep -q '/api/complaints' app/src/main/assets/index.html
       - name: Build Debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace --warning-mode all
       - name: Verify APK exists
