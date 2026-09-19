@@ -9,6 +9,7 @@ async function cloudLogin(api,user,pass){
  let x=await r.json();if(!x.token)throw new Error('No login token');
  d.settings.cloud={apiUrl:api,username:user,token:x.token};save(false);return x
 }
+function dataCount(x){return ['customers','payments','expenses','pending','history'].reduce((n,k)=>n+(Array.isArray(x[k])?x[k].length:0),0)}
 async function cloudSync(pushLocal){
  let cfg=cloudConfig();if(!cfg.apiUrl||!cfg.token||cloudBusy)return false;
  cloudBusy=true;
@@ -18,6 +19,15 @@ async function cloudSync(pushLocal){
   if(!r.ok)throw new Error('Cloud sync read failed');
   let x=await r.json();
   if(x.data&&Array.isArray(x.data.customers)){
+    let localCount=dataCount(d),cloudCount=dataCount(x.data);
+    if(cloudCount===0&&localCount>0&&!pushLocal){
+      toast('Cloud is empty — local data kept safe');
+      return false;
+    }
+    if(pushLocal&&cloudCount>0&&localCount>0){
+      await cloudPush();
+      return true;
+    }
     d.customers=x.data.customers||[];d.payments=x.data.payments||[];d.expenses=x.data.expenses||[];d.pending=x.data.pending||[];d.history=x.data.history||[];
     if(x.data.settings)d.settings=Object.assign({},d.settings,x.data.settings,{cloud:cfg});
     localStorage.setItem(KEY,JSON.stringify(d));
@@ -28,7 +38,6 @@ async function cloudSync(pushLocal){
   }
   return true
  }catch(e){try{toast('Cloud sync: '+e.message)}catch(_){ }return false}
- finally{cloudBusy=false}
 }
 async function cloudPush(){
  let cfg=cloudConfig();if(!cfg.apiUrl||!cfg.token)return false;
