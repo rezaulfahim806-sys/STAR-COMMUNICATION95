@@ -1,4 +1,4 @@
-name: STAR COMMUNICATION 66.91 SMS Fix
+name: STAR COMMUNICATION 66.91 SMS ONLY
 
 on:
   workflow_dispatch:
@@ -21,15 +21,13 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
-      - name: Apply only SMS fix
-        run: |
-          python3 tools/patch_account_sms_payment_final.py
-          python3 tools/patch_sms_only_6691.py
+      - name: Apply customer SMS patch only
+        run: python3 tools/patch_customer_sms_option.py
       - name: Build Debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace
       - name: Verify APK
         run: test -f app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: STAR-COMMUNICATION-66.91-SMS-FIX
+          name: STAR-COMMUNICATION-66.91-SMS-ONLY
           path: app/build/outputs/apk/debug/app-debug.apk
