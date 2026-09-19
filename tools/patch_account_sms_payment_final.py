@@ -1,13 +1,13 @@
-
 from pathlib import Path
 p=Path("app/src/main/assets/index.html")
 s=p.read_text(encoding="utf-8")
 D=chr(36)
-# Add buttons after the existing Details button in the customer card.
-anchor='<button class="small view" onclick="go(\\'details\\',{id:\\''+D+'{c.id}\\'})">Details</button>'
-insert=anchor+'<button class="small view" onclick="sendOneSms(\\''+D+'{num}\\',\\''+D+'{esc(c.name)}\\')">📩 SMS</button><button class="small" style="background:#7656d6;color:#fff" onclick="customerPaymentLink(\\''+D+'{c.id}\\')">🔗 Payment Link</button>'
-if 'customerPaymentLink(\\''+D+'{c.id}\\')' not in s:
-    if anchor not in s: raise SystemExit("Details anchor not found")
+
+anchor = '<button class="small view" onclick="go(\\'details\\',{id:' + D + '{c.id}})">Details</button>'
+insert = anchor + '<button class="small view" onclick="sendOneSms(\\'' + D + '{num}\\',\\'' + D + '{esc(c.name)}\\')">📩 SMS</button><button class="small" style="background:#7656d6;color:#fff" onclick="customerPaymentLink(\\'' + D + '{c.id}\\')">🔗 Payment Link</button>'
+if 'customerPaymentLink(\\'' + D + '{c.id}\\')' not in s:
+    if anchor not in s:
+        raise SystemExit("Details anchor not found")
     s=s.replace(anchor,insert,1)
 
 marker="function startup(){"
@@ -15,7 +15,7 @@ if "function registerScreen()" not in s:
     block=r'''function accountCard(title,sub){return '<div style="padding:28px 12px 100px"><div class="section" style="padding:22px"><div style="text-align:center"><img src="logo.svg" style="width:70px;height:70px;border-radius:18px"><h1 style="margin:12px 0 3px;color:#0b2145">STAR COMMUNICATION</h1><div class="muted">'+esc(sub)+'</div></div><h3 style="margin-top:22px">'+esc(title)+'</h3>'}
 function loginScreen(){document.getElementById('content').innerHTML=accountCard('Company Account Login','Use your Gmail + company password')+'<input id="loginApi" class="input" placeholder="Cloud API URL (HTTPS)" value="'+esc(d.settings.cloud?.apiUrl||'')+'"><input id="loginUser" class="input" type="email" placeholder="Gmail address"><input id="loginPass" class="input" type="password" placeholder="Password"><button class="btn green full" onclick="doStartupLogin()">Login</button><button class="btn light full" style="margin-top:8px" onclick="registerScreen()">Create Company Account</button><div id="loginMsg" class="muted" style="margin-top:10px;text-align:center"></div></div></div>'}
 function registerScreen(){document.getElementById('content').innerHTML=accountCard('Create Company Account','Your Gmail owns your company data')+'<input id="regApi" class="input" placeholder="Cloud API URL (HTTPS)" value="'+esc(d.settings.cloud?.apiUrl||'')+'"><input id="regCompany" class="input" placeholder="Company / ISP name"><input id="regEmail" class="input" type="email" placeholder="Gmail address"><input id="regPass" class="input" type="password" placeholder="Password (8+ characters)"><input id="regPass2" class="input" type="password" placeholder="Confirm password"><button class="btn green full" onclick="doRegister()">Create Account</button><button class="btn light full" style="margin-top:8px" onclick="loginScreen()">Back to Login</button><div id="regMsg" class="muted" style="margin-top:10px;text-align:center"></div></div></div>'}
-async function doStartupLogin(){let m=document.getElementById('loginMsg');try{let api=document.getElementById('loginApi').value,u=document.getElementById('loginUser').value.trim().toLowerCase(),p=document.getElementById('loginPass').value;m.textContent='Logging in...';let x=await cloudLogin(api,u,p);d.settings.cloud=Object.assign({},d.settings.cloud,{apiUrl:api.replace(/\/$/,''),username:u,token:x.token,role:x.role||'owner',owner:x.owner||u,companyName:x.companyName||''});save(false);await cloudSync(false);page='dashboard';opts={};render();toast('Login successful')}catch(e){m.textContent=e.message||'Login failed'}}
+async function doStartupLogin(){let m=document.getElementById('loginMsg');try{let api=document.getElementById('loginApi').value.trim().replace(/\/$/,''),u=document.getElementById('loginUser').value.trim().toLowerCase(),p=document.getElementById('loginPass').value;m.textContent='Logging in...';let x=await cloudLogin(api,u,p);d.settings.cloud=Object.assign({},d.settings.cloud,{apiUrl:api,username:u,token:x.token,role:x.role||'owner',owner:x.owner||u,companyName:x.companyName||''});save(false);await cloudSync(false);page='dashboard';opts={};render();toast('Login successful')}catch(e){m.textContent=e.message||'Login failed'}}
 async function doRegister(){let m=document.getElementById('regMsg');try{let api=document.getElementById('regApi').value.trim().replace(/\/$/,''),company=document.getElementById('regCompany').value.trim(),u=document.getElementById('regEmail').value.trim().toLowerCase(),p=document.getElementById('regPass').value,p2=document.getElementById('regPass2').value;if(!/^https:\/\//i.test(api))throw new Error('Cloud API URL is required');if(!/^[^\s@]+@gmail\.com$/i.test(u))throw new Error('Use a valid Gmail address');if(company.length<2)throw new Error('Company name is required');if(p.length<8)throw new Error('Password must be at least 8 characters');if(p!==p2)throw new Error('Passwords do not match');m.textContent='Creating account...';let r=await fetch(api+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:u,password:p,companyName:company})}),x=await r.json();if(!r.ok)throw new Error(x.error||'Registration failed');d.settings.cloud={apiUrl:api,username:u,token:x.token,role:'owner',owner:u,companyName:company};save(false);page='dashboard';opts={};await cloudSync(false);render();toast('Company account created')}catch(e){m.textContent=e.message||'Registration failed'}}
 function sendOneSms(phone,name){window.__starSmsPhone=String(phone||'');openSheet('<h3>Send SMS</h3><div class="muted">To: '+esc(name||'Customer')+' • '+esc(phone)+'</div><textarea id="onesms" class="input" rows="6" placeholder="Write your own message"></textarea><button class="btn green full" onclick="doSendOneSms()">Send SMS</button>')}
 function doSendOneSms(){let msg=document.getElementById('onesms')?.value||'',phone=window.__starSmsPhone||'';if(!msg.trim()){toast('Write a message first');return}if(!window.AndroidBridge||typeof AndroidBridge.sendSms!=='function'){toast('SMS service unavailable');return}let ok=AndroidBridge.sendSms(phone,msg);if(ok){closeSheet();toast('SMS sent')}}
@@ -24,8 +24,9 @@ async function copyCustomerPaymentLink(){let x=window.__starPay?.link||'';try{aw
 function openPaymentPage(){let x=window.__starPay?.link;if(x)window.open(x,'_blank')}
 function sendPaymentLinkSms(){let x=window.__starPay;if(!x)return;if(!window.AndroidBridge||typeof AndroidBridge.sendSms!=='function'){toast('SMS service unavailable');return}let ok=AndroidBridge.sendSms(x.phone,'Your bill payment link: '+x.link);if(ok){closeSheet();toast('Payment link SMS sent')}}
 '''
-    if marker not in s: raise SystemExit("startup marker missing")
+    if marker not in s:
+        raise SystemExit("startup marker missing")
     s=s.replace(marker,block+marker,1)
-s=s.replace("if(!r.ok)throw new Error('Login failed');\n let x=await r.json();if(!x.token)throw new Error('No login token');","let x=await r.json();if(!r.ok)throw new Error(x.error||'Login failed');if(!x.token)throw new Error(x.error||'No login token');")
+
 p.write_text(s,encoding="utf-8")
 print("OK")
