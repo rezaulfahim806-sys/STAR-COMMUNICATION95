@@ -55,8 +55,22 @@ app.post('/api/sync',auth,async(req,res)=>{
  const c=col('app_state');
  if(!c)return res.status(503).json({error:'Cloud database is not configured'});
  const now=new Date().toISOString();
- await c.updateOne({owner:req.user.username},{$set:{owner:req.user.username,data:clean,updatedAt:now}},{upsert:true});
- send(res,{ok:true,updatedAt:now});
+ const owner=req.user.username;
+ const existing=await c.findOne({owner});
+ if(existing&&existing.data){
+   const backups=db.collection('app_state_backups');
+   await backups.insertOne({owner,sourceUpdatedAt:existing.updatedAt||null,savedAt:now,data:existing.data});
+   const oldBackups=await backups.find({owner}).sort({savedAt:-1}).skip(20).toArray();
+   if(oldBackups.length) await backups.deleteMany({_id:{$in:oldBackups.map(x=>x._id)}});
+ }
+ await c.updateOne({owner},{$set:{owner,data:clean,updatedAt:now}},{upsert:true});
+ send(res,{ok:true,updatedAt:now,backupCreated:!!existing});
+});
+app.get('/api/sync/backups',auth,async(req,res)=>{
+ const c=db&&db.collection('app_state_backups');
+ if(!c)return send(res,{ok:true,backups:[]});
+ const rows=await c.find({owner:req.user.username},{projection:{data:0}}).sort({savedAt:-1}).limit(20).toArray();
+ send(res,{ok:true,backups:rows});
 });
 app.get('/api/customers',auth,async(req,res)=>send(res,await list('customers')));
 app.post('/api/customers',auth,async(req,res)=>{const b=req.body||{};const x={id:Date.now(),name:b.name,mobile:b.mobile||'',packageName:b.packageName||'',monthlyFee:Number(b.monthlyFee||0),pppoeUsername:b.pppoeUsername||'',pppoePassword:b.pppoePassword||'',onuId:b.onuId||'',expiryDate:b.expiryDate||null,status:b.status||'ACTIVE',previousDue:Number(b.previousDue||0),createdAt:new Date().toISOString()};send(res,await insert('customers',x))});
