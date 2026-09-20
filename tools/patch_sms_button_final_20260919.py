@@ -5,23 +5,18 @@ s=p.read_text(encoding="utf-8")
 
 new='''@JavascriptInterface public boolean sendSms(String phone,String message){
             if(phone==null||phone.trim().isEmpty()||message==null||message.trim().isEmpty())return false;
-            String p=phone.trim(), m=message.trim();
-            try{
-                if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED) {
-                    SmsManager.getDefault().sendTextMessage(p,null,m,null,null);
-                    runOnUiThread(()->Toast.makeText(MainActivity.this,"SMS sent using SIM",Toast.LENGTH_SHORT).show());
-                    return true;
-                }
-            }catch(Exception ignored){}
-            try{
-                Intent i=new Intent(Intent.ACTION_SENDTO,Uri.parse("smsto:"+Uri.encode(p)));
-                i.putExtra("sms_body",m);
-                startActivity(i);
-                return true;
-            }catch(Exception e){
-                runOnUiThread(()->Toast.makeText(MainActivity.this,"SMS app not available",Toast.LENGTH_LONG).show());
+            final String p=phone.trim(), m=message.trim();
+            if(Build.VERSION.SDK_INT>=23 && checkSelfPermission(Manifest.permission.SEND_SMS)!=PackageManager.PERMISSION_GRANTED){
+                pendingSmsPhone=p;
+                pendingSmsMessage=m;
+                runOnUiThread(()->{
+                    Toast.makeText(MainActivity.this,"Allow SMS permission, then the message will be sent.",Toast.LENGTH_LONG).show();
+                    requestSmsPermissions();
+                });
                 return false;
             }
+            sendDirectSms(p,m);
+            return true;
         }'''
 
 pat=re.compile(r'@JavascriptInterface public boolean sendSms\(String phone,String message\)\{.*?\n        \}\n        @JavascriptInterface public void sendBulk',re.S)
