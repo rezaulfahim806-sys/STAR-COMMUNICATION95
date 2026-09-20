@@ -3,24 +3,31 @@ import re
 p=Path("app/src/main/java/com/starcommunication/isp/MainActivity.java")
 s=p.read_text(encoding="utf-8")
 
-new='''@JavascriptInterface public boolean sendSms(String phone,String message){
+new='''@JavascriptInterface public boolean openSmsComposer(String phone,String message){
+            if(phone==null||phone.trim().isEmpty())return false;
+            final String p=phone.trim(), m=message==null?"":message.trim();
+            try{
+                Intent i=new Intent(Intent.ACTION_SENDTO,Uri.parse("smsto:"+Uri.encode(p)));
+                if(!m.isEmpty()) i.putExtra("sms_body",m);
+                if(i.resolveActivity(getPackageManager())==null){
+                    runOnUiThread(()->Toast.makeText(MainActivity.this,"No SMS app is installed.",Toast.LENGTH_LONG).show());
+                    return false;
+                }
+                startActivity(i);
+                return true;
+            }catch(Exception e){
+                runOnUiThread(()->Toast.makeText(MainActivity.this,"SMS app could not be opened.",Toast.LENGTH_LONG).show());
+                return false;
+            }
+        }
+        @JavascriptInterface public boolean sendSms(String phone,String message){
             if(phone==null||phone.trim().isEmpty()||message==null||message.trim().isEmpty())return false;
             final String p=phone.trim(), m=message.trim();
             if(Build.VERSION.SDK_INT>=23 && checkSelfPermission(Manifest.permission.SEND_SMS)==PackageManager.PERMISSION_GRANTED){
                 sendDirectSms(p,m);
                 return true;
             }
-            // No direct-SMS permission: always open the phone SMS composer so the
-            // customer SMS button never becomes a dead button.
-            try{
-                Intent i=new Intent(Intent.ACTION_SENDTO,Uri.parse("smsto:"+Uri.encode(p)));
-                i.putExtra("sms_body",m);
-                startActivity(i);
-                return true;
-            }catch(Exception e){
-                runOnUiThread(()->Toast.makeText(MainActivity.this,"SMS app not available. Allow SMS permission in App Settings.",Toast.LENGTH_LONG).show());
-                return false;
-            }
+            return openSmsComposer(p,m);
         }'''
 
 pat=re.compile(r'@JavascriptInterface public boolean sendSms\(String phone,String message\)\{.*?\n        \}\n        @JavascriptInterface public void sendBulk',re.S)
