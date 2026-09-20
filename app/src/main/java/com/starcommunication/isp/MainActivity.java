@@ -37,6 +37,7 @@ import android.widget.Toast;
 public class MainActivity extends Activity {
     private WebView webView;
     private static final int SMS_PERMISSION_REQUEST = 7001;
+    private String pendingSmsPhone = null, pendingSmsMessage = null, pendingBulkLines = null, pendingBulkMessage = null;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -95,6 +96,35 @@ public class MainActivity extends Activity {
         return !u.startsWith("file:///android_asset/");
     }
 
+    private void sendPendingSmsIfReady() {
+        if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) return;
+        if (pendingSmsPhone != null && pendingSmsMessage != null) {
+            String p=pendingSmsPhone, m=pendingSmsMessage; pendingSmsPhone=null; pendingSmsMessage=null; sendDirectSms(p,m);
+        }
+        if (pendingBulkLines != null && pendingBulkMessage != null) {
+            String lines=pendingBulkLines, msg=pendingBulkMessage; pendingBulkLines=null; pendingBulkMessage=null; sendBulkDirect(lines,msg);
+        }
+    }
+
+    private void sendDirectSms(String phone,String message) {
+        try {
+            SmsManager.getDefault().sendTextMessage(phone,null,message,null,null);
+            runOnUiThread(()->Toast.makeText(MainActivity.this,"SMS sent using SIM balance",Toast.LENGTH_SHORT).show());
+        } catch(Exception e) {
+            runOnUiThread(()->Toast.makeText(MainActivity.this,"SIM SMS failed. Check SIM/default SMS settings.",Toast.LENGTH_LONG).show());
+        }
+    }
+
+    private void sendBulkDirect(String lines,String message) {
+        String[] rows=lines.split("\\n"); int sent=0;
+        for(String row:rows){
+            try { String[] p=row.split("\\|",2); if(p.length>0&&!p[0].trim().isEmpty()){ SmsManager.getDefault().sendTextMessage(p[0].trim(),null,message,null,null); sent++; } Thread.sleep(250); }
+            catch(Exception ignored) {}
+        }
+        final int count=sent;
+        runOnUiThread(()->Toast.makeText(MainActivity.this,"SIM SMS sent: "+count+" messages",Toast.LENGTH_LONG).show());
+    }
+
     private void requestSmsPermission() {
         if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.SEND_SMS}, SMS_PERMISSION_REQUEST);
@@ -106,6 +136,7 @@ public class MainActivity extends Activity {
         if (requestCode == SMS_PERMISSION_REQUEST) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(this, "SIM SMS permission enabled", Toast.LENGTH_SHORT).show();
+                sendPendingSmsIfReady();
             } else {
                 Toast.makeText(this, "SMS permission denied. Direct SIM SMS cannot work.", Toast.LENGTH_LONG).show();
             }
@@ -129,27 +160,11 @@ public class MainActivity extends Activity {
         @JavascriptInterface public boolean sendSms(String phone,String message){
             if(phone==null||phone.trim().isEmpty()||message==null||message.trim().isEmpty())return false;
             String p=phone.trim(), m=message.trim();
-            if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED) {
-                try{
-                    SmsManager.getDefault().sendTextMessage(p,null,m,null,null);
-                    runOnUiThread(()->Toast.makeText(MainActivity.this,"SMS sent using SIM balance",Toast.LENGTH_SHORT).show());
-                    return true;
-                }catch(Exception e){
-                    runOnUiThread(()->Toast.makeText(MainActivity.this,"SIM SMS failed; opening SMS composer",Toast.LENGTH_LONG).show());
-                }
-            } else if(Build.VERSION.SDK_INT >= 23){
-                requestSmsPermission();
+            if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+                pendingSmsPhone=p; pendingSmsMessage=m; requestSmsPermission(); return true;
             }
-            try{
-                Intent i=new Intent(Intent.ACTION_SENDTO);
-                i.setData(Uri.parse("smsto:"+Uri.encode(p)));
-                i.putExtra("sms_body",m);
-                startActivity(i);
-                return true;
-            }catch(Exception e){
-                runOnUiThread(()->Toast.makeText(MainActivity.this,"No SMS app available",Toast.LENGTH_LONG).show());
-                return false;
-            }
+            sendDirectSms(p,m);
+            return true;
         }
         @JavascriptInterface public boolean copyText(String text){
             try{
@@ -165,16 +180,9 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void sendBulk(String lines,String message){
             if(lines==null||message==null||message.trim().isEmpty())return;
             if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
-                runOnUiThread(this::requestSmsPermission);
-                return;
+                pendingBulkLines=lines; pendingBulkMessage=message; runOnUiThread(this::requestSmsPermission); return;
             }
-            String[] rows=lines.split("\\n");
-            int sent=0;
-            for(String row:rows){
-                try{String[] p=row.split("\\|",2);if(p.length>0&&!p[0].trim().isEmpty()){SmsManager.getDefault().sendTextMessage(p[0].trim(),null,message,null,null);sent++;}Thread.sleep(250);}catch(Exception ignored){}
-            }
-            final int count=sent;
-            runOnUiThread(()->Toast.makeText(MainActivity.this,"SIM SMS send started: "+count+" messages",Toast.LENGTH_LONG).show());
+            sendBulkDirect(lines,message);
         }
         @JavascriptInterface public void saveCustomerPdf(String fileName,String body){
             String title=fileName==null?"Customer List":fileName.replace("STAR_COMMUNICATION_","").replace(".pdf","").replace("_"," ");
