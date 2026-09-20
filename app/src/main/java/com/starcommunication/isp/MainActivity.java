@@ -21,6 +21,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 import android.telephony.SmsManager;
+import android.telephony.SubscriptionManager;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import android.view.Gravity;
@@ -108,10 +109,27 @@ public class MainActivity extends Activity {
 
     private void sendDirectSms(String phone,String message) {
         try {
-            SmsManager.getDefault().sendTextMessage(phone,null,message,null,null);
-            runOnUiThread(()->Toast.makeText(MainActivity.this,"SMS sent using SIM balance",Toast.LENGTH_SHORT).show());
+            SmsManager manager = SmsManager.getDefault();
+            if (Build.VERSION.SDK_INT >= 22) {
+                try {
+                    int subId = SubscriptionManager.getDefaultSmsSubscriptionId();
+                    if (subId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+                        manager = SmsManager.getSmsManagerForSubscriptionId(subId);
+                    }
+                } catch(Exception ignored) {}
+            }
+            manager.sendTextMessage(phone,null,message,null,null);
+            runOnUiThread(()->{
+                try { webView.evaluateJavascript("try{closeSheet();}catch(e){}",null); } catch(Exception ignored) {}
+                Toast.makeText(MainActivity.this,"SMS sent using SIM balance",Toast.LENGTH_SHORT).show();
+            });
         } catch(Exception e) {
-            runOnUiThread(()->Toast.makeText(MainActivity.this,"SIM SMS failed. Check SIM/default SMS settings.",Toast.LENGTH_LONG).show());
+            runOnUiThread(()->Toast.makeText(MainActivity.this,"SIM SMS failed. Set a default SMS SIM and allow SMS permission.",Toast.LENGTH_LONG).show());
+            try {
+                Intent i=new Intent(Intent.ACTION_SENDTO,Uri.parse("smsto:"+Uri.encode(phone)));
+                i.putExtra("sms_body",message);
+                startActivity(i);
+            } catch(Exception ignored) {}
         }
     }
 
@@ -162,24 +180,14 @@ public class MainActivity extends Activity {
             final String p=phone.trim(), m=message.trim();
             if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
                 pendingSmsPhone=p; pendingSmsMessage=m;
-                runOnUiThread(MainActivity.this::requestSmsPermission);
-                return true;
+                runOnUiThread(()->{
+                    Toast.makeText(MainActivity.this,"SMS permission required — please Allow",Toast.LENGTH_LONG).show();
+                    requestSmsPermission();
+                });
+                return false;
             }
-            try {
-                SmsManager.getDefault().sendTextMessage(p,null,m,null,null);
-                runOnUiThread(()->Toast.makeText(MainActivity.this,"SMS sent",Toast.LENGTH_SHORT).show());
-                return true;
-            } catch(Exception e) {
-                try {
-                    Intent i=new Intent(Intent.ACTION_SENDTO,Uri.parse("smsto:"+Uri.encode(p)));
-                    i.putExtra("sms_body",m);
-                    startActivity(i);
-                    return true;
-                } catch(Exception ignored) {
-                    runOnUiThread(()->Toast.makeText(MainActivity.this,"SMS failed. Check SMS permission/SIM.",Toast.LENGTH_LONG).show());
-                    return false;
-                }
-            }
+            sendDirectSms(p,m);
+            return true;
         }
         @JavascriptInterface public boolean copyText(String text){
             try{
