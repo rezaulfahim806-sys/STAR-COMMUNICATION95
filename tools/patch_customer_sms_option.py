@@ -9,7 +9,7 @@ script = r'''<script>
   function phone(c){ return String((c&&(c.phone||c.mobile||c.mobileNumber||c.contact||c.msisdn))||'').trim(); }
   function find(id){ var x=String(id==null?'':id); return list().find(function(c){return String(c.id)===x||String(c.clientCode||'')===x;}); }
   function total(c){ return typeof due==='function' ? Number(due(c)||0) : Number(c.prevDue||c.previousDue||0)+Number(c.fee||c.monthlyFee||0); }
-  function sms(c,msg){ var p=phone(c); if(!p){toast('Customer mobile number নেই');return false;} try{ if(window.AndroidBridge&&typeof AndroidBridge.sendSms==='function'){ var ok=AndroidBridge.sendSms(p,msg); if(ok===true)return true; } }catch(e){} try{if(window.AndroidBridge&&typeof AndroidBridge.openSmsComposer==='function')return AndroidBridge.openSmsComposer(p,msg)===true;}catch(e){} try{location.href='smsto:'+encodeURIComponent(p)+'?body='+encodeURIComponent(msg);return true}catch(e){toast('SMS app could not be opened');return false;} }
+  function sms(c,msg){ var p=phone(c); if(!p){toast('Customer mobile number নেই');return false;} try{ if(window.AndroidBridge&&typeof AndroidBridge.sendSms==='function'){ var ok=AndroidBridge.sendSms(p,msg); return ok===true; } }catch(e){} try{location.href='smsto:'+encodeURIComponent(p)+'?body='+encodeURIComponent(msg);return true}catch(e){toast('SMS app could not be opened');return false;} }
   window.starCustomerSms=function(id){var c=find(id);if(!c){toast('Customer not found');return;}openSheet('<h3>📩 Send SMS</h3><div class="muted">To: '+esc(c.name||'Customer')+' • '+esc(phone(c)||'No mobile')+'</div><textarea id="starOneMsg" class="input" rows="6" placeholder="Write your own message"></textarea><button class="btn dark full" onclick="starSendOne('+JSON.stringify(String(c.id))+')">📨 Send SMS</button>');};
   window.starSendOne=function(id){var c=find(id),e=document.getElementById('starOneMsg'),m=e?e.value.trim():'';if(!c)return;if(!m){toast('Write a message first');return;}if(sms(c,m)){closeSheet();}else{toast('SMS permission allow kore abar Send SMS chapun');}};
   function filtered(){var f=(typeof opts!=='undefined'&&opts.filter)||'all';return list().filter(function(c){if(f==='expired')return String(c.status||'').toLowerCase()==='expired';if(f==='paid')return typeof paid==='function'&&Number(paid(c))>0;if(f==='unpaid')return total(c)>0;if(f==='active')return String(c.status||'').toLowerCase()==='active';if(f==='inactive')return String(c.status||'').toLowerCase()==='inactive';return true;});}
@@ -32,5 +32,23 @@ script = r'''<script>
 if 'starSmsPdfFixV3' not in s:
     script = script.replace('<script>', '<script>window.starSmsPdfFixV3=true;', 1)
     s = s.replace('</body>', script + '</body>', 1)
+import re
+# ONLY fix the individual Customer-card SMS button. Do not change Payment Link SMS.
+pat = re.compile(r'function doSendOneSms\(\)\{.*?\}', re.S)
+new_fn = r'''function doSendOneSms(){
+  let el=document.getElementById('onesms');
+  let msg=el?String(el.value||'').trim():'';
+  let phone=String(window.__starSmsPhone||'').trim();
+  if(!phone){toast('Customer phone number missing');return}
+  if(!msg){toast('Write a message first');if(el)el.focus();return}
+  try{
+    if(window.AndroidBridge&&typeof AndroidBridge.openSmsComposer==='function'){
+      if(AndroidBridge.openSmsComposer(phone,msg)){closeSheet();return}
+    }
+  }catch(e){}
+  toast('SMS app could not be opened');
+}'''
+if pat.search(s):
+    s=pat.sub(new_fn,s,count=1)
 html.write_text(s, encoding='utf-8')
-print('Customer SMS + filtered PDF list fix applied')
+print('Customer-card SMS fixed only; payment-link SMS untouched')
