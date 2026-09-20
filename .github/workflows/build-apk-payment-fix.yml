@@ -53,6 +53,7 @@ jobs:
           python3 tools/patch_customer_sms_option.py || true
           python3 tools/patch_final_customer_buttons_20260918.py || true
           python3 tools/patch_staff_accounts_complaints.py
+          python3 tools/patch_edit_direct_sms_final.py
       - name: Build Debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace --warning-mode all
       - name: Verify APK
