@@ -6,17 +6,21 @@ s=p.read_text(encoding="utf-8")
 new='''@JavascriptInterface public boolean sendSms(String phone,String message){
             if(phone==null||phone.trim().isEmpty()||message==null||message.trim().isEmpty())return false;
             final String p=phone.trim(), m=message.trim();
-            if(Build.VERSION.SDK_INT>=23 && checkSelfPermission(Manifest.permission.SEND_SMS)!=PackageManager.PERMISSION_GRANTED){
-                pendingSmsPhone=p;
-                pendingSmsMessage=m;
-                runOnUiThread(()->{
-                    Toast.makeText(MainActivity.this,"Allow SMS permission, then the message will be sent.",Toast.LENGTH_LONG).show();
-                    requestSmsPermissions();
-                });
+            if(Build.VERSION.SDK_INT>=23 && checkSelfPermission(Manifest.permission.SEND_SMS)==PackageManager.PERMISSION_GRANTED){
+                sendDirectSms(p,m);
+                return true;
+            }
+            // No direct-SMS permission: always open the phone SMS composer so the
+            // customer SMS button never becomes a dead button.
+            try{
+                Intent i=new Intent(Intent.ACTION_SENDTO,Uri.parse("smsto:"+Uri.encode(p)));
+                i.putExtra("sms_body",m);
+                startActivity(i);
+                return true;
+            }catch(Exception e){
+                runOnUiThread(()->Toast.makeText(MainActivity.this,"SMS app not available. Allow SMS permission in App Settings.",Toast.LENGTH_LONG).show());
                 return false;
             }
-            sendDirectSms(p,m);
-            return true;
         }'''
 
 pat=re.compile(r'@JavascriptInterface public boolean sendSms\(String phone,String message\)\{.*?\n        \}\n        @JavascriptInterface public void sendBulk',re.S)
