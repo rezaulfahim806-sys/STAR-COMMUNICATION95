@@ -23,7 +23,7 @@ async function cloudRegister(api,company,email,pass){
 async function cloudRegisterAndSync(){
  try{
   let api=document.getElementById('capi')?.value||'', company=document.getElementById('ccompany')?.value||'', email=document.getElementById('cuser')?.value||'', pass=document.getElementById('cpass')?.value||'';
-  let x=await cloudRegister(api,company,email,pass); await cloudSync(true); closeSheet(); toast('ISP account created');
+  let x=await cloudRegister(api,company,email,pass); await cloudPush(); closeSheet(); toast('ISP account created');
  }catch(e){toast(e.message||'Registration failed')}
 }
 let cloudLastUpdatedAt='';
