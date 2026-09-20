@@ -1,6 +1,8 @@
 name: Build STAR COMMUNICATION - Edit Fix Only
 on:
   workflow_dispatch:
+  push:
+    branches: [fix-edit-only-65k]
 jobs:
   build:
     runs-on: ubuntu-latest
