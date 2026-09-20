@@ -52,3 +52,5 @@ if pat.search(s):
     s=pat.sub(new_fn,s,count=1)
 html.write_text(s, encoding='utf-8')
 print('Customer-card SMS fixed only; payment-link SMS untouched')
+
+# Build trigger: verified customer SMS patch regex fix.
