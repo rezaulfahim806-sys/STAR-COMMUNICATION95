@@ -27,7 +27,7 @@ insert = r'''<script>
     var c=d.customers.find(function(x){return String(x.id)===String(id);});
     if(!c){toast('Customer not found');return;}
     var link=paymentLinkFor(c);
-    openSheet('<h3>🔗 Customer Payment Link</h3><div class="muted">'+esc(c.clientCode||'')+' • '+esc(c.name||'')+'</div><input id="customerPayLink" class="input" readonly value="'+esc(link)+'"><button class="btn full" onclick="copyCustomerPaymentLink()">📋 Copy Link</button><button class="btn green full" style="margin-top:7px" onclick="sendPaymentLinkSMS(\''+String(c.id).replace(/'/g,"\\'")+"\')">📨 Send Payment Link SMS</button><button class="btn light full" style="margin-top:7px" onclick="closeSheet()">Close</button>');
+    openSheet('<h3>🔗 Customer Payment Link</h3><div class="muted">'+esc(c.clientCode||'')+' • '+esc(c.name||'')+'</div><input id="customerPayLink" class="input" readonly value="'+esc(link)+'"><button class="btn full" onclick="copyCustomerPaymentLink()">📋 Copy Link</button><button class="btn green full" style="margin-top:7px" onclick="sendPaymentLinkSMS('+JSON.stringify(String(c.id))+')">📨 Send Payment Link SMS</button><button class="btn light full" style="margin-top:7px" onclick="closeSheet()">Close</button>');
   };
   window.copyCustomerPaymentLink=function(){
     var e=document.getElementById('customerPayLink');if(!e)return;
