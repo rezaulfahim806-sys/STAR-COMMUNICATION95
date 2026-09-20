@@ -6,7 +6,7 @@ patch=r'''<script id="star-edit-direct-sms-final-v3">
 (function(){
   if(window.__starEditDirectSmsFinalV3)return;
   window.__starEditDirectSmsFinalV3=true;
-  function findCustomer(id){return (window.d&&Array.isArray(d.customers)?d.customers:[]).find(function(c){return String(c.id)===String(id)||String(c.clientCode||'')===String(id);});}
+  function findCustomer(id){var a=[];try{a=(typeof d!=='undefined'&&d&&Array.isArray(d.customers))?d.customers:[]}catch(e){a=[]}return a.find(function(c){return String(c.id)===String(id)||String(c.clientCode||'')===String(id);});}
   function val(id){var e=document.getElementById(id);return e?String(e.value||''):'';}
   function persistNow(){localStorage.setItem(KEY,JSON.stringify(d));try{localStorage.setItem(KEY+'_last_backup',JSON.stringify({savedAt:new Date().toISOString(),data:d}));}catch(e){}}
   window.editCustomer=function(id){
