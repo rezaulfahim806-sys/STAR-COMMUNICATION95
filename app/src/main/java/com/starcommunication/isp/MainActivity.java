@@ -159,12 +159,27 @@ public class MainActivity extends Activity {
     public class AppBridge {
         @JavascriptInterface public boolean sendSms(String phone,String message){
             if(phone==null||phone.trim().isEmpty()||message==null||message.trim().isEmpty())return false;
-            String p=phone.trim(), m=message.trim();
+            final String p=phone.trim(), m=message.trim();
             if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
-                pendingSmsPhone=p; pendingSmsMessage=m; requestSmsPermission(); return true;
+                pendingSmsPhone=p; pendingSmsMessage=m;
+                runOnUiThread(MainActivity.this::requestSmsPermission);
+                return true;
             }
-            sendDirectSms(p,m);
-            return true;
+            try {
+                SmsManager.getDefault().sendTextMessage(p,null,m,null,null);
+                runOnUiThread(()->Toast.makeText(MainActivity.this,"SMS sent",Toast.LENGTH_SHORT).show());
+                return true;
+            } catch(Exception e) {
+                try {
+                    Intent i=new Intent(Intent.ACTION_SENDTO,Uri.parse("smsto:"+Uri.encode(p)));
+                    i.putExtra("sms_body",m);
+                    startActivity(i);
+                    return true;
+                } catch(Exception ignored) {
+                    runOnUiThread(()->Toast.makeText(MainActivity.this,"SMS failed. Check SMS permission/SIM.",Toast.LENGTH_LONG).show());
+                    return false;
+                }
+            }
         }
         @JavascriptInterface public boolean copyText(String text){
             try{
