@@ -39,7 +39,6 @@ jobs:
           python3 tools/patch_update_data_migration.py || true
           python3 tools/patch_sim2_sms.py || true
           python3 tools/patch_sms_permission_fix.py || true
-          python3 tools/patch_default_sms_handler.py || true
           python3 tools/patch_billing_expiry_activation.py || true
           python3 tools/patch_expired_paid_active.py || true
           python3 tools/patch_sms_dedupe.py || true
