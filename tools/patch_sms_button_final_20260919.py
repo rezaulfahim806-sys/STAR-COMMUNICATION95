@@ -9,12 +9,20 @@ new='''@JavascriptInterface public boolean openSmsComposer(String phone,String m
             try{
                 Intent i=new Intent(Intent.ACTION_SENDTO,Uri.parse("smsto:"+Uri.encode(p)));
                 if(!m.isEmpty()) i.putExtra("sms_body",m);
-                if(i.resolveActivity(getPackageManager())==null){
-                    runOnUiThread(()->Toast.makeText(MainActivity.this,"No SMS app is installed.",Toast.LENGTH_LONG).show());
-                    return false;
+                try{
+                    startActivity(i);
+                    return true;
+                }catch(Exception first){
+                    try{
+                        Intent v=new Intent(Intent.ACTION_VIEW,Uri.parse("sms:"+Uri.encode(p)));
+                        if(!m.isEmpty()) v.putExtra("sms_body",m);
+                        startActivity(v);
+                        return true;
+                    }catch(Exception second){
+                        runOnUiThread(()->Toast.makeText(MainActivity.this,"SMS app could not be opened.",Toast.LENGTH_LONG).show());
+                        return false;
+                    }
                 }
-                startActivity(i);
-                return true;
             }catch(Exception e){
                 runOnUiThread(()->Toast.makeText(MainActivity.this,"SMS app could not be opened.",Toast.LENGTH_LONG).show());
                 return false;
