@@ -34,7 +34,7 @@ if 'starSmsPdfFixV3' not in s:
     s = s.replace('</body>', script + '</body>', 1)
 import re
 # ONLY fix the individual Customer-card SMS button. Do not change Payment Link SMS.
-pat = re.compile(r'function doSendOneSms\(\)\{.*?\}', re.S)
+pat = re.compile(r'function doSendOneSms\(\)\{[\s\S]*?(?=\nfunction customerPaymentLink)', re.S)
 new_fn = r'''function doSendOneSms(){
   let el=document.getElementById('onesms');
   let msg=el?String(el.value||'').trim():'';
