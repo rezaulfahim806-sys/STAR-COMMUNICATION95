@@ -28,6 +28,8 @@ jobs:
           gradle-version: '8.7'
       - name: Apply approved UI patch
         run: python3 tools/patch_staff_accounts_complaints.py
+      - name: Apply final SMS fix
+        run: python3 tools/patch_sms_button_final_20260919.py
       - name: Verify Android project
         shell: bash
         run: |
