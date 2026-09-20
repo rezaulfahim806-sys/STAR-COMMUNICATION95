@@ -16,6 +16,7 @@ import android.print.PrintManager;
 import android.graphics.Paint;
 import android.graphics.pdf.PdfDocument;
 import android.provider.MediaStore;
+import android.provider.Settings;
 import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -108,6 +109,9 @@ public class MainActivity extends Activity {
     }
 
     private void sendDirectSms(String phone,String message) {
+        final String p=phone==null?"":phone.trim();
+        final String m=message==null?"":message.trim();
+        if(p.isEmpty()||m.isEmpty()) return;
         try {
             SmsManager manager = SmsManager.getDefault();
             if (Build.VERSION.SDK_INT >= 22) {
@@ -118,16 +122,30 @@ public class MainActivity extends Activity {
                     }
                 } catch(Exception ignored) {}
             }
-            manager.sendTextMessage(phone,null,message,null,null);
+
+            java.util.ArrayList<String> parts = manager.divideMessage(m);
+            if (parts != null && parts.size() > 1) {
+                manager.sendMultipartTextMessage(p,null,parts,null,null);
+            } else {
+                manager.sendTextMessage(p,null,m,null,null);
+            }
+
             runOnUiThread(()->{
                 try { webView.evaluateJavascript("try{closeSheet();}catch(e){}",null); } catch(Exception ignored) {}
                 Toast.makeText(MainActivity.this,"SMS sent using SIM balance",Toast.LENGTH_SHORT).show();
             });
         } catch(Exception e) {
-            runOnUiThread(()->Toast.makeText(MainActivity.this,"SIM SMS failed. Set a default SMS SIM and allow SMS permission.",Toast.LENGTH_LONG).show());
+            runOnUiThread(()->{
+                Toast.makeText(MainActivity.this,"SIM SMS failed. Check SMS permission and default SMS SIM.",Toast.LENGTH_LONG).show();
+                try {
+                    Intent settings=new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                    settings.setData(Uri.parse("package:"+getPackageName()));
+                    startActivity(settings);
+                } catch(Exception ignored) {}
+            });
             try {
-                Intent i=new Intent(Intent.ACTION_SENDTO,Uri.parse("smsto:"+Uri.encode(phone)));
-                i.putExtra("sms_body",message);
+                Intent i=new Intent(Intent.ACTION_SENDTO,Uri.parse("smsto:"+Uri.encode(p)));
+                i.putExtra("sms_body",m);
                 startActivity(i);
             } catch(Exception ignored) {}
         }
