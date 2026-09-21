@@ -215,3 +215,34 @@ if not re.search(pat2,j,re.S):
 j=re.sub(pat2,method2,j,count=1,flags=re.S)
 java.write_text(j,encoding='utf-8')
 print('hardfix applied')
+
+# Final Java cleanup: some older SMS patches can leave duplicate AppBridge methods.
+def remove_duplicate_methods(src, signature):
+    pos=[]
+    start=0
+    while True:
+        i=src.find(signature,start)
+        if i<0: break
+        pos.append(i); start=i+len(signature)
+    if len(pos)<=1: return src
+    keep=pos[0]
+    out=src
+    for i in reversed(pos[1:]):
+        brace=out.find('{',i)
+        if brace<0: continue
+        depth=0; end=None
+        for k in range(brace,len(out)):
+            if out[k]=='{': depth+=1
+            elif out[k]=='}':
+                depth-=1
+                if depth==0:
+                    end=k+1
+                    if end<len(out) and out[end]=='\n': end+=1
+                    break
+        if end: out=out[:i]+out[end:]
+    return out
+
+j=remove_duplicate_methods(j, '@JavascriptInterface public boolean openSmsComposer(String phone,String message)')
+j=remove_duplicate_methods(j, '@JavascriptInterface public void sendSmsDirect(String phone,String message)')
+java.write_text(j,encoding='utf-8')
+print('Removed duplicate SMS bridge methods if present.')
