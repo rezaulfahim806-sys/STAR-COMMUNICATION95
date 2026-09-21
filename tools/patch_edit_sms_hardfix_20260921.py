@@ -117,6 +117,9 @@ patch = r'''<script id="star-edit-sms-hardfix-20260921">
     if(!c||!c.phone){toast('Customer mobile number নেই');return false;}
     if(!msg){toast('Write a message first');return false;}
     try{
+      if(window.AndroidBridge && typeof AndroidBridge.requestSmsPermission==='function'){
+        AndroidBridge.requestSmsPermission();
+      }
       if(window.AndroidBridge && typeof AndroidBridge.sendSmsDirect==='function'){
         AndroidBridge.sendSmsDirect(String(c.phone).trim(),msg);
         toast('SMS sending from SIM...');
@@ -144,7 +147,17 @@ if 'id="star-edit-sms-hardfix-20260921"' not in s:
 java=Path('app/src/main/java/com/starcommunication/isp/MainActivity.java')
 j=java.read_text(encoding='utf-8')
 
-new_method = r'''        @JavascriptInterface public void sendSmsDirect(String phone,String message){
+new_method = r'''        @JavascriptInterface public void requestSmsPermission(){
+            runOnUiThread(() -> {
+                if (Build.VERSION.SDK_INT < 23 || checkSelfPermission(Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED) {
+                    Toast.makeText(MainActivity.this,"SMS permission already enabled",Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                MainActivity.this.requestSmsPermission();
+            });
+        }
+
+        @JavascriptInterface public void sendSmsDirect(String phone,String message){
             String p=phone==null?"":phone.trim(), m=message==null?"":message.trim();
             if(p.isEmpty()||m.isEmpty())return;
             if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
