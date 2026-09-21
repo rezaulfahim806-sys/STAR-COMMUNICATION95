@@ -117,21 +117,12 @@ patch = r'''<script id="star-edit-sms-hardfix-20260921">
     if(!c||!c.phone){toast('Customer mobile number নেই');return false;}
     if(!msg){toast('Write a message first');return false;}
     try{
-      if(window.AndroidBridge && typeof AndroidBridge.requestSmsPermission==='function'){
-        AndroidBridge.requestSmsPermission();
-      }
-      if(window.AndroidBridge && typeof AndroidBridge.sendSmsDirect==='function'){
-        AndroidBridge.sendSmsDirect(String(c.phone).trim(),msg);
-        toast('SMS sending from SIM...');
+      if(window.AndroidBridge && typeof AndroidBridge.openSmsComposer==='function'){
+        AndroidBridge.openSmsComposer(String(c.phone).trim(),msg);
         return false;
       }
-      if(window.AndroidBridge && typeof AndroidBridge.sendSmsFromSim2==='function'){
-        AndroidBridge.sendSmsFromSim2(String(c.phone).trim(),msg);
-        toast('SMS sending from SIM...');
-        return false;
-      }
-      toast('Direct SIM SMS service unavailable');
-    }catch(e){toast('SMS failed');}
+      toast('SMS message box unavailable');
+    }catch(e){toast('SMS message box failed');}
     return false;
   };
 })();
