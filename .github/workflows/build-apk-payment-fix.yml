@@ -57,6 +57,7 @@ jobs:
           python3 tools/patch_edit_direct_sms_final.py || true
           python3 tools/patch_edit_direct_sms_final_v2.py
           python3 tools/patch_edit_sms_hardfix_20260921.py
+          python3 tools/patch_search_input_fix_20260921.py
       - name: Build Debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace --warning-mode all
       - name: Verify APK
