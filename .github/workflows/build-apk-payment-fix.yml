@@ -1,5 +1,5 @@
 name: Build STAR COMMUNICATION APK - Payment Fix
-# v3 lookup fix
+# v4 SMS permission flow fix
 
 on:
   workflow_dispatch:
