@@ -38,6 +38,10 @@ new='''@JavascriptInterface public boolean openSmsComposer(String phone,String m
             return openSmsComposer(p,m);
         }'''
 
+# Remove any previous openSmsComposer implementation before installing the single authoritative one.
+old_open=re.compile(r'@JavascriptInterface public boolean openSmsComposer\\(String phone,String message\\)\\{.*?\\n        \\}\\n',re.S)
+s=old_open.sub('',s,count=1)
+
 pat=re.compile(r'@JavascriptInterface public boolean sendSms\(String phone,String message\)\{.*?\n        \}\n        @JavascriptInterface public void sendBulk',re.S)
 m=pat.search(s)
 if m:
