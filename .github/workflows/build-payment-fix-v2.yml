@@ -3,7 +3,7 @@ name: STAR COMMUNICATION Payment Fix APK v2
 on:
   workflow_dispatch:
   push:
-    branches: [main, fix-edit-direct-sms-mainbase]
+    branches: [main, fix-edit-direct-sms-mainbase, search-fix-clean-b4ef]
 
 permissions:
   contents: read
