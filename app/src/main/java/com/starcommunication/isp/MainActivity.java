@@ -196,7 +196,7 @@ public class MainActivity extends Activity {
         @JavascriptInterface public boolean openSmsComposer(String phone,String message){
             final String p=phone==null?"":phone.trim();
             final String m=message==null?"":message.trim();
-            if(p.isEmpty()||m.isEmpty())return false;
+            if(m.isEmpty())return false;
             try{
                 Intent i=new Intent(Intent.ACTION_SENDTO,Uri.parse("smsto:"+Uri.encode(p)));
                 i.putExtra("sms_body",m);
