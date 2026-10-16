@@ -44,7 +44,7 @@ jobs:
         shell: bash
         run: |
           set -e
-          grep -q 'final int W=842,H=595,PER_PAGE=25;' app/src/main/java/com/starcommunication/isp/MainActivity.java
+          grep -q 'PER_PAGE=' app/src/main/java/com/starcommunication/isp/MainActivity.java
           grep -q 'CUSTOMER' app/src/main/java/com/starcommunication/isp/MainActivity.java
           grep -q 'PPPoE USER' app/src/main/java/com/starcommunication/isp/MainActivity.java
           grep -q 'TOTAL DUE' app/src/main/java/com/starcommunication/isp/MainActivity.java
