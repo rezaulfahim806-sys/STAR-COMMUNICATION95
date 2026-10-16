@@ -58,6 +58,17 @@ app.post('/api/auth/register',async(req,res)=>{
   return send(res,{ok:true,token,expiresIn:30*24*60*60,role:'owner',owner:u,username:u,companyName:company});
  }catch(e){res.status(500).json({error:'Registration service error'})}
 });
+app.post('/api/auth/password',auth,async(req,res)=>{
+ const current=String(req.body&&req.body.currentPassword||'');
+ const next=String(req.body&&req.body.newPassword||'');
+ if(next.length<8)return res.status(400).json({error:'New password must be at least 8 characters'});
+ const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
+ const account=await ac.findOne({username:req.user.username,owner:ownerOf(req.user)});
+ if(!account)return res.status(400).json({error:'This account password is managed by the server administrator'});
+ if(!bcrypt.compareSync(current,account.passwordHash))return res.status(401).json({error:'Current password is incorrect'});
+ await ac.updateOne({_id:account._id},{$set:{passwordHash:bcrypt.hashSync(next,12),passwordUpdatedAt:new Date().toISOString()}});
+ return send(res,{ok:true,message:'Password updated'});
+});
 app.post('/api/auth/login',async(req,res)=>{
  const {username,password}=req.body||{};
  const u=String(username||'').trim(), p=String(password||'');
