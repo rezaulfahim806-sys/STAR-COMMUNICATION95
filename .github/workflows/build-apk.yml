@@ -26,8 +26,6 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
-      - name: Apply approved UI patch
-        run: python3 tools/patch_staff_accounts_complaints.py
       - name: Verify Android project
         shell: bash
         run: |
