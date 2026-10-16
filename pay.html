@@ -14,15 +14,18 @@
 <script>
 const q=new URLSearchParams(location.search);
 const code=(q.get('code')||'').trim();
-const merchant=(q.get('merchant')||'01897-099850').trim();
+let merchant=(q.get('merchant')||'01897-099850').trim();
 const apiBase=(q.get('api')||'').trim().replace(/\/$/,'');
+const company=(q.get('company')||'').trim().toLowerCase();
 const customerMobile=(q.get('mobile')||'').trim();
-const packages=[{speed:'30 Mbps',price:500},{speed:'40 Mbps',price:650},{speed:'50 Mbps',price:750},{speed:'60 Mbps',price:800},{speed:'100 Mbps',price:1000},{speed:'110 Mbps',price:1200},{speed:'130 Mbps',price:1500}];
+let packages=[{speed:'30 Mbps',price:500},{speed:'40 Mbps',price:650},{speed:'50 Mbps',price:750},{speed:'60 Mbps',price:800},{speed:'100 Mbps',price:1000},{speed:'110 Mbps',price:1200},{speed:'130 Mbps',price:1500}];
 const c={name:q.get('name')||'Customer',location:q.get('location')||'-',package:q.get('package')||'',bill:Number(q.get('bill')||0),previousDue:Number(q.get('prev')||0),totalDue:Number(q.get('total')||0)};
 const app=document.getElementById('app');
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const money=n=>'৳'+Number(n||0).toLocaleString('en-BD');
 function findPackage(){let p=packages.find(x=>x.speed.toLowerCase()===String(c.package).toLowerCase());return p||packages.find(x=>x.price===c.bill)||packages[0]}
+async function initPaymentPage(){
+if(apiBase&&company){try{const r=await fetch(apiBase+'/api/public/packages?company='+encodeURIComponent(company));if(r.ok){const data=await r.json();if(Array.isArray(data.packages)&&data.packages.length)packages=data.packages.filter(p=>p&&String(p.speed||'').trim()&&Number(p.price)>0).map(p=>({speed:String(p.speed),price:Number(p.price)}));if(data.merchantNumber&&!q.get('merchant'))merchant=String(data.merchantNumber);}}catch(e){console.warn('Company package lookup unavailable; using built-in defaults')}}
 if(!code){app.innerHTML='<section class="card"><div class="error"><h2>Invalid Payment Link</h2><p>Please open the payment link provided by STAR COMMUNICATION.</p></div></section>'}
 else{
 const selected=findPackage();
@@ -49,6 +52,8 @@ document.getElementById('packageSelect').onchange=updatePackage;
 document.getElementById('payNow').onclick=startPayment;
 document.getElementById('copy').onclick=()=>{const s=document.getElementById('status');if(navigator.clipboard){navigator.clipboard.writeText(merchant).then(()=>s.textContent='✓ bKash Merchant Number copied').catch(()=>fallback(s))}else fallback(s)};
 }
+}
+initPaymentPage();
 let selectedPrice=0;
 function updatePackage(){const speed=document.getElementById('packageSelect').value;const p=packages.find(x=>x.speed===speed);selectedPrice=p.price;document.getElementById('packageValue').textContent=p.speed;document.getElementById('billValue').textContent=money(p.price);document.getElementById('totalValue').textContent=money(p.price+c.previousDue);document.getElementById('selectedPackage').textContent=p.speed;document.getElementById('selectedBill').textContent=money(p.price);document.getElementById('secureAmount').textContent=money(p.price+c.previousDue);}
 function getSelected(){const speed=document.getElementById('packageSelect')?.value;return packages.find(x=>x.speed===speed)||findPackage()}
