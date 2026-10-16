@@ -1,5 +1,5 @@
 name: Build STAR COMMUNICATION APK
-# Validate company login, cloud packages, and separate settings
+# Validate company login, cloud packages, bKash setup status, and OLT connection test
 
 on:
   workflow_dispatch:
