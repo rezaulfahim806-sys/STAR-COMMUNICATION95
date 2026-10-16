@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - login-create-account-7d7db6d5
 
 permissions:
   contents: read
