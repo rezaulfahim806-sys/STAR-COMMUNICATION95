@@ -14,7 +14,7 @@
 <script>
 const q=new URLSearchParams(location.search);
 const code=(q.get('code')||'').trim();
-const merchant=(q.get('merchant')||'01897-099850').trim();
+let merchant=(q.get('merchant')||'01897-099850').trim();
 const apiBase=(q.get('api')||'').trim().replace(/\/$/,'');
 const company=(q.get('company')||'').trim().toLowerCase();
 const customerMobile=(q.get('mobile')||'').trim();
@@ -25,7 +25,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&
 const money=n=>'৳'+Number(n||0).toLocaleString('en-BD');
 function findPackage(){let p=packages.find(x=>x.speed.toLowerCase()===String(c.package).toLowerCase());return p||packages.find(x=>x.price===c.bill)||packages[0]}
 async function initPaymentPage(){
-if(apiBase&&company){try{const r=await fetch(apiBase+'/api/public/packages?company='+encodeURIComponent(company));if(r.ok){const data=await r.json();if(Array.isArray(data.packages)&&data.packages.length)packages=data.packages.filter(p=>p&&String(p.speed||'').trim()&&Number(p.price)>0).map(p=>({speed:String(p.speed),price:Number(p.price)}));if(data.merchantNumber&&!q.get('merchant'))document.querySelector('.number')?.replaceChildren(document.createTextNode(data.merchantNumber));}}catch(e){console.warn('Company package lookup unavailable; using built-in defaults')}}
+if(apiBase&&company){try{const r=await fetch(apiBase+'/api/public/packages?company='+encodeURIComponent(company));if(r.ok){const data=await r.json();if(Array.isArray(data.packages)&&data.packages.length)packages=data.packages.filter(p=>p&&String(p.speed||'').trim()&&Number(p.price)>0).map(p=>({speed:String(p.speed),price:Number(p.price)}));if(data.merchantNumber&&!q.get('merchant'))merchant=String(data.merchantNumber);}}catch(e){console.warn('Company package lookup unavailable; using built-in defaults')}}
 if(!code){app.innerHTML='<section class="card"><div class="error"><h2>Invalid Payment Link</h2><p>Please open the payment link provided by STAR COMMUNICATION.</p></div></section>'}
 else{
 const selected=findPackage();
