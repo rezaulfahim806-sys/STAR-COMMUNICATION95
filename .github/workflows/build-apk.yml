@@ -1,4 +1,5 @@
 name: Build STAR COMMUNICATION APK
+# Validate company login, cloud packages, and separate settings
 
 on:
   workflow_dispatch:
