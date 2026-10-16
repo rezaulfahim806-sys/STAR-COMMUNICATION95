@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - company-login-packages-7d7db6d
 
 permissions:
   contents: read
