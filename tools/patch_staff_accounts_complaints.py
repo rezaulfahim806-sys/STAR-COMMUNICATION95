@@ -17,7 +17,7 @@ new="""let x=await r.json();
   }"""
 if old not in s: raise SystemExit("sync marker missing")
 s=s.replace(old,new,1)
-marker="function openSettings(){closeDrawer();openSheet("
+marker="function openSettings(){"
 insert="""function workerPage(){
  let ex=(d.customers||[]).filter(c=>String(c.status||'').toLowerCase()==='expired');
  return '<h1 class="title">Worker Panel</h1><div class="sub">Expired customer service + complaint box</div><div class="section"><h3>🔴 Expired Customers ('+ex.length+')</h3>'+ (ex.length?ex.map(c=>'<div class="customer"><div class="cmain"><div class="avatar">'+esc((c.name||'?')[0])+'</div><div class="grow"><div class="name">'+esc(c.name)+'</div><div class="muted">'+esc(c.phone)+' • '+esc(c.address||'')+'</div></div><span class="badge expired">EXPIRED</span></div><div class="actions"><button class="small call" onclick="callCustomer(\\''+esc(c.phone)+'\\')">📞 Call</button><button class="small wa" onclick="waCustomer(\\''+esc(c.phone)+'\\')">WhatsApp</button><button class="small view" onclick="workerComplaint(\\''+c.id+'\\')">📝 Complaint</button></div></div>').join(''):'<div class="muted">No expired customers.</div>')+'</div><div class="section"><h3>📝 Complaint Box</h3><button class="btn green full" onclick="workerComplaint(\\'\\')">＋ New Complaint</button><button class="btn light full" style="margin-top:7px" onclick="workerComplaints()">My Complaints</button></div>';
