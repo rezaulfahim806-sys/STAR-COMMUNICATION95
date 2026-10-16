@@ -29,6 +29,20 @@ async function initDb(){
 function auth(req,res,next){try{const h=req.headers.authorization||'';if(!h.startsWith('Bearer '))throw 0;req.user=jwt.verify(h.slice(7),JWT_SECRET);next()}catch(e){res.status(401).json({error:'Unauthorized'})}}
 function send(res,payload){res.json(payload)}
 app.get('/api/health',(req,res)=>send(res,{ok:true,app:'STAR COMMUNICATION',time:new Date().toISOString(),database:!!db}));
+// Public read-only package lookup used by customer Payment Links.
+app.get('/api/public/packages',async(req,res)=>{
+ const company=String(req.query.company||'').trim().toLowerCase();
+ if(!company||!/^[^\s@]+@gmail\.com$/i.test(company))return res.status(400).json({error:'Valid company Gmail is required'});
+ const c=col('app_state');
+ if(!c)return res.status(503).json({error:'Cloud database is not configured'});
+ try{
+  const state=await c.findOne({owner:company});
+  if(!state||!state.data)return res.status(404).json({error:'Company package data not found'});
+  const settings=state.data.settings||{};
+  const packages=Array.isArray(settings.packages)&&settings.packages.length?settings.packages:[];
+  return send(res,{ok:true,companyName:settings.cloud&&settings.cloud.companyName||'',packages,merchantNumber:String(settings.merchantNumber||'')});
+ }catch(e){return res.status(500).json({error:'Could not load company packages'})}
+});
 app.post('/api/auth/register',async(req,res)=>{
  const {email,password,companyName}=req.body||{};
  const u=String(email||'').trim().toLowerCase(), p=String(password||''), company=String(companyName||'').trim();
