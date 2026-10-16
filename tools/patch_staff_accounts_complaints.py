@@ -43,12 +43,11 @@ async function toggleComplaint(id,status){let cfg=cloudConfig();try{let r=await 
 """
 if marker not in s: raise SystemExit("settings marker missing")
 s=s.replace(marker,insert+marker,1)
-old="function render(){fix();let html=page==='dashboard'?dashboard():page==='customers'?customers():page==='details'?details():page==='billing'?billing():page==='analytics'?analytics():page==='accounts'?accounts():page==='monitor'?monitor():dashboard();document.getElementById('content').innerHTML=html;setNav()}"
-guarded="function render(){if(!authenticated){loginScreen();return}fix();let html=page==='dashboard'?dashboard():page==='customers'?customers():page==='details'?details():page==='billing'?billing():page==='analytics'?analytics():page==='accounts'?accounts():page==='monitor'?monitor():dashboard();document.getElementById('content').innerHTML=html;setNav()}"
+start=s.find("function render(){")
+end=s.find("startup();",start)
+if start<0 or end<0: raise SystemExit("render function boundaries missing")
 new="function render(){if(!authenticated){loginScreen();return}if(cloudConfig().role==='worker'){document.getElementById('content').innerHTML=workerPage();return}fix();let html=page==='dashboard'?dashboard():page==='customers'?customers():page==='details'?details():page==='billing'?billing():page==='analytics'?analytics():page==='accounts'?accounts():page==='monitor'?monitor():dashboard();document.getElementById('content').innerHTML=html;setNav()}"
-if old in s: s=s.replace(old,new,1)
-elif guarded in s: s=s.replace(guarded,new,1)
-else: raise SystemExit("render marker missing (including login guard)")
+s=s[:start]+new+s[end:]
 old='<button class="btn light full" style="margin-top:7px" onclick="cloudLogout()">Logout Cloud Account</button>'
 new=old+'<button class="btn dark full" style="margin-top:7px" onclick="staffPanel()">👷 Staff & Complaint Box</button>'
 if old not in s: raise SystemExit("settings button marker missing")
