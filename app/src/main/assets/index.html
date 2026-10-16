@@ -61,7 +61,7 @@ async function cloudSync(pushLocal){
     if(localCount>0&&cloudCount>0){
       let merged=mergeState(d,x.data);
       let before=JSON.stringify({customers:x.data.customers||[],payments:x.data.payments||[],expenses:x.data.expenses||[],pending:x.data.pending||[],history:x.data.history||[]});
-      d.customers=merged.customers;d.payments=merged.payments;d.expenses=merged.expenses;d.pending=merged.pending;d.history=merged.history;
+      d.customers=merged.customers;d.payments=merged.payments;d.expenses=merged.expenses;d.pending=merged.pending;d.history=merged.history;d.settings=Object.assign({},d.settings||{},merged.settings||{},{cloud:cfg});
       let after=JSON.stringify({customers:d.customers,payments:d.payments,expenses:d.expenses,pending:d.pending,history:d.history});
       if(after!==before) await cloudPush();
       cloudLastUpdatedAt=new Date().toISOString();
