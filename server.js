@@ -32,7 +32,7 @@ app.get('/api/health',(req,res)=>send(res,{ok:true,app:'STAR COMMUNICATION',time
 app.post('/api/auth/register',async(req,res)=>{
  const {email,password,companyName}=req.body||{};
  const u=String(email||'').trim().toLowerCase(), p=String(password||''), company=String(companyName||'').trim();
- if(!/^[^\\s@]+@gmail\\.com$/i.test(u))return res.status(400).json({error:'A valid Gmail address is required'});
+ if(!/^[^\s@]+@gmail\.com$/i.test(u))return res.status(400).json({error:'A valid Gmail address is required'});
  if(p.length<8)return res.status(400).json({error:'Password must be at least 8 characters'});
  if(company.length<2||company.length>100)return res.status(400).json({error:'Company name is required'});
  try{
