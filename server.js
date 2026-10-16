@@ -29,6 +29,11 @@ async function initDb(){
 function auth(req,res,next){try{const h=req.headers.authorization||'';if(!h.startsWith('Bearer '))throw 0;req.user=jwt.verify(h.slice(7),JWT_SECRET);next()}catch(e){res.status(401).json({error:'Unauthorized'})}}
 function send(res,payload){res.json(payload)}
 app.get('/api/health',(req,res)=>send(res,{ok:true,app:'STAR COMMUNICATION',time:new Date().toISOString(),database:!!db}));
+app.get('/api/bkash/config-status',auth,(req,res)=>{
+ const keys=['BKASH_APP_KEY','BKASH_APP_SECRET','BKASH_USERNAME','BKASH_PASSWORD','BKASH_BASE_URL'];
+ const configured=keys.filter(k=>String(process.env[k]||'').trim().length>0);
+ send(res,{ok:true,configured:configured.length===keys.length,configuredCount:configured.length,requiredCount:keys.length,missing:keys.filter(k=>!String(process.env[k]||'').trim()),message:configured.length===keys.length?'bKash server credentials are present; checkout and callback validation still need end-to-end testing.':'Add the missing bKash credentials in Render Environment. Secret values are never returned to the app.'});
+});
 // Public, read-only company package data for customer Payment Links.
 app.get('/api/public/packages',async(req,res)=>{
  const company=String(req.query.company||'').trim().toLowerCase();
