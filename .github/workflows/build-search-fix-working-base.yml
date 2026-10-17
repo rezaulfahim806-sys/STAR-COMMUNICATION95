@@ -1,8 +1,6 @@
 name: Build STAR COMMUNICATION APK - Current App Search/Edit/SMS Checks
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
