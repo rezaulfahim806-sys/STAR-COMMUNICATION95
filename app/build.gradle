@@ -10,13 +10,26 @@ android {
         applicationId 'com.starcommunication.isp'
         minSdk 23
         targetSdk 35
-        versionCode 5
-        versionName '1.4'
+        versionCode 6
+        versionName '1.5'
+    }
+
+    signingConfigs {
+        stable {
+            storeFile file("star-release-key.jks")
+            storePassword System.getenv("STAR_SIGNING_STORE_PASSWORD")
+            keyAlias System.getenv("STAR_SIGNING_KEY_ALIAS")
+            keyPassword System.getenv("STAR_SIGNING_KEY_PASSWORD")
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfig signingConfigs.stable
+        }
         release {
             minifyEnabled false
+            signingConfig signingConfigs.stable
         }
     }
 
