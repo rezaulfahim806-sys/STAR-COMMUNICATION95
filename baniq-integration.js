@@ -195,7 +195,7 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
       if (payload.event !== 'order.paid' || !payload.order) return res.status(200).json({ ok: true, ignored: true });
       const order = payload.order;
       const session = await findSession({ orderId: String(order.id || '') , reference: String(order.reference || '') });
-      if (!session) return res.status(404).json({ error: 'Payment order not found' });
+      if (!session) return res.status(200).json({ ok: true, ignored: true, reason: 'No matching payment session' });
       if (Number(order.amount) !== Number(session.amountPaisa) || String(order.status || '').toLowerCase() !== 'paid') {
         return res.status(409).json({ error: 'Webhook order does not match expected payment' });
       }
