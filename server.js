@@ -73,7 +73,7 @@ app.get('/api/public/packages',async(req,res)=>{
 app.put('/api/settings/packages',auth,async(req,res)=>{
  if(!isOwner(req.user))return res.status(403).json({error:'Company owner access required'});
  const raw=req.body&&req.body.packages;
- if(!Array.isArray(raw)||raw.length>1000)return res.status(400).json({error:'A package list of up to 1000 items is required'});
+ if(!Array.isArray(raw))return res.status(400).json({error:'A package list is required'});
  const packages=raw.map(p=>({speed:String(p&&p.speed||p&&p.name||'').trim(),price:Number((p&&p.price)??(p&&p.fee)??0)}));
  if(packages.some(p=>!p.speed||p.speed.length>80||!Number.isFinite(p.price)||p.price<=0))return res.status(400).json({error:'Every package needs a name and a price greater than zero'});
  const c=col('app_state');if(!c)return res.status(503).json({error:'Cloud database is not configured'});
@@ -177,8 +177,7 @@ app.post('/api/auth/login',async(req,res)=>{
  if(!u||!p)return res.status(400).json({error:'Username and password are required'});
  try{
   let account=null;
-  const ac=col(ACCOUNT_COLLECTION);  if(ac)account=await ac.findOne({username:u});
-  if(account){
+  const ac=col(ACCOUNT_COLLECTION);  if(ac)account=await ac.findOne({username:u});  if(account){
    if(!bcrypt.compareSync(p,account.passwordHash))return res.status(401).json({error:'Invalid username or password'});
    if(account.approvalStatus==='pending'||account.active===false)return res.status(403).json({error:'Your registration is pending administrator approval'});
    if(account.approvalStatus==='rejected')return res.status(403).json({error:'Your registration was not approved. Contact the administrator'});
@@ -357,8 +356,7 @@ app.get('/api/bkash/callback',async(req,res)=>{
   const duplicate=payments.some(p=>String(p.ref||'')===trxID||String(p.paymentID||'')===paymentID);
   const now=new Date(),iso=now.toISOString();
   customer.pkg=session.selectedPackage;  customer.fee=Number(session.packagePrice);
-  customer.prevDue=0;
-  if(!duplicate)payments.push({id:'bkash-'+paymentID,customer:String(session.customerCode),amount:Number(session.amount),date:iso.slice(0,10),month:iso.slice(0,7),status:'paid',source:'bkash',ref:trxID||paymentID,paymentID,createdAt:iso,updatedAt:iso});
+  customer.prevDue=0;  if(!duplicate)payments.push({id:'bkash-'+paymentID,customer:String(session.customerCode),amount:Number(session.amount),date:iso.slice(0,10),month:iso.slice(0,7),status:'paid',source:'bkash',ref:trxID||paymentID,paymentID,createdAt:iso,updatedAt:iso});
   await stateCol.updateOne({owner:session.owner},{$set:{data,updatedAt:iso}});
   await sessions.updateOne({paymentID},{$set:{status:'PAID',trxID,verifiedAmount:Number(result.amount),verifiedAt:iso,updatedAt:iso}});
   return page('success');
