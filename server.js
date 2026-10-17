@@ -49,7 +49,7 @@ app.put('/api/settings/packages',auth,async(req,res)=>{
  if(!isOwner(req.user))return res.status(403).json({error:'Company owner access required'});
  const raw=req.body&&req.body.packages;
  if(!Array.isArray(raw)||raw.length>100)return res.status(400).json({error:'A package list of up to 100 items is required'});
- const packages=raw.map(p=>({speed:String(p&&p.speed||p&&p.name||'').trim(),price:Number(p&&p.price??p&&p.fee??0)}));
+ const packages=raw.map(p=>({speed:String(p&&p.speed||p&&p.name||'').trim(),price:Number((p&&p.price)??(p&&p.fee)??0)}));
  if(packages.some(p=>!p.speed||p.speed.length>80||!Number.isFinite(p.price)||p.price<=0))return res.status(400).json({error:'Every package needs a name and a price greater than zero'});
  const c=col('app_state');if(!c)return res.status(503).json({error:'Cloud database is not configured'});
  const owner=ownerOf(req.user),now=new Date().toISOString();
