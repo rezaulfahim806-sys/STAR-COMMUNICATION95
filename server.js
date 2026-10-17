@@ -16,7 +16,8 @@ const ADMIN_USER=process.env.ADMIN_USER||'';
 const ADMIN_HASH=process.env.ADMIN_PASSWORD_HASH||((process.env.ADMIN_PASSWORD)?bcrypt.hashSync(process.env.ADMIN_PASSWORD,10):'');
 const ACCOUNT_COLLECTION='accounts';
 function ownerOf(u){return String(u&&u.owner||u&&u.username||'')}
-function isOwner(u){return String(u&&u.role||'owner')==='owner'}
+function isOwner(u){return String(u&&u.role||'')==='owner'}
+function isSystemAdmin(u){return !!u&&String(u.username||'')===String(ADMIN_USER)&&String(u.role||'')==='owner'}
 function publicAccount(a){return {username:a.username,role:a.role,owner:a.owner,active:a.active!==false}}
 
 let db=null;
@@ -52,12 +53,36 @@ app.post('/api/auth/register',async(req,res)=>{
  try{
   const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
   if(await ac.findOne({username:u}))return res.status(409).json({error:'This Gmail account is already registered'});
-  const a={username:u,email:u,companyName:company,passwordHash:bcrypt.hashSync(p,12),role:'owner',owner:u,active:true,createdAt:new Date().toISOString()};
+  const a={username:u,email:u,companyName:company,passwordHash:bcrypt.hashSync(p,12),role:'owner',owner:u,active:false,approvalStatus:'pending',createdAt:new Date().toISOString()};
   await ac.insertOne(a);
-  const token=jwt.sign({username:u,role:'owner',owner:u},JWT_SECRET,{expiresIn:'30d'});
-  return send(res,{ok:true,token,expiresIn:30*24*60*60,role:'owner',owner:u,username:u,companyName:company});
+  return res.status(202).json({ok:true,pending:true,message:'Registration submitted. Wait for administrator approval before logging in.',username:u,companyName:company});
  }catch(e){res.status(500).json({error:'Registration service error'})}
 });
+
+// System-admin approval queue for newly registered ISP/company accounts.
+app.get('/api/admin/registrations',auth,async(req,res)=>{
+ if(!isSystemAdmin(req.user))return res.status(403).json({error:'System administrator access required'});
+ const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
+ const accounts=await ac.find({approvalStatus:'pending'}).sort({createdAt:1}).project({passwordHash:0}).toArray();
+ send(res,{ok:true,registrations:accounts.map(a=>({username:a.username,email:a.email||a.username,companyName:a.companyName||'',createdAt:a.createdAt,status:a.approvalStatus||'pending'}))});
+});
+app.post('/api/admin/registrations/:username/approve',auth,async(req,res)=>{
+ if(!isSystemAdmin(req.user))return res.status(403).json({error:'System administrator access required'});
+ const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
+ const u=String(req.params.username||'').trim().toLowerCase();
+ const result=await ac.updateOne({username:u,approvalStatus:'pending'},{$set:{active:true,approvalStatus:'approved',approvedAt:new Date().toISOString(),approvedBy:req.user.username}});
+ if(!result.matchedCount)return res.status(404).json({error:'Pending registration not found'});
+ send(res,{ok:true,message:'Registration approved',username:u});
+});
+app.post('/api/admin/registrations/:username/reject',auth,async(req,res)=>{
+ if(!isSystemAdmin(req.user))return res.status(403).json({error:'System administrator access required'});
+ const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
+ const u=String(req.params.username||'').trim().toLowerCase();
+ const result=await ac.updateOne({username:u,approvalStatus:'pending'},{$set:{active:false,approvalStatus:'rejected',rejectedAt:new Date().toISOString(),rejectedBy:req.user.username}});
+ if(!result.matchedCount)return res.status(404).json({error:'Pending registration not found'});
+ send(res,{ok:true,message:'Registration rejected',username:u});
+});
+
 app.post('/api/auth/password',auth,async(req,res)=>{
  const current=String(req.body&&req.body.currentPassword||'');
  const next=String(req.body&&req.body.newPassword||'');
@@ -78,7 +103,9 @@ app.post('/api/auth/login',async(req,res)=>{
   const ac=col(ACCOUNT_COLLECTION);
   if(ac)account=await ac.findOne({username:u});
   if(account){
-   if(account.active===false||!bcrypt.compareSync(p,account.passwordHash))return res.status(401).json({error:'Invalid username or password'});
+   if(!bcrypt.compareSync(p,account.passwordHash))return res.status(401).json({error:'Invalid username or password'});
+   if(account.approvalStatus==='pending'||account.active===false)return res.status(403).json({error:'Your registration is pending administrator approval'});
+   if(account.approvalStatus==='rejected')return res.status(403).json({error:'Your registration was not approved. Contact the administrator'});
    const claims={username:account.username,role:account.role||'worker',owner:account.owner||account.username};
    const token=jwt.sign(claims,JWT_SECRET,{expiresIn:'30d'});
    return send(res,{token,expiresIn:30*24*60*60,role:claims.role,owner:claims.owner,username:claims.username});
