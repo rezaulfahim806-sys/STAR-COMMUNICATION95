@@ -3,8 +3,6 @@ name: Build STAR COMMUNICATION APK - Payment Fix
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
 
 permissions:
   contents: read
