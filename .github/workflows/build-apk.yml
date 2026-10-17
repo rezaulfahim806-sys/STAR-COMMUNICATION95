@@ -46,6 +46,22 @@ jobs:
         with:
           gradle-version: '8.7'
 
+      - name: Check server and app JavaScript syntax
+        shell: bash
+        run: |
+          set -e
+          node --check server.js
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          html = Path('app/src/main/assets/index.html').read_text(encoding='utf-8')
+          scripts = re.findall(r'<script>([\\s\\S]*?)</script>', html, flags=re.I)
+          if not scripts:
+              raise SystemExit('No inline application script found')
+          Path('/tmp/star-app-check.js').write_text('\\n'.join(scripts), encoding='utf-8')
+          PY
+          node --check /tmp/star-app-check.js
+
       - name: Verify Android project
         shell: bash
         run: |
