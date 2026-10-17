@@ -18,6 +18,8 @@ let merchant=(q.get('merchant')||'01897-099850').trim();
 const apiBase=(q.get('api')||'').trim().replace(/\/$/,'');
 const company=(q.get('company')||'').trim().toLowerCase();
 const customerMobile=(q.get('mobile')||'').trim();
+const paymentStatus=(q.get('status')||'').toLowerCase();
+const paymentID=(q.get('paymentID')||'').trim();
 let packages=[];
 let packageLoadError='';
 const c={name:q.get('name')||'Customer',location:q.get('location')||'-',package:q.get('package')||'',bill:Number(q.get('bill')||0),previousDue:Number(q.get('prev')||0),totalDue:Number(q.get('total')||0)};
@@ -26,6 +28,17 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&
 const money=n=>'৳'+Number(n||0).toLocaleString('en-BD');
 function findPackage(){let p=packages.find(x=>x.speed.toLowerCase()===String(c.package).toLowerCase());return p||packages.find(x=>x.price===c.bill)||packages[0]}
 async function initPaymentPage(){
+if(paymentStatus&&paymentID){
+ if(paymentStatus==='success'){
+  try{
+   const vr=await fetch(apiBase+'/api/bkash/status?paymentID='+encodeURIComponent(paymentID),{cache:'no-store'});
+   const vs=await vr.json().catch(()=>({}));
+   if(vr.ok&&vs.verified){app.innerHTML='<section class="card"><div class="status" style="font-size:18px;color:#087443">✓ Payment Verified Successfully</div><h2 class="heading" style="text-align:center">Thank you!</h2><p class="hint" style="text-align:center">Your bKash payment has been verified and your bill has been marked PAID.</p><div class="rows"><div class="row"><span class="label">Customer ID</span><span class="value">'+esc(vs.customerCode||'')+'</span></div><div class="row"><span class="label">Payment ID</span><span class="value">'+esc(paymentID)+'</span></div></div></section>';return}
+   app.innerHTML='<section class="card"><div class="error"><h2>Payment Not Yet Verified</h2><p>We could not confirm this payment yet. Please wait briefly and refresh, or contact STAR COMMUNICATION.</p></div></section>';return
+  }catch(e){app.innerHTML='<section class="card"><div class="error"><h2>Verification Unavailable</h2><p>Could not confirm payment status. Please refresh this page.</p></div></section>';return}
+ }
+ if(['failed','cancelled','invalid'].includes(paymentStatus)){app.innerHTML='<section class="card"><div class="error"><h2>Payment Not Completed</h2><p>Your payment was not confirmed. Return to the original payment link and try again.</p><button class="btn secondary" onclick="history.back()">Go Back</button></div></section>';return}
+}
 if(!apiBase||!company){packageLoadError='This payment link is not connected to the live company package system.'}
 else{
  try{
@@ -77,7 +90,7 @@ async function startPayment(){
  if(!Number.isFinite(amount)||amount<=0){s.textContent='No payable amount found.';return}
  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Connecting to bKash...';s.textContent='';
  try{
-   const r=await fetch(apiBase+'/api/bkash/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customerCode:code,customerName:c.name,customerMobile:customerMobile,selectedPackage:p.speed,packagePrice:p.price,previousDue:c.previousDue,amount:amount,merchantInvoiceNumber:'SC-'+code+'-'+Date.now()})});
+   const r=await fetch(apiBase+'/api/bkash/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({company:company,customerCode:code,customerName:c.name,customerMobile:customerMobile,selectedPackage:p.speed,packagePrice:p.price,previousDue:c.previousDue,amount:amount,merchantInvoiceNumber:'SC-'+code+'-'+Date.now()})});
    const data=await r.json().catch(()=>({}));
    if(!r.ok||!data.bkashURL)throw new Error(data.error||'Unable to start bKash checkout');
    location.href=data.bkashURL;
