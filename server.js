@@ -48,6 +48,7 @@ app.post('/api/auth/register',async(req,res)=>{
  const {email,password,companyName}=req.body||{};
  const u=String(email||'').trim().toLowerCase(), p=String(password||''), company=String(companyName||'').trim();
  if(!/^[^\s@]+@gmail\.com$/i.test(u))return res.status(400).json({error:'A valid Gmail address is required'});
+ if(u===String(ADMIN_USER).trim().toLowerCase())return res.status(409).json({error:'This Gmail is reserved for the system administrator'});
  if(p.length<8)return res.status(400).json({error:'Password must be at least 8 characters'});
  if(company.length<2||company.length>100)return res.status(400).json({error:'Company name is required'});
  try{
