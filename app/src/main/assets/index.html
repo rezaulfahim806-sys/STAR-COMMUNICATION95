@@ -105,7 +105,7 @@ function dataCount(x){return ['customers','payments','expenses','pending','histo
 function mergeRows(localRows,cloudRows){
  let out=[],map=new Map();
  (localRows||[]).forEach(x=>{let k=String(x.id??x._id??'');if(k){map.set(k,x)}else{out.push(x)}});
- (cloudRows||[]).forEach(x=>{let k=String(x.id??x._id??'');if(!k){out.push(x);return}let old=map.get(k);if(!old){map.set(k,x);return}let ot=Date.parse(old.updatedAt||old.createdAt||'')||0,nt=Date.parse(x.updatedAt||x.createdAt||'')||0;if(nt>ot)map.set(k,x)});
+ (cloudRows||[]).forEach(x=>{let k=String(x.id??x._id??'');if(!k){out.push(x);return}let old=map.get(k);if(!old){map.set(k,x);return}let ot=Date.parse(old.updatedAt||old.createdAt||'')||0,nt=Date.parse(x.updatedAt||x.createdAt||'')||0;let cloudPayment=!!(x.baniqOrderId||x.source==='baniq'||x.lastPaymentSource==='baniq'),oldPayment=!!(old.baniqOrderId||old.source==='baniq'||old.lastPaymentSource==='baniq');if((cloudPayment&&!oldPayment)||(cloudPayment&&oldPayment&&nt>=ot)||(!oldPayment&&nt>ot))map.set(k,x)});
  return out.concat(Array.from(map.values()))
 }
 function mergeState(local,cloud){
