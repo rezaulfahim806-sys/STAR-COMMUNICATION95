@@ -246,4 +246,84 @@ app.post('/api/olt/test',auth,async(req,res)=>{const {host,port,protocol,user,pa
 app.post('/api/olt/monitor',auth,async(req,res)=>{const {host,port,protocol,user,password,vendor}=req.body||{};if(!host||!user||!password)return res.status(400).json({error:'OLT IP, username and password are required'});try{const cmd=commandFor(vendor,'summary');const r=await runOltCommand({host,port,user,password,protocol,vendor,command:cmd});const counts=parseOnuCounts(r.out,vendor);send(res,{ok:true,connected:true,vendor:vendor||'generic',raw:r.out.slice(-15000),...counts,parser:'heuristic'})}catch(e){res.status(502).json({error:'OLT monitor failed: '+e.message})}});
 app.post('/api/olt/onu-list',auth,async(req,res)=>{const {host,port,protocol,user,password,vendor}=req.body||{};if(!host||!user||!password)return res.status(400).json({error:'OLT IP, username and password are required'});if(String(vendor||'').toLowerCase()!=='vsol')return res.status(400).json({error:'Live ONU list is currently implemented for VSOL EPON'});try{const r=await runOltCommand({host,port, user,password,protocol,vendor,command:'show onu status all'});const rows=parseVsolOnuRows(r.out);const counts=parseOnuCounts(r.out,'vsol');send(res,{ok:true,connected:true,vendor:'vsol',rows,...counts,raw:r.out.slice(-20000)})}catch(e){res.status(502).json({error:'VSOL ONU list failed: '+e.message})}});
 app.use(express.static(require('path').join(__dirname,'app','src','main','assets')));
+
+function readApiPath(obj,path){
+ if(!path)return undefined;
+ return String(path).split('.').reduce((v,k)=>v==null?undefined:v[k],obj);
+}
+function configuredHttpsUrl(raw){
+ let u;try{u=new URL(String(raw||''))}catch(e){throw new Error('A valid HTTPS API URL is required')}
+ if(u.protocol!=='https:'||!u.hostname||u.username||u.password)throw new Error('API endpoint must use HTTPS');
+ const h=u.hostname.toLowerCase();
+ if(h==='localhost'||h==='127.0.0.1'||h==='::1'||h.endsWith('.local'))throw new Error('Local API endpoints are not allowed');
+ return u;
+}
+async function integrationSettings(owner){
+ const c=col('app_state');if(!c)throw new Error('Cloud database is not configured');
+ const state=await c.findOne({owner:String(owner)});
+ if(!state||!state.data)throw new Error('Company cloud settings not found');
+ return state.data.settings||{};
+}
+async function callConfiguredApi(cfg,{transactionId,amount,customerId,phone,message}){
+ const u=configuredHttpsUrl(cfg.url);
+ const method=String(cfg.method||'POST').toUpperCase()==='GET'?'GET':'POST';
+ const key=String(cfg.apiKey||'').trim();
+ if(!key)throw new Error('API key/token is missing in Settings');
+ const payload={transactionId:transactionId||'',trxID:transactionId||'',amount:Number(amount||0),customerId:customerId||'',to:phone||'',phone:phone||'',message:message||'',senderid:cfg.senderId||'',senderId:cfg.senderId||''};
+ const keyField=String(cfg.apiKeyField||'').trim();
+ if(keyField)payload[keyField]=key;
+ const headers={'Accept':'application/json','Authorization':'Bearer '+key,'x-api-key':key};
+ let body;
+ if(method==='GET'){
+  Object.entries(payload).forEach(([k,v])=>{if(v!==''&&v!==undefined)u.searchParams.set(k,String(v))});
+ }else{
+  headers['Content-Type']='application/json';
+  body=JSON.stringify(payload);
+ }
+ const controller=new AbortController();
+ const timer=setTimeout(()=>controller.abort(),12000);
+ try{
+  const response=await fetch(u,{method,headers,body,signal:controller.signal,redirect:'error'});
+  const raw=await response.text();let data={};try{data=raw?JSON.parse(raw):{}}catch(e){data={message:raw.slice(0,300)}}
+  if(!response.ok)throw new Error('Provider API returned HTTP '+response.status);
+  return {data,status:response.status};
+ }finally{clearTimeout(timer)}
+}
+app.post('/api/integrations/sms/send',auth,async(req,res)=>{
+ try{
+  const phone=String(req.body&&req.body.phone||'').trim(),message=String(req.body&&req.body.message||'').trim();
+  if(!phone||!message)return res.status(400).json({error:'Phone and message are required'});
+  if(message.length>1200)return res.status(400).json({error:'Message is too long'});
+  const settings=await integrationSettings(ownerOf(req.user)),cfg=settings.smsApi||{};
+  if(!cfg.url)return res.status(400).json({error:'Configure the SMS API endpoint in Settings first'});
+  const result=await callConfiguredApi({...cfg,apiKeyField:cfg.apiKeyField,senderId:cfg.senderId},{phone,message});
+  const d=result.data||{};
+  if(d.success===false||d.ok===false||String(d.status||'').toLowerCase()==='error')return res.status(502).json({error:'SMS provider reported failure',providerMessage:String(d.message||d.error||'').slice(0,180)});
+  send(res,{ok:true,message:'SMS request accepted by provider',providerResponse:d});
+ }catch(e){res.status(502).json({error:'SMS API failed: '+String(e.message||'Request failed').slice(0,180)})}
+});
+app.post('/api/billing/verify-payment',auth,async(req,res)=>{
+ try{
+  const transactionId=String(req.body&&req.body.transactionId||'').trim();
+  const customerId=String(req.body&&req.body.customerId||'').trim();
+  const amount=Number(req.body&&req.body.amount||0);
+  if(!transactionId||!customerId||!Number.isFinite(amount)||amount<=0)return res.status(400).json({error:'Customer, transaction ID and amount are required'});
+  const settings=await integrationSettings(ownerOf(req.user)),cfg=settings.paymentVerify||{};
+  if(!cfg.url)return res.status(400).json({error:'Configure the payment verification API in Settings first'});
+  const result=await callConfiguredApi({...cfg,apiKeyField:cfg.apiKeyField},{transactionId,amount,customerId});
+  const data=result.data||{};
+  const statusPath=String(cfg.statusPath||'status');
+  const amountPath=String(cfg.amountPath||'amount');
+  const transactionPath=String(cfg.transactionPath||'transactionId');
+  const statusValue=readApiPath(data,statusPath)??data.transactionStatus??data.paymentStatus??data.status??data.result?.status??data.data?.status;
+  const amountValue=readApiPath(data,amountPath)??data.trxAmount??data.transactionAmount??data.data?.amount;
+  const transactionValue=readApiPath(data,transactionPath)??data.trxID??data.trxId??data.data?.trxID;
+  const normalized=String(statusValue||'').trim().toLowerCase();
+  if(!['paid','success','successful','completed','complete','approved','verified'].includes(normalized))return res.status(409).json({ok:false,verified:false,error:'Provider did not confirm a successful payment',providerStatus:String(statusValue||'unknown')});
+  if(amountValue===undefined||amountValue===null||!Number.isFinite(Number(amountValue))||Math.abs(Number(amountValue)-amount)>0.01)return res.status(409).json({ok:false,verified:false,error:'Provider amount does not match the bill'});
+  if(transactionValue&&String(transactionValue).trim().toLowerCase()!==transactionId.toLowerCase())return res.status(409).json({ok:false,verified:false,error:'Provider transaction ID does not match'});
+  send(res,{ok:true,verified:true,transactionId,amount:Number(amountValue),providerStatus:String(statusValue),message:'Payment verified by configured provider API'});
+ }catch(e){res.status(502).json({ok:false,verified:false,error:'Payment verification failed: '+String(e.message||'Request failed').slice(0,180)})}
+});
+
 app.listen(PORT,async()=>{try{await initDb();console.log('STAR COMMUNICATION server on '+PORT)}catch(e){console.error(e);process.exit(1)}});
