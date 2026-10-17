@@ -22,6 +22,12 @@ const paymentStatus=(q.get('status')||'').toLowerCase();
 const orderId=(q.get('orderId')||q.get('oid')||'').trim();
 let packages=[];
 let packageLoadError='';
+let fallbackPackages=[];
+try {
+  const rawFallback=JSON.parse(q.get('packages')||'[]');
+  if(Array.isArray(rawFallback)) fallbackPackages=rawFallback.filter(x=>x&&String(x.speed||'').trim()&&Number(x.price)>0).map(x=>({speed:String(x.speed),price:Number(x.price)}));
+} catch (_) {}
+
 const c={name:q.get('name')||'Customer',location:q.get('location')||'-',package:q.get('package')||'',bill:Number(q.get('bill')||0),previousDue:Number(q.get('prev')||0),totalDue:Number(q.get('total')||0)};
 const app=document.getElementById('app');
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -39,16 +45,24 @@ if(paymentStatus&&(orderId||paymentStatus==='failed'||paymentStatus==='cancelled
  }
  if(['failed','cancelled','invalid'].includes(paymentStatus)){app.innerHTML='<section class="card"><div class="error"><h2>Payment Not Completed</h2><p>Your payment was not confirmed. Return to the original payment link and try again.</p><button class="btn secondary" onclick="history.back()">Go Back</button></div></section>';return}
 }
-if(!apiBase||!company){packageLoadError='This payment link is not connected to the live company package system.'}
-else{
+if(apiBase&&company){
  try{
   const r=await fetch(apiBase+'/api/public/packages?company='+encodeURIComponent(company),{cache:'no-store'});
   const data=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(data.error||'Could not load the latest company packages');
-  packages=Array.isArray(data.packages)?data.packages.filter(p=>p&&String(p.speed||'').trim()&&Number(p.price)>0).map(p=>({speed:String(p.speed),price:Number(p.price)})):[];
-  if(!packages.length)throw new Error('No saved packages found. Please contact STAR COMMUNICATION.');
+  const livePackages=Array.isArray(data.packages)?data.packages.filter(p=>p&&String(p.speed||'').trim()&&Number(p.price)>0).map(p=>({speed:String(p.speed),price:Number(p.price)})):[];
+  if(livePackages.length) packages=livePackages;
+  else if(fallbackPackages.length) packages=fallbackPackages;
+  else throw new Error('No saved packages found. Add packages in app Settings first.');
   if(data.merchantNumber&&!q.get('merchant'))merchant=String(data.merchantNumber);
- }catch(e){packageLoadError=e.message||'Could not load the latest packages. Please refresh.'}
+ }catch(e){
+  if(fallbackPackages.length) packages=fallbackPackages;
+  else packageLoadError=e.message||'Could not load the latest packages. Please refresh.';
+ }
+}else if(fallbackPackages.length){
+ packages=fallbackPackages;
+}else{
+ packageLoadError='This payment link is not connected to the live company package system.';
 }
 if(!code){app.innerHTML='<section class="card"><div class="error"><h2>Invalid Payment Link</h2><p>Please open the payment link provided by STAR COMMUNICATION.</p></div></section>'}
 else if(packageLoadError){app.innerHTML='<section class="card"><div class="error"><h2>Package List Unavailable</h2><p>'+esc(packageLoadError)+'</p><p>Please refresh this page or contact STAR COMMUNICATION.</p></div></section>'}
