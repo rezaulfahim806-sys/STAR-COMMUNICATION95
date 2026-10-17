@@ -61,6 +61,7 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
     customer.pkg = session.selectedPackage;
     customer.fee = Number(session.packagePrice);
     customer.prevDue = 0;
+    customer.clientCode = String(session.clientCode || customer.clientCode || session.customerCode);
     customer.lastPaymentStatus = 'paid';
     customer.lastPaymentMonth = now.slice(0, 7);
     customer.lastPaymentAmount = amountTaka;
@@ -124,7 +125,7 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
       if (!Number.isFinite(requestedAmount) || Math.abs(requestedAmount - amountTaka) > 0.01) {
         return res.status(409).json({ error: 'Payment amount does not match the current package and previous due' });
       }
-      const reference = ('SC-' + clientCode.replace(/\\s+/g, '-') + '-' + Date.now()).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80);
+      const reference = ('SC-' + clientCode.replace(/\s+/g, '-') + '-' + Date.now()).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80);
       const amountPaisa = Math.round(amountTaka * 100);
       const callback = PUBLIC_URL + '/api/baniq/callback?reference=' + encodeURIComponent(reference);
       const created = await baniqFetch('/api/v1/orders', {
