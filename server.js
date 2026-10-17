@@ -29,7 +29,7 @@ async function initDb(){
 }
 function auth(req,res,next){try{const h=req.headers.authorization||'';if(!h.startsWith('Bearer '))throw 0;req.user=jwt.verify(h.slice(7),JWT_SECRET);next()}catch(e){res.status(401).json({error:'Unauthorized'})}}
 function send(res,payload){res.json(payload)}
-app.get('/api/health',(req,res)=>send(res,{ok:true,app:'STAR COMMUNICATION',version:'1.5.1',deployment:'render-backend-update-2026-10-17',time:new Date().toISOString(),database:!!db}));
+app.get('/api/health',(req,res)=>send(res,{ok:true,app:'STAR COMMUNICATION',version:'1.5.2',deployment:'login-api-update-2026-10-17',time:new Date().toISOString(),database:!!db}));
 // Public read-only package lookup used by customer Payment Links.
 app.get('/api/public/packages',async(req,res)=>{
  const company=String(req.query.company||'').trim().toLowerCase();
