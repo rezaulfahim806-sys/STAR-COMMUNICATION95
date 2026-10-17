@@ -32,7 +32,7 @@ jobs:
         run: |
           set -e
           grep -q "applicationId 'com.starcommunication.isp'" app/build.gradle
-          grep -q "versionCode 5" app/build.gradle
+          grep -q "versionCode 6" app/build.gradle
           grep -q 'function applyCustomerSearch' app/src/main/assets/index.html
           grep -q 'function editCustomer' app/src/main/assets/index.html
           grep -q 'function sendCustomerSmsById' app/src/main/assets/index.html
