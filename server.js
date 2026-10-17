@@ -86,6 +86,40 @@ app.put('/api/settings/packages',auth,async(req,res)=>{
  }
  return send(res,{ok:true,packages,updatedAt:now,message:'Packages published to customer payment links'});
 });
+// Company-owner managed sub-panel accounts. Sub-panels share only their owner's company data.
+app.get('/api/subpanels',auth,async(req,res)=>{
+ if(!isOwner(req.user)||isSystemAdmin(req.user))return res.status(403).json({error:'Company owner access required'});
+ const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
+ try{
+  const rows=await ac.find({owner:ownerOf(req.user),role:'worker'}).sort({createdAt:1}).project({passwordHash:0}).toArray();
+  return send(res,{ok:true,accounts:rows.map(a=>({username:a.username,role:a.role,active:a.active!==false,createdAt:a.createdAt||''}))});
+ }catch(e){return res.status(500).json({error:'Could not load sub-panel accounts'})}
+});
+app.post('/api/subpanels',auth,async(req,res)=>{
+ if(!isOwner(req.user)||isSystemAdmin(req.user))return res.status(403).json({error:'Company owner access required'});
+ const username=String(req.body&&req.body.username||'').trim().toLowerCase();
+ const password=String(req.body&&req.body.password||'');
+ if(!/^[^\\s@]+@gmail\\.com$/i.test(username))return res.status(400).json({error:'Sub-panel login must be a valid Gmail address'});
+ if(password.length<8)return res.status(400).json({error:'Sub-panel password must be at least 8 characters'});
+ const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
+ try{
+  if(await ac.findOne({username}))return res.status(409).json({error:'This Gmail is already registered'});
+  const owner=ownerOf(req.user);
+  await ac.insertOne({username,email:username,passwordHash:bcrypt.hashSync(password,12),role:'worker',owner,active:true,approvalStatus:'approved',createdAt:new Date().toISOString()});
+  return send(res,{ok:true,account:{username,role:'worker',active:true},message:'Sub-panel account created'});
+ }catch(e){return res.status(500).json({error:'Could not create sub-panel account'})}
+});
+app.delete('/api/subpanels/:username',auth,async(req,res)=>{
+ if(!isOwner(req.user)||isSystemAdmin(req.user))return res.status(403).json({error:'Company owner access required'});
+ const username=String(req.params.username||'').trim().toLowerCase();
+ const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
+ try{
+  const result=await ac.deleteOne({username,owner:ownerOf(req.user),role:'worker'});
+  if(!result.deletedCount)return res.status(404).json({error:'Sub-panel account not found'});
+  return send(res,{ok:true,message:'Sub-panel account deleted'});
+ }catch(e){return res.status(500).json({error:'Could not delete sub-panel account'})}
+});
+
 app.post('/api/auth/register',async(req,res)=>{
  const {email,password,companyName}=req.body||{};
  const u=String(email||'').trim().toLowerCase(), p=String(password||''), company=String(companyName||'').trim();
