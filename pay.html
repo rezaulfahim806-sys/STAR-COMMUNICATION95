@@ -18,26 +18,27 @@ let merchant=(q.get('merchant')||'01897-099850').trim();
 const apiBase=(q.get('api')||'').trim().replace(/\/$/,'');
 const company=(q.get('company')||'').trim().toLowerCase();
 const customerMobile=(q.get('mobile')||'').trim();
-const fallbackPackages=[{speed:'30 Mbps',price:500},{speed:'40 Mbps',price:650},{speed:'50 Mbps',price:750},{speed:'60 Mbps',price:800},{speed:'100 Mbps',price:1000},{speed:'110 Mbps',price:1200},{speed:'130 Mbps',price:1500}];
-let packages=fallbackPackages;
-try {
- const rawPackages=q.get('packages');
- if(rawPackages){
-  const parsed=JSON.parse(rawPackages);
-  if(Array.isArray(parsed)){
-   const normalized=parsed.map(p=>({speed:String(p.speed||p.name||''),price:Number(p.price??p.fee??0)})).filter(p=>p.speed&&Number.isFinite(p.price)&&p.price>0);
-   if(normalized.length) packages=normalized;
-  }
- }
-} catch(e) { console.warn('Could not read packages from payment link',e); }
+let packages=[];
+let packageLoadError='';
 const c={name:q.get('name')||'Customer',location:q.get('location')||'-',package:q.get('package')||'',bill:Number(q.get('bill')||0),previousDue:Number(q.get('prev')||0),totalDue:Number(q.get('total')||0)};
 const app=document.getElementById('app');
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const money=n=>'৳'+Number(n||0).toLocaleString('en-BD');
 function findPackage(){let p=packages.find(x=>x.speed.toLowerCase()===String(c.package).toLowerCase());return p||packages.find(x=>x.price===c.bill)||packages[0]}
 async function initPaymentPage(){
-if(apiBase&&company){try{const r=await fetch(apiBase+'/api/public/packages?company='+encodeURIComponent(company));if(r.ok){const data=await r.json();if(Array.isArray(data.packages)&&data.packages.length)packages=data.packages.filter(p=>p&&String(p.speed||'').trim()&&Number(p.price)>0).map(p=>({speed:String(p.speed),price:Number(p.price)}));if(data.merchantNumber&&!q.get('merchant'))merchant=String(data.merchantNumber);}}catch(e){console.warn('Company package lookup unavailable; using built-in defaults')}}
+if(!apiBase||!company){packageLoadError='This payment link is not connected to the live company package system.'}
+else{
+ try{
+  const r=await fetch(apiBase+'/api/public/packages?company='+encodeURIComponent(company),{cache:'no-store'});
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(data.error||'Could not load the latest company packages');
+  packages=Array.isArray(data.packages)?data.packages.filter(p=>p&&String(p.speed||'').trim()&&Number(p.price)>0).map(p=>({speed:String(p.speed),price:Number(p.price)})):[];
+  if(!packages.length)throw new Error('No saved packages found. Please contact STAR COMMUNICATION.');
+  if(data.merchantNumber&&!q.get('merchant'))merchant=String(data.merchantNumber);
+ }catch(e){packageLoadError=e.message||'Could not load the latest packages. Please refresh.'}
+}
 if(!code){app.innerHTML='<section class="card"><div class="error"><h2>Invalid Payment Link</h2><p>Please open the payment link provided by STAR COMMUNICATION.</p></div></section>'}
+else if(packageLoadError){app.innerHTML='<section class="card"><div class="error"><h2>Package List Unavailable</h2><p>'+esc(packageLoadError)+'</p><p>Please refresh this page or contact STAR COMMUNICATION.</p></div></section>'}
 else{
 const selected=findPackage();
 app.innerHTML=`
