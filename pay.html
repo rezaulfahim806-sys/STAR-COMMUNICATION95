@@ -18,7 +18,18 @@ let merchant=(q.get('merchant')||'01897-099850').trim();
 const apiBase=(q.get('api')||'').trim().replace(/\/$/,'');
 const company=(q.get('company')||'').trim().toLowerCase();
 const customerMobile=(q.get('mobile')||'').trim();
-let packages=[{speed:'30 Mbps',price:500},{speed:'40 Mbps',price:650},{speed:'50 Mbps',price:750},{speed:'60 Mbps',price:800},{speed:'100 Mbps',price:1000},{speed:'110 Mbps',price:1200},{speed:'130 Mbps',price:1500}];
+const fallbackPackages=[{speed:'30 Mbps',price:500},{speed:'40 Mbps',price:650},{speed:'50 Mbps',price:750},{speed:'60 Mbps',price:800},{speed:'100 Mbps',price:1000},{speed:'110 Mbps',price:1200},{speed:'130 Mbps',price:1500}];
+let packages=fallbackPackages;
+try {
+ const rawPackages=q.get('packages');
+ if(rawPackages){
+  const parsed=JSON.parse(rawPackages);
+  if(Array.isArray(parsed)){
+   const normalized=parsed.map(p=>({speed:String(p.speed||p.name||''),price:Number(p.price??p.fee??0)})).filter(p=>p.speed&&Number.isFinite(p.price)&&p.price>0);
+   if(normalized.length) packages=normalized;
+  }
+ }
+} catch(e) { console.warn('Could not read packages from payment link',e); }
 const c={name:q.get('name')||'Customer',location:q.get('location')||'-',package:q.get('package')||'',bill:Number(q.get('bill')||0),previousDue:Number(q.get('prev')||0),totalDue:Number(q.get('total')||0)};
 const app=document.getElementById('app');
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
