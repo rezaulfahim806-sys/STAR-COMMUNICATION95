@@ -32,6 +32,7 @@ function send(res,payload){res.json(payload)}
 app.get('/api/health',(req,res)=>send(res,{ok:true,app:'STAR COMMUNICATION',version:'1.5.3',deployment:'login-flow-update-2026-10-17',time:new Date().toISOString(),database:!!db}));
 // Public read-only package lookup used by customer Payment Links.
 app.get('/api/public/packages',async(req,res)=>{
+ res.set('Cache-Control','no-store, no-cache, must-revalidate, proxy-revalidate');
  const company=String(req.query.company||'').trim().toLowerCase();
  if(!company||!/^[^\s@]+@gmail\.com$/i.test(company))return res.status(400).json({error:'Valid company Gmail is required'});
  const c=col('app_state');
@@ -43,6 +44,22 @@ app.get('/api/public/packages',async(req,res)=>{
   const packages=Array.isArray(settings.packages)&&settings.packages.length?settings.packages:[];
   return send(res,{ok:true,companyName:settings.cloud&&settings.cloud.companyName||'',packages,merchantNumber:String(settings.merchantNumber||'')});
  }catch(e){return res.status(500).json({error:'Could not load company packages'})}
+});
+app.put('/api/settings/packages',auth,async(req,res)=>{
+ if(!isOwner(req.user))return res.status(403).json({error:'Company owner access required'});
+ const raw=req.body&&req.body.packages;
+ if(!Array.isArray(raw)||raw.length>100)return res.status(400).json({error:'A package list of up to 100 items is required'});
+ const packages=raw.map(p=>({speed:String(p&&p.speed||p&&p.name||'').trim(),price:Number(p&&p.price??p&&p.fee??0)}));
+ if(packages.some(p=>!p.speed||p.speed.length>80||!Number.isFinite(p.price)||p.price<=0))return res.status(400).json({error:'Every package needs a name and a price greater than zero'});
+ const c=col('app_state');if(!c)return res.status(503).json({error:'Cloud database is not configured'});
+ const owner=ownerOf(req.user),now=new Date().toISOString();
+ const state=await c.findOne({owner});
+ if(!state){
+  await c.insertOne({owner,data:{customers:[],payments:[],expenses:[],pending:[],history:[],settings:{packages}},updatedAt:now});
+ }else{
+  await c.updateOne({owner},{$set:{'data.settings.packages':packages,updatedAt:now}});
+ }
+ return send(res,{ok:true,packages,updatedAt:now,message:'Packages published to customer payment links'});
 });
 app.post('/api/auth/register',async(req,res)=>{
  const {email,password,companyName}=req.body||{};
