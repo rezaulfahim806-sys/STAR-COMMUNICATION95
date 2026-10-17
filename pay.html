@@ -19,7 +19,7 @@ const apiBase=(q.get('api')||'').trim().replace(/\/$/,'');
 const company=(q.get('company')||'').trim().toLowerCase();
 const customerMobile=(q.get('mobile')||'').trim();
 const paymentStatus=(q.get('status')||'').toLowerCase();
-const paymentID=(q.get('paymentID')||'').trim();
+const orderId=(q.get('orderId')||q.get('oid')||'').trim();
 let packages=[];
 let packageLoadError='';
 const c={name:q.get('name')||'Customer',location:q.get('location')||'-',package:q.get('package')||'',bill:Number(q.get('bill')||0),previousDue:Number(q.get('prev')||0),totalDue:Number(q.get('total')||0)};
@@ -28,12 +28,12 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&
 const money=n=>'৳'+Number(n||0).toLocaleString('en-BD');
 function findPackage(){let p=packages.find(x=>x.speed.toLowerCase()===String(c.package).toLowerCase());return p||packages.find(x=>x.price===c.bill)||packages[0]}
 async function initPaymentPage(){
-if(paymentStatus&&paymentID){
+if(paymentStatus&&(orderId||paymentStatus==='failed'||paymentStatus==='cancelled'||paymentStatus==='invalid')){
  if(paymentStatus==='success'){
   try{
-   const vr=await fetch(apiBase+'/api/bkash/status?paymentID='+encodeURIComponent(paymentID),{cache:'no-store'});
+   const vr=await fetch(apiBase+'/api/baniq/status?orderId='+encodeURIComponent(orderId),{cache:'no-store'});
    const vs=await vr.json().catch(()=>({}));
-   if(vr.ok&&vs.verified){app.innerHTML='<section class="card"><div class="status" style="font-size:18px;color:#087443">✓ Payment Verified Successfully</div><h2 class="heading" style="text-align:center">Thank you!</h2><p class="hint" style="text-align:center">Your bKash payment has been verified and your bill has been marked PAID.</p><div class="rows"><div class="row"><span class="label">Customer ID</span><span class="value">'+esc(vs.customerCode||'')+'</span></div><div class="row"><span class="label">Payment ID</span><span class="value">'+esc(paymentID)+'</span></div></div></section>';return}
+   if(vr.ok&&vs.verified){app.innerHTML='<section class="card"><div class="status" style="font-size:18px;color:#087443">✓ Payment Verified Successfully</div><h2 class="heading" style="text-align:center">Thank you!</h2><p class="hint" style="text-align:center">Your Baniq Pay payment has been verified and your bill has been marked PAID.</p><div class="rows"><div class="row"><span class="label">Customer ID</span><span class="value">'+esc(vs.customerCode||'')+'</span></div><div class="row"><span class="label">Payment ID</span><span class="value">'+esc(orderId)+'</span></div></div></section>';return}
    app.innerHTML='<section class="card"><div class="error"><h2>Payment Not Yet Verified</h2><p>We could not confirm this payment yet. Please wait briefly and refresh, or contact STAR COMMUNICATION.</p></div></section>';return
   }catch(e){app.innerHTML='<section class="card"><div class="error"><h2>Verification Unavailable</h2><p>Could not confirm payment status. Please refresh this page.</p></div></section>';return}
  }
@@ -67,15 +67,13 @@ app.innerHTML=`
 <div class="hint">Choose the package you want for this billing period. The full package price is required; a lower amount cannot be paid.</div>
 <select class="select" id="packageSelect">${packages.map(p=>`<option value="${p.speed}" ${p.speed===selected.speed?'selected':''}>${p.speed} — ${money(p.price)}/month</option>`).join('')}</select>
 <div class="packageNote">Selected package: <b id="selectedPackage">${esc(selected.speed)}</b> • Bill: <b id="selectedBill">${money(selected.price)}</b></div>
-</section>
-<section class="card pay"><h2 class="heading">💳 Pay with bKash</h2><div class="bkash">bKash Merchant</div><div class="number">${esc(merchant)}</div><div class="hint">Your payment will be linked to <b>${esc(code)}</b>. After bKash verifies a successful payment, the customer confirmation SMS can be sent automatically.</div>
-<button class="btn" id="payNow">Pay with bKash</button>
-<button class="btn secondary" id="copy">Copy bKash Merchant Number</button>
+</section><section class="card pay"><h2 class="heading">💳 Pay with Baniq Pay</h2><div class="bkash">Secure hosted checkout</div><div class="hint">Pay this bill using supported payment methods in Baniq Pay. Your bill is marked paid only after server-side verification.</div>
+<button class="btn" id="payNow">Pay with Baniq Pay</button>
 <div class="status" id="status"></div><div class="secure">🔒 Secure checkout • Amount: <b id="secureAmount">${money(selected.price+c.previousDue)}</b></div></section>`;
 
 document.getElementById('packageSelect').onchange=updatePackage;
 document.getElementById('payNow').onclick=startPayment;
-document.getElementById('copy').onclick=()=>{const s=document.getElementById('status');if(navigator.clipboard){navigator.clipboard.writeText(merchant).then(()=>s.textContent='✓ bKash Merchant Number copied').catch(()=>fallback(s))}else fallback(s)};
+
 }
 }
 initPaymentPage();
@@ -88,13 +86,13 @@ async function startPayment(){
  const p=getSelected();
  const amount=Number(p.price+c.previousDue||0);
  if(!Number.isFinite(amount)||amount<=0){s.textContent='No payable amount found.';return}
- btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Connecting to bKash...';s.textContent='';
+ btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Connecting to Baniq Pay...';s.textContent='';
  try{
-   const r=await fetch(apiBase+'/api/bkash/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({company:company,customerCode:code,customerName:c.name,customerMobile:customerMobile,selectedPackage:p.speed,packagePrice:p.price,previousDue:c.previousDue,amount:amount,merchantInvoiceNumber:'SC-'+code+'-'+Date.now()})});
+   const r=await fetch(apiBase+'/api/baniq/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({company:company,customerCode:code,customerName:c.name,customerMobile:customerMobile,selectedPackage:p.speed,packagePrice:p.price,previousDue:c.previousDue,amount:amount,merchantInvoiceNumber:'SC-'+code+'-'+Date.now()})});
    const data=await r.json().catch(()=>({}));
-   if(!r.ok||!data.bkashURL)throw new Error(data.error||'Unable to start bKash checkout');
-   location.href=data.bkashURL;
- }catch(e){s.textContent=e.message||'Payment service unavailable.';btn.disabled=false;btn.textContent='Pay with bKash'}
+   if(!r.ok||!data.checkoutUrl)throw new Error(data.error||'Unable to start Baniq Pay checkout');
+   location.href=data.checkoutUrl;
+ }catch(e){s.textContent=e.message||'Payment service unavailable.';btn.disabled=false;btn.textContent='Pay with Baniq Pay'}
 }
-function fallback(s){const t=document.createElement('textarea');t.value=merchant;document.body.appendChild(t);t.select();try{document.execCommand('copy');s.textContent='✓ bKash Merchant Number copied'}catch(e){s.textContent='bKash Merchant: '+merchant}t.remove()}
+
 </script></body></html>

@@ -1,0 +1,208 @@
+const crypto = require('crypto');
+
+module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, PAYMENT_PAGE_URL }) {
+  const API_BASE = (process.env.BANIQ_API_BASE || 'https://api.baniq.app').replace(/\/$/, '');
+  const KEY_ID = process.env.BANIQ_KEY_ID || '';
+  const API_SECRET = process.env.BANIQ_SECRET || '';
+  const WEBHOOK_SECRET = process.env.BANIQ_WEBHOOK_SECRET || '';
+
+  function requireConfig() {
+    if (!KEY_ID || !API_SECRET) throw new Error('Baniq API credentials are not configured in Render Environment Variables');
+  }
+  async function baniqFetch(path, options = {}) {
+    requireConfig();
+    const response = await fetch(API_BASE + path, {
+      ...options,
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        'x-api-key-id': KEY_ID,
+        'x-api-secret': API_SECRET,
+        ...(options.headers || {})
+      }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(String(data.message || data.error || 'Baniq API returned HTTP ' + response.status).slice(0, 200));
+    return data;
+  }
+  async function findSession({ orderId, reference }) {
+    const c = col('baniq_checkout_sessions');
+    if (!c) throw new Error('Cloud database is not configured');
+    if (orderId) return c.findOne({ orderId: String(orderId) });
+    if (reference) return c.findOne({ reference: String(reference) });
+    return null;
+  }
+  async function verifyOrder(orderId, expectedAmount) {
+    const data = await baniqFetch('/api/v1/orders/' + encodeURIComponent(orderId), { method: 'GET' });
+    if (data.paid !== true || String(data.status || '').toLowerCase() !== 'paid') {
+      return { verified: false, providerStatus: String(data.status || 'unknown') };
+    }
+    if (Number(data.amount) !== Number(expectedAmount)) {
+      throw new Error('Verified Baniq amount does not match the expected bill');
+    }
+    return { verified: true, data };
+  }
+  async function markPaid(session, providerData) {
+    const sessions = col('baniq_checkout_sessions');
+    const stateCol = col('app_state');
+    if (!sessions || !stateCol) throw new Error('Cloud database is not configured');
+    const current = await sessions.findOne({ orderId: session.orderId });
+    if (current && current.status === 'PAID') return current;
+    const state = await stateCol.findOne({ owner: session.owner });
+    if (!state || !state.data) throw new Error('Company data not found after payment verification');
+    const data = state.data;
+    const customers = Array.isArray(data.customers) ? data.customers : [];
+    const customer = customers.find(x => String(x.id) === String(session.customerCode));
+    if (!customer) throw new Error('Customer not found after payment verification');
+    const amountTaka = Number(session.amountPaisa) / 100;
+    const payments = Array.isArray(data.payments) ? data.payments : (data.payments = []);
+    const alreadyAdded = payments.some(p => String(p.baniqOrderId || '') === String(session.orderId));
+    const now = new Date().toISOString();
+    customer.pkg = session.selectedPackage;
+    customer.fee = Number(session.packagePrice);
+    customer.prevDue = 0;
+    if (!alreadyAdded) {
+      payments.push({
+        id: 'baniq-' + session.orderId,
+        customer: String(session.customerCode),
+        amount: amountTaka,
+        date: now.slice(0, 10),
+        month: now.slice(0, 7),
+        status: 'paid',
+        source: 'baniq',
+        ref: String(providerData.reference || session.reference),
+        baniqOrderId: String(session.orderId),
+        createdAt: now,
+        updatedAt: now
+      });
+    }
+    await stateCol.updateOne({ owner: session.owner }, { $set: { data, updatedAt: now } });
+    await sessions.updateOne({ orderId: session.orderId }, { $set: {
+      status: 'PAID',
+      verifiedAmountPaisa: Number(providerData.amount),
+      paidAt: providerData.paidAt || now,
+      verifiedAt: now,
+      updatedAt: now
+    } });
+    return { ...session, status: 'PAID' };
+  }
+
+  app.post('/api/baniq/create', async (req, res) => {
+    try {
+      const body = req.body || {};
+      const owner = String(body.company || '').trim().toLowerCase();
+      const customerCode = String(body.customerCode || '').trim();
+      const selectedPackage = String(body.selectedPackage || '').trim();
+      const packagePrice = Number(body.packagePrice || 0);
+      const requestedAmount = Number(body.amount || 0);
+      if (!owner || !customerCode || !selectedPackage || !Number.isFinite(packagePrice) || packagePrice <= 0) {
+        return res.status(400).json({ error: 'Company, customer and selected package are required' });
+      }
+      const stateCol = col('app_state');
+      if (!stateCol) return res.status(503).json({ error: 'Cloud database is not configured' });
+      const state = await stateCol.findOne({ owner });
+      if (!state || !state.data) return res.status(404).json({ error: 'Company cloud data was not found' });
+      const customer = (state.data.customers || []).find(c => String(c.id) === customerCode);
+      if (!customer) return res.status(404).json({ error: 'Customer does not belong to this company' });
+      const packages = Array.isArray(state.data.settings && state.data.settings.packages) ? state.data.settings.packages : [];
+      const livePackage = packages.find(p => String(p.speed || p.name || '').trim() === selectedPackage);
+      if (!livePackage || Math.abs(Number(livePackage.price ?? livePackage.fee ?? 0) - packagePrice) > 0.01) {
+        return res.status(409).json({ error: 'This package changed. Refresh the payment link and select a current package' });
+      }
+      const previousDue = Math.max(0, Number(customer.prevDue ?? customer.previousDue ?? 0));
+      const amountTaka = Number((packagePrice + previousDue).toFixed(2));
+      if (!Number.isFinite(requestedAmount) || Math.abs(requestedAmount - amountTaka) > 0.01) {
+        return res.status(409).json({ error: 'Payment amount does not match the current package and previous due' });
+      }
+      const reference = ('SC-' + customerCode + '-' + Date.now()).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80);
+      const amountPaisa = Math.round(amountTaka * 100);
+      const callback = PUBLIC_URL + '/api/baniq/callback?reference=' + encodeURIComponent(reference);
+      const created = await baniqFetch('/api/v1/orders', {
+        method: 'POST',
+        body: JSON.stringify({
+          amount: amountPaisa,
+          productName: 'STAR COMMUNICATION Internet Bill - ' + selectedPackage,
+          reference,
+          successUrl: callback,
+          cancelUrl: PAYMENT_PAGE_URL + '?status=cancelled&api=' + encodeURIComponent(PUBLIC_URL),
+          customerName: String(customer.name || body.customerName || 'Customer'),
+          customerPhone: String(customer.mobile || customer.phone || body.customerMobile || ''),
+          metadata: { company: owner, customerCode, selectedPackage, packagePrice, previousDue, orderType: 'isp-bill' }
+        })
+      });
+      if (!created.orderId || !created.checkoutUrl) throw new Error('Baniq did not return a checkout URL');
+      const sessions = col('baniq_checkout_sessions');
+      await sessions.insertOne({
+        orderId: String(created.orderId), reference, owner, customerCode,
+        customerName: String(customer.name || body.customerName || 'Customer'),
+        customerMobile: String(customer.mobile || customer.phone || body.customerMobile || ''),
+        selectedPackage, packagePrice, previousDue, amountPaisa,
+        status: 'PENDING', createdAt: new Date().toISOString()
+      });
+      return res.json({ ok: true, orderId: String(created.orderId), checkoutUrl: created.checkoutUrl, reference });
+    } catch (e) {
+      return res.status(502).json({ error: String(e.message || 'Unable to start Baniq payment').slice(0, 220) });
+    }
+  });
+
+  app.get('/api/baniq/status', async (req, res) => {
+    try {
+      const orderId = String(req.query.orderId || '').trim();
+      if (!orderId) return res.status(400).json({ error: 'orderId is required' });
+      const session = await findSession({ orderId });
+      if (!session) return res.status(404).json({ ok: true, verified: false, status: 'NOT_FOUND' });
+      if (session.status === 'PAID') return res.json({ ok: true, verified: true, status: 'PAID', customerCode: session.customerCode, orderId });
+      const verification = await verifyOrder(orderId, session.amountPaisa);
+      if (!verification.verified) return res.json({ ok: true, verified: false, status: verification.providerStatus, customerCode: session.customerCode, orderId });
+      const paid = await markPaid(session, verification.data);
+      return res.json({ ok: true, verified: true, status: paid.status, customerCode: session.customerCode, orderId });
+    } catch (e) {
+      return res.status(502).json({ ok: false, verified: false, error: String(e.message || 'Baniq verification failed').slice(0, 200) });
+    }
+  });
+
+  app.get('/api/baniq/callback', async (req, res) => {
+    const reference = String(req.query.reference || '').trim();
+    const orderIdFromQuery = String(req.query.orderId || req.query.oid || '').trim();
+    const page = (status, orderId = '') => {
+      const params = new URLSearchParams({ status, api: PUBLIC_URL });
+      if (orderId) params.set('orderId', orderId);
+      if (reference) params.set('reference', reference);
+      return res.redirect(PAYMENT_PAGE_URL + '?' + params.toString());
+    };
+    try {
+      const session = await findSession({ orderId: orderIdFromQuery, reference });
+      if (!session) return page('failed');
+      const result = await verifyOrder(session.orderId, session.amountPaisa);
+      if (!result.verified) return page('pending', session.orderId);
+      await markPaid(session, result.data);
+      return page('success', session.orderId);
+    } catch (e) {
+      return page('pending', orderIdFromQuery);
+    }
+  });
+
+  app.post('/api/baniq/webhook', async (req, res) => {
+    try {
+      if (!WEBHOOK_SECRET) return res.status(503).json({ error: 'Baniq webhook secret is not configured' });
+      const signature = String(req.get('x-deshpay-signature') || '');
+      const rawBody = req.rawBody;
+      if (!rawBody) return res.status(400).json({ error: 'Raw webhook body unavailable' });
+      const expected = 'sha256=' + crypto.createHmac('sha256', WEBHOOK_SECRET).update(rawBody).digest('hex');
+      const a = Buffer.from(signature), b = Buffer.from(expected);
+      if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return res.status(401).json({ error: 'Invalid Baniq webhook signature' });
+      const payload = JSON.parse(rawBody.toString('utf8'));
+      if (payload.event !== 'order.paid' || !payload.order) return res.status(200).json({ ok: true, ignored: true });
+      const order = payload.order;
+      const session = await findSession({ orderId: String(order.id || '') , reference: String(order.reference || '') });
+      if (!session) return res.status(404).json({ error: 'Payment order not found' });
+      if (Number(order.amount) !== Number(session.amountPaisa) || String(order.status || '').toLowerCase() !== 'paid') {
+        return res.status(409).json({ error: 'Webhook order does not match expected payment' });
+      }
+      await markPaid(session, order);
+      return res.status(200).json({ ok: true });
+    } catch (e) {
+      return res.status(400).json({ error: String(e.message || 'Invalid Baniq webhook').slice(0, 180) });
+    }
+  });
+};
