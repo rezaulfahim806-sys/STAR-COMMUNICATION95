@@ -15,7 +15,7 @@
 const q=new URLSearchParams(location.search);
 const code=(q.get('code')||'').trim();
 let merchant=(q.get('merchant')||'01897-099850').trim();
-const apiBase=(q.get('api')||'').trim().replace(/\/$/,'');
+const apiBase=(q.get('api')||'https://star-communication-api.onrender.com').trim().replace(/\/$/,'');
 const company=(q.get('company')||'').trim().toLowerCase();
 const customerMobile=(q.get('mobile')||'').trim();
 const paymentStatus=(q.get('status')||'').toLowerCase();
@@ -29,6 +29,8 @@ try {
 } catch (_) {}
 
 const c={name:q.get('name')||'Customer',location:q.get('location')||'-',package:q.get('package')||'',bill:Number(q.get('bill')||0),previousDue:Number(q.get('prev')||0),totalDue:Number(q.get('total')||0)};
+// Backward compatibility for older payment links: retain the customer's current package if no package list was embedded.
+if(!fallbackPackages.length && String(c.package||'').trim() && Number.isFinite(c.bill) && c.bill>0) fallbackPackages=[{speed:String(c.package).trim(),price:c.bill}];
 const app=document.getElementById('app');
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const money=n=>'৳'+Number(n||0).toLocaleString('en-BD');
