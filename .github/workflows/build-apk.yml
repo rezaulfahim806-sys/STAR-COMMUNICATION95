@@ -51,8 +51,9 @@ jobs:
           grep -q 'TOTAL DUE' app/src/main/java/com/starcommunication/isp/MainActivity.java
           grep -q 'android:allowBackup="false"' app/src/main/AndroidManifest.xml
           grep -q 'android:usesCleartextTraffic="false"' app/src/main/AndroidManifest.xml
-          grep -q 'workerPage' app/src/main/assets/index.html
-          grep -q '/api/complaints' app/src/main/assets/index.html
+          grep -q 'function renderPackageRows()' app/src/main/assets/index.html
+          grep -q 'function saveCompanyPackages()' app/src/main/assets/index.html
+          grep -q 'Choose internet package' app/src/main/assets/index.html
       - name: Build Debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace --warning-mode all
       - name: Verify APK exists
