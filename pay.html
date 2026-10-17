@@ -14,6 +14,7 @@
 <script>
 const q=new URLSearchParams(location.search);
 const code=(q.get('code')||'').trim();
+const clientCode=(q.get('clientCode')||'').trim()||code;
 let merchant=(q.get('merchant')||'01897-099850').trim();
 const apiBase=(q.get('api')||'').trim().replace(/\/$/,'');
 const company=(q.get('company')||'').trim().toLowerCase();
@@ -41,7 +42,7 @@ if(paymentStatus&&(orderId||paymentStatus==='failed'||paymentStatus==='cancelled
   try{
    const vr=await fetch(apiBase+'/api/baniq/status?orderId='+encodeURIComponent(orderId),{cache:'no-store'});
    const vs=await vr.json().catch(()=>({}));
-   if(vr.ok&&vs.verified){app.innerHTML='<section class="card"><div class="status" style="font-size:18px;color:#087443">✓ Payment Verified Successfully</div><h2 class="heading" style="text-align:center">Thank you!</h2><p class="hint" style="text-align:center">Your Baniq Pay payment has been verified and your bill has been marked PAID.</p><div class="rows"><div class="row"><span class="label">Customer ID</span><span class="value">'+esc(vs.customerCode||'')+'</span></div><div class="row"><span class="label">Payment ID</span><span class="value">'+esc(orderId)+'</span></div></div></section>';return}
+   if(vr.ok&&vs.verified){app.innerHTML='<section class="card"><div class="status" style="font-size:18px;color:#087443">✓ Payment Verified Successfully</div><h2 class="heading" style="text-align:center">Thank you!</h2><p class="hint" style="text-align:center">Your Baniq Pay payment has been verified and your bill has been marked PAID.</p><div class="rows"><div class="row"><span class="label">Client Code</span><span class="value">'+esc(vs.clientCode||clientCode||vs.customerCode||'')+'</span></div><div class="row"><span class="label">Payment ID</span><span class="value">'+esc(orderId)+'</span></div></div></section>';return}
    app.innerHTML='<section class="card"><div class="error"><h2>Payment Not Yet Verified</h2><p>We could not confirm this payment yet. Please wait briefly and refresh, or contact STAR COMMUNICATION.</p></div></section>';return
   }catch(e){app.innerHTML='<section class="card"><div class="error"><h2>Verification Unavailable</h2><p>Could not confirm payment status. Please refresh this page.</p></div></section>';return}
  }
@@ -72,7 +73,7 @@ else{
 const selected=findPackage();
 app.innerHTML=`
 <section class="card"><h2 class="heading">📄 Bill Details</h2><div class="rows">
-<div class="row"><span class="label">Customer ID</span><span class="value">${esc(code)}</span></div>
+<div class="row"><span class="label">Client Code</span><span class="value">${esc(clientCode)}</span></div>
 <div class="row"><span class="label">Customer Name</span><span class="value">${esc(c.name)}</span></div>
 <div class="row"><span class="label">Location</span><span class="value">${esc(c.location)}</span></div>
 <div class="row"><span class="label">Package</span><span class="value" id="packageValue">${esc(selected.speed)}</span></div>
@@ -104,7 +105,7 @@ async function startPayment(){
  if(!Number.isFinite(amount)||amount<=0){s.textContent='No payable amount found.';return}
  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Connecting to Baniq Pay...';s.textContent='';
  try{
-   const r=await fetch(apiBase+'/api/baniq/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({company:company,customerCode:code,customerName:c.name,customerMobile:customerMobile,selectedPackage:p.speed,packagePrice:p.price,previousDue:c.previousDue,amount:amount,merchantInvoiceNumber:'SC-'+code+'-'+Date.now()})});
+   const r=await fetch(apiBase+'/api/baniq/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({company:company,customerCode:code,clientCode:clientCode,customerName:c.name,customerMobile:customerMobile,selectedPackage:p.speed,packagePrice:p.price,previousDue:c.previousDue,amount:amount,merchantInvoiceNumber:'SC-'+code+'-'+Date.now()})});
    const data=await r.json().catch(()=>({}));
    if(!r.ok||!data.checkoutUrl)throw new Error(data.error||'Unable to start Baniq Pay checkout');
    location.href=data.checkoutUrl;
