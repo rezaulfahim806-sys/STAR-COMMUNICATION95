@@ -99,7 +99,7 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
     try {
       const body = req.body || {};
       const owner = String(body.company || '').trim().toLowerCase();
-      const customerCode = String(body.customerCode || '').trim();
+      let customerCode = String(body.customerCode || '').trim();
       const requestedClientCode = String(body.clientCode || '').trim();
       const selectedPackage = String(body.selectedPackage || '').trim();
       const packagePrice = Number(body.packagePrice || 0);
@@ -111,8 +111,11 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
       if (!stateCol) return res.status(503).json({ error: 'Cloud database is not configured' });
       const state = await stateCol.findOne({ owner });
       if (!state || !state.data) return res.status(404).json({ error: 'Company cloud data was not found' });
-      const customer = (state.data.customers || []).find(c => String(c.id) === customerCode);
-      if (!customer) return res.status(404).json({ error: 'Customer does not belong to this company' });
+      const companyCustomers = Array.isArray(state.data.customers) ? state.data.customers : [];
+      const customer = companyCustomers.find(c => String(c.id) === customerCode) || companyCustomers.find(c => requestedClientCode && String(c.clientCode || '').trim().toLowerCase() === requestedClientCode.toLowerCase());
+      if (!customer) return res.status(404).json({ error: 'Customer does not belong to this company. Please sync this customer to the same company account and retry.' });
+      // Store the company's canonical customer ID so verified payments update the right record.
+      customerCode = String(customer.id || customerCode);
       const clientCode = String(customer.clientCode || requestedClientCode || customerCode).trim();
       const packages = Array.isArray(state.data.settings && state.data.settings.packages) ? state.data.settings.packages : [];
       const livePackage = packages.find(p => String(p.speed || p.name || '').trim() === selectedPackage);
