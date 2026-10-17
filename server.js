@@ -99,7 +99,7 @@ app.post('/api/subpanels',auth,async(req,res)=>{
  if(!isOwner(req.user)||isSystemAdmin(req.user))return res.status(403).json({error:'Company owner access required'});
  const username=String(req.body&&req.body.username||'').trim().toLowerCase();
  const password=String(req.body&&req.body.password||'');
- if(!/^[^\\s@]+@gmail\\.com$/i.test(username))return res.status(400).json({error:'Sub-panel login must be a valid Gmail address'});
+ if(!/^[^\s@]+@gmail\.com$/i.test(username))return res.status(400).json({error:'Sub-panel login must be a valid Gmail address'});
  if(password.length<8)return res.status(400).json({error:'Sub-panel password must be at least 8 characters'});
  const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
  try{
