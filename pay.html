@@ -15,7 +15,7 @@
 const q=new URLSearchParams(location.search);
 const code=(q.get('code')||'').trim();
 let merchant=(q.get('merchant')||'01897-099850').trim();
-const apiBase=(q.get('api')||'https://star-communication-api.onrender.com').trim().replace(/\/$/,'');
+const apiBase=(q.get('api')||'').trim().replace(/\/$/,'');
 const company=(q.get('company')||'').trim().toLowerCase();
 const customerMobile=(q.get('mobile')||'').trim();
 const paymentStatus=(q.get('status')||'').toLowerCase();
