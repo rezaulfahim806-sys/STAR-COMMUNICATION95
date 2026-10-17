@@ -61,10 +61,18 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
     customer.pkg = session.selectedPackage;
     customer.fee = Number(session.packagePrice);
     customer.prevDue = 0;
+    customer.lastPaymentStatus = 'paid';
+    customer.lastPaymentMonth = now.slice(0, 7);
+    customer.lastPaymentAmount = amountTaka;
+    customer.lastPaymentSource = 'baniq';
+    customer.lastPaymentAt = now;
+    customer.updatedAt = now;
     if (!alreadyAdded) {
       payments.push({
         id: 'baniq-' + session.orderId,
         customer: String(session.customerCode),
+        clientCode: String(session.clientCode || customer.clientCode || session.customerCode),
+        customerName: String(customer.name || session.customerName || 'Customer'),
         amount: amountTaka,
         date: now.slice(0, 10),
         month: now.slice(0, 7),
@@ -92,6 +100,7 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
       const body = req.body || {};
       const owner = String(body.company || '').trim().toLowerCase();
       const customerCode = String(body.customerCode || '').trim();
+      const requestedClientCode = String(body.clientCode || '').trim();
       const selectedPackage = String(body.selectedPackage || '').trim();
       const packagePrice = Number(body.packagePrice || 0);
       const requestedAmount = Number(body.amount || 0);
@@ -104,6 +113,7 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
       if (!state || !state.data) return res.status(404).json({ error: 'Company cloud data was not found' });
       const customer = (state.data.customers || []).find(c => String(c.id) === customerCode);
       if (!customer) return res.status(404).json({ error: 'Customer does not belong to this company' });
+      const clientCode = String(customer.clientCode || requestedClientCode || customerCode).trim();
       const packages = Array.isArray(state.data.settings && state.data.settings.packages) ? state.data.settings.packages : [];
       const livePackage = packages.find(p => String(p.speed || p.name || '').trim() === selectedPackage);
       if (!livePackage || Math.abs(Number(livePackage.price ?? livePackage.fee ?? 0) - packagePrice) > 0.01) {
@@ -114,26 +124,26 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
       if (!Number.isFinite(requestedAmount) || Math.abs(requestedAmount - amountTaka) > 0.01) {
         return res.status(409).json({ error: 'Payment amount does not match the current package and previous due' });
       }
-      const reference = ('SC-' + customerCode + '-' + Date.now()).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80);
+      const reference = ('SC-' + clientCode.replace(/\\s+/g, '-') + '-' + Date.now()).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80);
       const amountPaisa = Math.round(amountTaka * 100);
       const callback = PUBLIC_URL + '/api/baniq/callback?reference=' + encodeURIComponent(reference);
       const created = await baniqFetch('/api/v1/orders', {
         method: 'POST',
         body: JSON.stringify({
           amount: amountPaisa,
-          productName: 'STAR COMMUNICATION Internet Bill - ' + selectedPackage,
+          productName: 'STAR COMMUNICATION ' + clientCode + ' - ' + String(customer.name || body.customerName || 'Customer') + ' Internet Bill - ' + selectedPackage,
           reference,
           successUrl: callback,
           cancelUrl: PAYMENT_PAGE_URL + '?status=cancelled&api=' + encodeURIComponent(PUBLIC_URL),
-          customerName: String(customer.name || body.customerName || 'Customer'),
+          customerName: clientCode + ' - ' + String(customer.name || body.customerName || 'Customer'),
           customerPhone: String(customer.mobile || customer.phone || body.customerMobile || ''),
-          metadata: { company: owner, customerCode, selectedPackage, packagePrice, previousDue, orderType: 'isp-bill' }
+          metadata: { company: owner, customerCode, clientCode, customerName: String(customer.name || body.customerName || 'Customer'), selectedPackage, packagePrice, previousDue, orderType: 'isp-bill' }
         })
       });
       if (!created.orderId || !created.checkoutUrl) throw new Error('Baniq did not return a checkout URL');
       const sessions = col('baniq_checkout_sessions');
       await sessions.insertOne({
-        orderId: String(created.orderId), reference, owner, customerCode,
+        orderId: String(created.orderId), reference, owner, customerCode, clientCode,
         customerName: String(customer.name || body.customerName || 'Customer'),
         customerMobile: String(customer.mobile || customer.phone || body.customerMobile || ''),
         selectedPackage, packagePrice, previousDue, amountPaisa,
@@ -151,11 +161,11 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
       if (!orderId) return res.status(400).json({ error: 'orderId is required' });
       const session = await findSession({ orderId });
       if (!session) return res.status(404).json({ ok: true, verified: false, status: 'NOT_FOUND' });
-      if (session.status === 'PAID') return res.json({ ok: true, verified: true, status: 'PAID', customerCode: session.customerCode, orderId });
+      if (session.status === 'PAID') return res.json({ ok: true, verified: true, status: 'PAID', customerCode: session.customerCode, clientCode: session.clientCode || session.customerCode, customerName: session.customerName || '', orderId });
       const verification = await verifyOrder(orderId, session.amountPaisa);
       if (!verification.verified) return res.json({ ok: true, verified: false, status: verification.providerStatus, customerCode: session.customerCode, orderId });
       const paid = await markPaid(session, verification.data);
-      return res.json({ ok: true, verified: true, status: paid.status, customerCode: session.customerCode, orderId });
+      return res.json({ ok: true, verified: true, status: paid.status, customerCode: session.customerCode, clientCode: session.clientCode || session.customerCode, customerName: session.customerName || '', orderId });
     } catch (e) {
       return res.status(502).json({ ok: false, verified: false, error: String(e.message || 'Baniq verification failed').slice(0, 200) });
     }
