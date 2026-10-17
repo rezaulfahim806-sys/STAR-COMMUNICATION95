@@ -33,7 +33,7 @@ In Baniq Dashboard → API & Webhook:
 
 ## Package management
 
-The existing owner settings page manages packages and publishes them to customer payment links. The backend now accepts up to 1,000 packages per company instead of 100. Package names and prices are still validated server-side.
+The existing owner settings page manages packages and publishes them to customer payment links. The backend no longer imposes a fixed package-count limit. Package names and prices are still validated server-side, and request size remains bounded by the server's JSON body limit.
 
 ## Before going live
 
