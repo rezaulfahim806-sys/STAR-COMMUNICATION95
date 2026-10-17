@@ -72,6 +72,23 @@ async function insert(name,obj,owner){const x={...obj,owner:String(owner)};const
 async function update(name,id,patch,owner){const c=col(name);if(c){const {ObjectId}=require('mongodb');let q;try{q={_id:new ObjectId(id),owner:String(owner)}}catch{q={id,owner:String(owner)}};await c.updateOne(q,{$set:patch});return}const x=mem[name].find(v=>String(v.id)===String(id)&&String(v.owner)===String(owner));if(x)Object.assign(x,patch)}
 async function remove(name,id,owner){const c=col(name);if(c){const {ObjectId}=require('mongodb');let q;try{q={_id:new ObjectId(id),owner:String(owner)}}catch{q={id,owner:String(owner)}};await c.deleteOne(q);return}const i=mem[name].findIndex(v=>String(v.id)===String(id)&&String(v.owner)===String(owner));if(i>=0)mem[name].splice(i,1)}
 // Staff accounts: owner can create worker logins. Workers share the owner's customer cloud but are restricted to expired clients and complaints.
+// Feature permissions are assigned by the company owner and returned after login.
+app.get('/api/account/permissions',auth,async(req,res)=>{
+ const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
+ const account=await ac.findOne({username:req.user.username,owner:ownerOf(req.user)});
+ return send(res,{ok:true,approvedFeatures:Array.isArray(account&&account.approvedFeatures)?account.approvedFeatures:[]});
+});
+app.put('/api/accounts/:username/features',auth,async(req,res)=>{
+ if(!isOwner(req.user))return res.status(403).json({error:'Owner access required'});
+ const allowed=['dashboard','customers','billing','packages','paymentLinks','incomeExpenses','olt','mikrotik','monitoring','reports','accounts','settings'];
+ const features=Array.isArray(req.body&&req.body.features)?[...new Set(req.body.features.map(String).filter(x=>allowed.includes(x)))]:null;
+ if(!features)return res.status(400).json({error:'features array is required'});
+ const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
+ const username=String(req.params.username||'').trim();
+ const result=await ac.updateOne({username,owner:ownerOf(req.user),role:'worker'},{$set:{approvedFeatures:features,featuresUpdatedAt:new Date().toISOString(),featuresUpdatedBy:req.user.username}});
+ if(!result.matchedCount)return res.status(404).json({error:'Worker account not found'});
+ return send(res,{ok:true,username,approvedFeatures:features});
+});
 app.post('/api/accounts',auth,async(req,res)=>{
  if(!isOwner(req.user))return res.status(403).json({error:'Owner access required'});
  const {username,password}=req.body||{}, role=String(req.body&&req.body.role||'worker');
