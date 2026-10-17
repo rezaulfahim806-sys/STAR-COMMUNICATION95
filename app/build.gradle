@@ -2,6 +2,11 @@ plugins {
     id 'com.android.application'
 }
 
+def hasStableSigning = file("star-release-key.jks").exists() &&
+        System.getenv("STAR_SIGNING_STORE_PASSWORD") &&
+        System.getenv("STAR_SIGNING_KEY_ALIAS") &&
+        System.getenv("STAR_SIGNING_KEY_PASSWORD")
+
 android {
     namespace 'com.starcommunication.isp'
     compileSdk 35
@@ -15,21 +20,23 @@ android {
     }
 
     signingConfigs {
-        stable {
-            storeFile file("star-release-key.jks")
-            storePassword System.getenv("STAR_SIGNING_STORE_PASSWORD")
-            keyAlias System.getenv("STAR_SIGNING_KEY_ALIAS")
-            keyPassword System.getenv("STAR_SIGNING_KEY_PASSWORD")
+        if (hasStableSigning) {
+            stable {
+                storeFile file("star-release-key.jks")
+                storePassword System.getenv("STAR_SIGNING_STORE_PASSWORD")
+                keyAlias System.getenv("STAR_SIGNING_KEY_ALIAS")
+                keyPassword System.getenv("STAR_SIGNING_KEY_PASSWORD")
+            }
         }
     }
 
     buildTypes {
         debug {
-            signingConfig signingConfigs.stable
+            if (hasStableSigning) signingConfig signingConfigs.stable
         }
         release {
             minifyEnabled false
-            signingConfig signingConfigs.stable
+            if (hasStableSigning) signingConfig signingConfigs.stable
         }
     }
 
