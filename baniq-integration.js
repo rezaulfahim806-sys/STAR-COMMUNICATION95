@@ -47,7 +47,6 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
     const stateCol = col('app_state');
     if (!sessions || !stateCol) throw new Error('Cloud database is not configured');
     const current = await sessions.findOne({ orderId: session.orderId });
-    if (current && current.status === 'PAID') return current;
     const state = await stateCol.findOne({ owner: session.owner });
     if (!state || !state.data) throw new Error('Company data not found after payment verification');
     const data = state.data;
@@ -162,7 +161,10 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
       if (!orderId) return res.status(400).json({ error: 'orderId is required' });
       const session = await findSession({ orderId });
       if (!session) return res.status(404).json({ ok: true, verified: false, status: 'NOT_FOUND' });
-      if (session.status === 'PAID') return res.json({ ok: true, verified: true, status: 'PAID', customerCode: session.customerCode, clientCode: session.clientCode || session.customerCode, customerName: session.customerName || '', orderId });
+      if (session.status === 'PAID') {
+        await markPaid(session, { amount: Number(session.verifiedAmountPaisa || session.amountPaisa), reference: session.reference, paidAt: session.paidAt });
+        return res.json({ ok: true, verified: true, status: 'PAID', customerCode: session.customerCode, clientCode: session.clientCode || session.customerCode, customerName: session.customerName || '', orderId });
+      }
       const verification = await verifyOrder(orderId, session.amountPaisa);
       if (!verification.verified) return res.json({ ok: true, verified: false, status: verification.providerStatus, customerCode: session.customerCode, orderId });
       const paid = await markPaid(session, verification.data);
