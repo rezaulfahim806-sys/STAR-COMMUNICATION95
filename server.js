@@ -29,6 +29,31 @@ async function initDb(){
 }
 function auth(req,res,next){try{const h=req.headers.authorization||'';if(!h.startsWith('Bearer '))throw 0;req.user=jwt.verify(h.slice(7),JWT_SECRET);next()}catch(e){res.status(401).json({error:'Unauthorized'})}}
 function send(res,payload){res.json(payload)}
+const BKASH_BASE_URL=(process.env.BKASH_BASE_URL||'https://checkout.sandbox.bka.sh/v1.2.0-beta').replace(/\/$/,'');
+const BKASH_APP_KEY=process.env.BKASH_APP_KEY||'';
+const BKASH_APP_SECRET=process.env.BKASH_APP_SECRET||'';
+const BKASH_USERNAME=process.env.BKASH_USERNAME||'';
+const BKASH_PASSWORD=process.env.BKASH_PASSWORD||'';
+const PUBLIC_URL=(process.env.PUBLIC_URL||'https://star-communication-api.onrender.com').replace(/\/$/,'');
+const PAYMENT_PAGE_URL=process.env.PAYMENT_PAGE_URL||'https://rezaulfahim806-sys.github.io/STAR-COMMUNICATION95/pay.html';
+let bkashTokenCache={token:'',expiresAt:0};
+async function getBkashToken(){
+ if(!BKASH_APP_KEY||!BKASH_APP_SECRET||!BKASH_USERNAME||!BKASH_PASSWORD)throw new Error('bKash API credentials are not configured in Render Environment Variables');
+ if(bkashTokenCache.token&&Date.now()<bkashTokenCache.expiresAt)return bkashTokenCache.token;
+ const r=await fetch(BKASH_BASE_URL+'/checkout/token/grant',{method:'POST',headers:{accept:'application/json','content-type':'application/json',username:BKASH_USERNAME,password:BKASH_PASSWORD},body:JSON.stringify({app_key:BKASH_APP_KEY,app_secret:BKASH_APP_SECRET})});
+ const data=await r.json().catch(()=>({}));
+ if(!r.ok||!data.id_token||data.statusCode&&String(data.statusCode)!=='0000')throw new Error(data.statusMessage||data.errorMessage||'bKash token request failed');
+ bkashTokenCache={token:data.id_token,expiresAt:Date.now()+(Number(data.expires_in||3600)-60)*1000};
+ return bkashTokenCache.token;
+}
+async function bkashCheckoutRequest(path,token,body){
+ const r=await fetch(BKASH_BASE_URL+path,{method:'POST',headers:{accept:'application/json','content-type':'application/json',authorization:token,'x-app-key':BKASH_APP_KEY},body:JSON.stringify(body)});
+ const data=await r.json().catch(()=>({}));
+ if(!r.ok||data.statusCode&&String(data.statusCode)!=='0000')throw new Error(data.statusMessage||data.errorMessage||'bKash checkout request failed');
+ return data;
+}
+function bkashCompleted(x){return String(x&&x.statusCode||'')==='0000'&&String(x&&x.transactionStatus||'').toLowerCase()==='completed'}
+
 app.get('/api/health',(req,res)=>send(res,{ok:true,app:'STAR COMMUNICATION',version:'1.5.3',deployment:'login-flow-update-2026-10-17',time:new Date().toISOString(),database:!!db}));
 // Public read-only package lookup used by customer Payment Links.
 app.get('/api/public/packages',async(req,res)=>{
@@ -239,6 +264,78 @@ app.post('/api/customers/:id/payment',auth,async(req,res)=>{const x={id:Date.now
 app.get('/api/billing/payments',auth,async(req,res)=>send(res,await list('payments',ownerOf(req.user))));
 app.get('/api/billing/history',auth,async(req,res)=>send(res,await list('history',ownerOf(req.user))));
 app.post('/api/billing/ledger',auth,async(req,res)=>{const x={id:Date.now(),...req.body,amount:Number(req.body.amount||0),createdAt:new Date().toISOString()};send(res,await insert('ledger',x,ownerOf(req.user)))});
+
+app.post('/api/bkash/create',async(req,res)=>{
+ try{
+  const body=req.body||{};
+  const owner=String(body.company||'').trim().toLowerCase();
+  const customerCode=String(body.customerCode||'').trim();
+  const selectedPackage=String(body.selectedPackage||'').trim();
+  const packagePrice=Number(body.packagePrice||0);
+  const requestedAmount=Number(body.amount||0);
+  if(!owner||!customerCode||!selectedPackage||!Number.isFinite(packagePrice)||packagePrice<=0)return res.status(400).json({error:'Company, customer and selected package are required'});
+  const stateCol=col('app_state');if(!stateCol)return res.status(503).json({error:'Cloud database is not configured'});
+  const state=await stateCol.findOne({owner});
+  if(!state||!state.data)return res.status(404).json({error:'Company cloud data was not found'});
+  const customer=(state.data.customers||[]).find(c=>String(c.id)===customerCode);
+  if(!customer)return res.status(404).json({error:'Customer does not belong to this company'});
+  const packages=Array.isArray(state.data.settings&&state.data.settings.packages)?state.data.settings.packages:[];
+  const livePackage=packages.find(p=>String(p.speed||p.name||'').trim()===selectedPackage);
+  if(!livePackage||Math.abs(Number(livePackage.price??livePackage.fee??0)-packagePrice)>0.01)return res.status(409).json({error:'This package changed. Refresh the payment link and select a current package'});
+  const previousDue=Math.max(0,Number(customer.prevDue||0));
+  const amount=Number((packagePrice+previousDue).toFixed(2));
+  if(!Number.isFinite(requestedAmount)||Math.abs(requestedAmount-amount)>0.01)return res.status(409).json({error:'Payment amount does not match the current package and previous due'});
+  const token=await getBkashToken();
+  const invoice=String('SC-'+customerCode+'-'+Date.now()).replace(/[^A-Za-z0-9_-]/g,'').slice(0,50);
+  const created=await bkashCheckoutRequest('/checkout/payment/create',token,{mode:'0011',payerReference:customerCode,callbackURL:PUBLIC_URL+'/api/bkash/callback',amount:amount.toFixed(2),currency:'BDT',intent:'sale',merchantInvoiceNumber:invoice});
+  if(!created.paymentID||!created.bkashURL)throw new Error('bKash did not return a checkout URL');
+  await db.collection('bkash_checkout_sessions').insertOne({paymentID:String(created.paymentID),owner,customerCode,customerName:String(customer.name||body.customerName||'Customer'),customerMobile:String(customer.phone||body.customerMobile||''),selectedPackage,packagePrice,previousDue,amount,invoice,status:'PENDING',createdAt:new Date().toISOString()});
+  return send(res,{ok:true,paymentID:created.paymentID,bkashURL:created.bkashURL,merchantInvoiceNumber:invoice});
+ }catch(e){return res.status(502).json({error:String(e.message||'Unable to start bKash payment').slice(0,220)})}
+});
+app.get('/api/bkash/status',async(req,res)=>{
+ const paymentID=String(req.query.paymentID||'').trim();
+ if(!paymentID)return res.status(400).json({error:'paymentID is required'});
+ const c=col('bkash_checkout_sessions');if(!c)return res.status(503).json({error:'Cloud database is not configured'});
+ const session=await c.findOne({paymentID});
+ if(!session)return res.status(404).json({ok:true,verified:false,status:'NOT_FOUND'});
+ return send(res,{ok:true,verified:session.status==='PAID',status:session.status||'PENDING',customerCode:session.customerCode});
+});
+app.get('/api/bkash/callback',async(req,res)=>{
+ const paymentID=String(req.query.paymentID||'').trim(), status=String(req.query.status||'');
+ const page=(result)=>res.redirect(PAYMENT_PAGE_URL+'?status='+encodeURIComponent(result)+(paymentID?'&paymentID='+encodeURIComponent(paymentID):'')+'&api='+encodeURIComponent(PUBLIC_URL));
+ if(!paymentID)return page('invalid');
+ const sessions=col('bkash_checkout_sessions');if(!sessions)return page('failed');
+ try{
+  const session=await sessions.findOne({paymentID});
+  if(!session)return page('invalid');
+  if(session.status==='PAID')return page('success');
+  if(status==='cancel'||status==='failure'){await sessions.updateOne({paymentID},{$set:{status:status==='cancel'?'CANCELLED':'FAILED',updatedAt:new Date().toISOString()}});return page(status==='cancel'?'cancelled':'failed')}
+  const token=await getBkashToken();
+  const result=await bkashCheckoutRequest('/checkout/payment/execute',token,{paymentID});
+  if(!bkashCompleted(result))throw new Error(result.statusMessage||'bKash did not confirm a completed payment');
+  if(Math.abs(Number(result.amount||0)-Number(session.amount||0))>0.01)throw new Error('Verified payment amount does not match the requested amount');
+  const trxID=String(result.trxID||'');
+  const stateCol=col('app_state'),state=await stateCol.findOne({owner:session.owner});
+  if(!state||!state.data)throw new Error('Company data not found after payment verification');
+  const data=state.data,customers=Array.isArray(data.customers)?data.customers:[],customer=customers.find(c=>String(c.id)===String(session.customerCode));
+  if(!customer)throw new Error('Customer not found after payment verification');
+  const payments=Array.isArray(data.payments)?data.payments:(data.payments=[]);
+  const duplicate=payments.some(p=>String(p.ref||'')===trxID||String(p.paymentID||'')===paymentID);
+  const now=new Date(),iso=now.toISOString();
+  customer.pkg=session.selectedPackage;
+  customer.fee=Number(session.packagePrice);
+  customer.prevDue=0;
+  if(!duplicate)payments.push({id:'bkash-'+paymentID,customer:String(session.customerCode),amount:Number(session.amount),date:iso.slice(0,10),month:iso.slice(0,7),status:'paid',source:'bkash',ref:trxID||paymentID,paymentID,createdAt:iso,updatedAt:iso});
+  await stateCol.updateOne({owner:session.owner},{$set:{data,updatedAt:iso}});
+  await sessions.updateOne({paymentID},{$set:{status:'PAID',trxID,verifiedAmount:Number(result.amount),verifiedAt:iso,updatedAt:iso}});
+  return page('success');
+ }catch(e){
+  await sessions.updateOne({paymentID},{$set:{status:'FAILED',verificationError:String(e.message||'verification failed').slice(0,200),updatedAt:new Date().toISOString()}}).catch(()=>{});
+  return page('failed');
+ }
+});
+
 app.get('/api/bkash/transactions',auth,async(req,res)=>send(res,await list('bkash',ownerOf(req.user))));
 app.post('/api/bkash/transactions',auth,async(req,res)=>send(res,await insert('bkash',{id:Date.now(),...req.body,status:'PENDING',createdAt:new Date().toISOString()},ownerOf(req.user))));
 app.post('/api/bkash/transactions/:id/manual-paid',auth,async(req,res)=>{await update('bkash',req.params.id,{status:'MANUAL_MATCHED',matchedCustomerId:req.body.customerId},ownerOf(req.user));send(res,{ok:true})});
