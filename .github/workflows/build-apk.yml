@@ -7,7 +7,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -75,3 +75,15 @@ jobs:
           name: STAR-COMMUNICATION-stable-signed-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Publish installable APK release
+        if: success() && github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: star-build-${{ github.run_number }}
+          name: STAR COMMUNICATION APK build ${{ github.run_number }}
+          body: |
+            Android APK built from the main branch.
+            Install over the existing app only if it is signed with the same stable signing key.
+          files: app/build/outputs/apk/debug/app-debug.apk
+          make_latest: true
