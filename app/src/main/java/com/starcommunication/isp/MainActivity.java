@@ -403,6 +403,7 @@ public class MainActivity extends Activity {
             s=s.replace("\n"," ").replace("\r"," ").trim();
             return s.length()>max?s.substring(0,Math.max(1,max-1))+"…":s;
         }
+        @JavascriptInterface public void openExternalUrl(String url){ runOnUiThread(() -> { try { if(url==null||!(url.startsWith("https://")||url.startsWith("http://"))) throw new Exception("Invalid link"); Intent i=new Intent(Intent.ACTION_VIEW,Uri.parse(url)); startActivity(i); } catch(Exception e){ Toast.makeText(MainActivity.this,"Payment page could not open. Copy the link and open it in Chrome.",Toast.LENGTH_LONG).show(); } }); }
         @JavascriptInterface public void printPage(String title){ runOnUiThread(() -> { try { PrintManager pm=(PrintManager)getSystemService(PRINT_SERVICE); PrintDocumentAdapter adapter=webView.createPrintDocumentAdapter(title==null?"STAR COMMUNICATION":title); pm.print(title==null?"STAR COMMUNICATION":title,adapter,new PrintAttributes.Builder().setMediaSize(PrintAttributes.MediaSize.ISO_A4).setMinMargins(PrintAttributes.Margins.NO_MARGINS).build()); } catch(Exception e){ Toast.makeText(MainActivity.this,"PDF/Print failed. Please try again.",Toast.LENGTH_LONG).show(); } }); }
         @JavascriptInterface public void scheduleExpiry(String phone,String name,String expiry){AutoMessageReceiver.scheduleExpiry(MainActivity.this,phone,name,expiry);}
         @JavascriptInterface public void scheduleMonthEnd(String phone,String name){AutoMessageReceiver.scheduleMonthEnd(MainActivity.this,phone,name);}
