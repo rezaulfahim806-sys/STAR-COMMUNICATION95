@@ -51,7 +51,7 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
     if (!state || !state.data) throw new Error('Company data not found after payment verification');
     const data = state.data;
     const customers = Array.isArray(data.customers) ? data.customers : [];
-    const customer = customers.find(x => String(x.id) === String(session.customerCode));
+    const customer = customers.find(x => String(x.id) === String(session.customerCode)) || customers.find(x => String(x.clientCode || '').trim().toLowerCase() === String(session.clientCode || session.customerCode || '').trim().toLowerCase());
     if (!customer) throw new Error('Customer not found after payment verification');
     const amountTaka = Number(session.amountPaisa) / 100;
     const payments = Array.isArray(data.payments) ? data.payments : (data.payments = []);
@@ -61,6 +61,7 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
     customer.fee = Number(session.packagePrice);
     customer.prevDue = 0;
     customer.clientCode = String(session.clientCode || customer.clientCode || session.customerCode);
+    const canonicalCustomerId = String(customer.id || session.customerCode);
     customer.lastPaymentStatus = 'paid';
     customer.lastPaymentMonth = now.slice(0, 7);
     customer.lastPaymentAmount = amountTaka;
@@ -70,7 +71,7 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
     if (!alreadyAdded) {
       payments.push({
         id: 'baniq-' + session.orderId,
-        customer: String(session.customerCode),
+        customer: canonicalCustomerId,
         clientCode: String(session.clientCode || customer.clientCode || session.customerCode),
         customerName: String(customer.name || session.customerName || 'Customer'),
         amount: amountTaka,
