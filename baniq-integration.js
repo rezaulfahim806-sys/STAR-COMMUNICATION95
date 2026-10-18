@@ -60,7 +60,14 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
     customer.pkg = session.selectedPackage;
     customer.fee = Number(session.packagePrice);
     customer.prevDue = 0;
-    customer.clientCode = String(session.clientCode || customer.clientCode || session.customerCode);
+    // A verified full bill payment must immediately restore service for expired/unpaid customers.
+    customer.status = 'active';
+    customer.left = false;
+    customer.disconnected = false;
+    const nextExpiry = new Date();
+    nextExpiry.setDate(nextExpiry.getDate() + 30);
+    customer.expiry = nextExpiry.toISOString().slice(0, 10);
+    customer.clientCode = String(session.clientCode || customer.clientCode || session.customerCode).replace(/\\s+/g, '').toUpperCase();
     const canonicalCustomerId = String(customer.id || session.customerCode);
     customer.lastPaymentStatus = 'paid';
     customer.lastPaymentMonth = now.slice(0, 7);
