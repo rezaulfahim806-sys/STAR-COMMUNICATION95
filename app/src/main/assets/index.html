@@ -71,7 +71,7 @@ async function deleteSubpanel(encodedEmail){
   toast('Sub-panel account deleted');await loadSubpanels();
  }catch(e){toast(e.message||'Sub-panel deletion failed')}
 }
-function pendingMerchantCount(){return (d.pending||[]).reduce(function(n,x){return n+(x&&x.status===\'pending\'?1:0)},0)}
+function pendingMerchantCount(){return (d.pending||[]).reduce(function(n,x){return n+(x&&x.status==="pending"?1:0)},0)}
 function cloudHeaders(){let h={'Content-Type':'application/json'};let tok=cloudConfig().token;if(tok)h.Authorization='Bearer '+tok;return h}
 async function cloudLogin(api,user,pass){
  api=String(api||'https://star-communication-api.onrender.com').trim().replace(/\/$/,''); user=String(user||'').trim(); pass=String(pass||'');
