@@ -115,9 +115,24 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
       const companyCustomers = Array.isArray(state.data.customers) ? state.data.customers : [];
       const customer = companyCustomers.find(c => String(c.id) === customerCode) || companyCustomers.find(c => requestedClientCode && String(c.clientCode || '').trim().toLowerCase() === requestedClientCode.toLowerCase());
       if (!customer) return res.status(404).json({ error: 'Customer does not belong to this company. Please sync this customer to the same company account and retry.' });
-      // Store the company's canonical customer ID so verified payments update the right record.
+      // Store the company's canonical customer ID and a stable human-readable client code.
       customerCode = String(customer.id || customerCode);
-      const clientCode = String(customer.clientCode || requestedClientCode || customerCode).trim();
+      const normalizeClientCode = value => String(value || '').replace(/\\s+/g, '').trim().toUpperCase();
+      let clientCode = normalizeClientCode(customer.clientCode || requestedClientCode);
+      if (!/^SC\\d{3,}$/i.test(clientCode)) {
+        const used = new Set(companyCustomers.map(c => {
+          const m = normalizeClientCode(c.clientCode).match(/^SC0*(\\d+)$/i);
+          return m ? Number(m[1]) : 0;
+        }));
+        let n = 1;
+        while (used.has(n)) n++;
+        clientCode = 'SC' + String(n).padStart(3, '0');
+        customer.clientCode = clientCode;
+        customer.updatedAt = new Date().toISOString();
+        await stateCol.updateOne({ owner }, { $set: { data: state.data, updatedAt: customer.updatedAt } });
+      } else {
+        customer.clientCode = clientCode;
+      }
       const packages = Array.isArray(state.data.settings && state.data.settings.packages) ? state.data.settings.packages : [];
       const livePackage = packages.find(p => String(p.speed || p.name || '').trim() === selectedPackage);
       if (!livePackage || Math.abs(Number(livePackage.price ?? livePackage.fee ?? 0) - packagePrice) > 0.01) {
