@@ -61,7 +61,14 @@ jobs:
               raise SystemExit('No inline application script found')
           Path('/tmp/star-app-check.js').write_text('\n'.join(scripts), encoding='utf-8')
           PY
-          node --check /tmp/star-app-check.js
+          npm install --no-save acorn
+          node - <<'NODE'
+          const fs = require('fs');
+          const acorn = require('acorn');
+          const source = fs.readFileSync('/tmp/star-app-check.js', 'utf8');
+          try { acorn.parse(source, {ecmaVersion: 'latest', sourceType: 'script'}); console.log('JavaScript syntax OK'); }
+          catch (e) { console.error('Exact JavaScript syntax error:', e.message); console.error('Line:', e.loc && e.loc.line, 'Column:', e.loc && e.loc.column); const lines=source.split('\\n'); const n=(e.loc&&e.loc.line||1)-1; console.error((lines[n]||'').slice(Math.max(0,(e.loc&&e.loc.column||0)-180),(e.loc&&e.loc.column||0)+180)); process.exit(1); }
+          NODE
 
       - name: Verify Android project
         shell: bash
