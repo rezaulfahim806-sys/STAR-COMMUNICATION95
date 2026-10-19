@@ -19,6 +19,8 @@ function ownerOf(u){return String(u&&u.owner||u&&u.username||'')}
 function isOwner(u){return String(u&&u.role||'')==='owner'}
 function isSystemAdmin(u){return !!u&&String(u.username||'')===String(ADMIN_USER)&&String(u.role||'')==='owner'}
 function publicAccount(a){return {username:a.username,role:a.role,owner:a.owner,active:a.active!==false}}
+function flagEnabled(value){return value===true||['true','1','yes','on','enabled'].includes(String(value??'').trim().toLowerCase())}
+function packageChoiceEnabled(customer){return flagEnabled(customer&&customer.allowPackageChoice)||flagEnabled(customer&&customer.allowPackageChange)}
 
 let db=null;
 async function initDb(){
@@ -75,7 +77,7 @@ app.get('/api/public/packages',async(req,res)=>{
    const customers=Array.isArray(state.data.customers)?state.data.customers:[];
    const customer=customers.find(x=>String(x.id||'')===customerCode)||customers.find(x=>String(x.clientCode||'').trim().toLowerCase()===customerCode.toLowerCase());
    if(!customer)return res.status(404).json({error:'Customer not found for this payment link'});
-   allowPackageChoice=customer.allowPackageChoice===true||customer.allowPackageChange===true||String(customer.allowPackageChoice||customer.allowPackageChange||'').trim().toLowerCase()==='true';
+   allowPackageChoice=packageChoiceEnabled(customer);
    currentPackage={speed:String(customer.pkg||customer.packageName||customer.package||''),price:Number(customer.fee??customer.monthlyFee??customer.price??0),previousDue:Number(customer.prevDue??customer.previousDue??0)};
    if(!allowPackageChoice){
     const normalizePackageName=value=>String(value||'').trim().toLowerCase().replace(/\s+/g,' ').replace(/\s*mbps\s*$/i,'').trim();
