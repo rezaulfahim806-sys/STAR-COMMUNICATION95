@@ -165,9 +165,15 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
       // If it is disabled, honor the package and fee already assigned to this customer even if
       // the company has since removed/renamed that package in Settings.
       if (customer.allowPackageChoice === true) {
-        const livePackage = packages.find(p => String(p.speed || p.name || '').trim() === selectedPackage);
-        if (!livePackage || Math.abs(Number(livePackage.price ?? livePackage.fee ?? 0) - packagePrice) > 0.01) {
-          return res.status(409).json({ error: 'This package changed. Refresh the payment link and select a current package' });
+        // Normalize legacy/current package records consistently (speed/name and price/fee),
+        // so harmless casing/spacing or numeric-string differences do not reject a valid choice.
+        const normalizePackageName = value => String(value || '').trim().replace(/\\s+/g, ' ').toLocaleLowerCase();
+        const livePackage = packages.find(p =>
+          normalizePackageName(p && (p.speed || p.name)) === normalizePackageName(selectedPackage) &&
+          Math.abs(Number(p && (p.price ?? p.fee ?? 0)) - packagePrice) < 0.01
+        );
+        if (!livePackage) {
+          return res.status(409).json({ error: 'Selected package or price is no longer in the company package list. Sync package settings from the admin app to Render, then create a new payment link.' });
         }
       } else {
         const currentSpeed = String(customer.pkg || '').trim();
