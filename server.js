@@ -85,7 +85,8 @@ app.get('/api/public/packages',async(req,res)=>{
     if(!visiblePackages.length&&currentPackage.speed&&Number.isFinite(currentPackage.price)&&currentPackage.price>0)visiblePackages=[currentPackage];
    }
   }
-  return send(res,{ok:true,companyName:settings.cloud&&settings.cloud.companyName||'',packages:visiblePackages,allowPackageChoice,currentPackage,merchantNumber:String(settings.merchantNumber||'')});
+  const referralOffer=settings.referralOffer&&typeof settings.referralOffer==='object'?settings.referralOffer:{enabled:true,text:'৩ জন নতুন গ্রাহক সংযোগ করালে ১ মাসের বিল ফ্রি!'};
+  return send(res,{ok:true,companyName:settings.cloud&&settings.cloud.companyName||'',packages:visiblePackages,allowPackageChoice,currentPackage,merchantNumber:String(settings.merchantNumber||''),referralOffer:{enabled:referralOffer.enabled!==false,text:String(referralOffer.text||'৩ জন নতুন গ্রাহক সংযোগ করালে ১ মাসের বিল ফ্রি!')}});
  }catch(e){return res.status(500).json({error:'Could not load company packages'})}
 });
 app.put('/api/settings/packages',auth,async(req,res)=>{
