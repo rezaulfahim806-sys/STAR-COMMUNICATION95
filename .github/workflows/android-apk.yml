@@ -17,6 +17,10 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      STAR_SIGNING_STORE_PASSWORD: ${{ secrets.STAR_SIGNING_STORE_PASSWORD }}
+      STAR_SIGNING_KEY_ALIAS: ${{ secrets.STAR_SIGNING_KEY_ALIAS }}
+      STAR_SIGNING_KEY_PASSWORD: ${{ secrets.STAR_SIGNING_KEY_PASSWORD }}
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
