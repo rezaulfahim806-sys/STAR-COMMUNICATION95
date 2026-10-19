@@ -75,7 +75,7 @@ if(apiBase&&company){
   else throw new Error('No saved packages found. Add packages in app Settings first.');
   if(data.merchantNumber&&!q.get('merchant'))merchant=String(data.merchantNumber);
  }catch(e){
-  allowPackageChoice=false; // If live settings cannot be loaded, fail closed: do not allow package changes.
+  allowPackageChoice=q.get('allowPackageChoice')==='true'; // Fallback to the link permission only when the live API is unavailable; a successful API response always wins.
   if(fallbackPackages.length)packages=fallbackPackages;
   else packageLoadError=(e.name==='AbortError'?'Package service timed out. Please reopen the payment link.':e.message)||'Could not load the latest packages.';
  }finally{clearTimeout(timeoutId)}
