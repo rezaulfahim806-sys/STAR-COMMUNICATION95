@@ -327,9 +327,17 @@ app.post('/api/bkash/create',async(req,res)=>{
   const customer=(state.data.customers||[]).find(c=>String(c.id)===customerCode);
   if(!customer)return res.status(404).json({error:'Customer does not belong to this company'});
   const packages=Array.isArray(state.data.settings&&state.data.settings.packages)?state.data.settings.packages:[];
+  const assignedPackage=String(customer.pkg||customer.packageName||'').trim();
+  const assignedPrice=Number(customer.fee??customer.monthlyFee??0);
+  // Enforce the package-choice permission on the server, not only in the page UI.
+  if(customer.allowPackageChoice!==true){
+   if(!assignedPackage||!Number.isFinite(assignedPrice)||assignedPrice<=0)return res.status(409).json({error:'Customer package is not configured correctly'});
+   if(selectedPackage!==assignedPackage||Math.abs(packagePrice-assignedPrice)>0.01)return res.status(403).json({error:'Package choice is locked. This customer can only pay for the assigned package'});
+  }
   const livePackage=packages.find(p=>String(p.speed||p.name||'').trim()===selectedPackage);
-  if(!livePackage||Math.abs(Number(livePackage.price??livePackage.fee??0)-packagePrice)>0.01)return res.status(409).json({error:'This package changed. Refresh the payment link and select a current package'});
-  const previousDue=Math.max(0,Number(customer.prevDue||0));
+  if(customer.allowPackageChoice===true&&(!livePackage||Math.abs(Number(livePackage.price??livePackage.fee??0)-packagePrice)>0.01))return res.status(409).json({error:'This package changed. Refresh the payment link and select a current package'});
+  if(customer.allowPackageChoice!==true&&livePackage&&Math.abs(Number(livePackage.price??livePackage.fee??0)-packagePrice)>0.01)return res.status(409).json({error:'Assigned package price changed. Refresh the payment link'});
+  const previousDue=Math.max(0,Number(customer.prevDue??customer.previousDue??0));
   const amount=Number((packagePrice+previousDue).toFixed(2));
   if(!Number.isFinite(requestedAmount)||Math.abs(requestedAmount-amount)>0.01)return res.status(409).json({error:'Payment amount does not match the current package and previous due'});
   const token=await getBkashToken();
