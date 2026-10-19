@@ -78,7 +78,7 @@ app.get('/api/public/packages',async(req,res)=>{
    allowPackageChoice=customer.allowPackageChoice===true||customer.allowPackageChange===true||String(customer.allowPackageChoice||customer.allowPackageChange||'').trim().toLowerCase()==='true';
    currentPackage={speed:String(customer.pkg||customer.packageName||customer.package||''),price:Number(customer.fee??customer.monthlyFee??customer.price??0),previousDue:Number(customer.prevDue??customer.previousDue??0)};
    if(!allowPackageChoice){
-    const normalizePackageName=value=>String(value||'').trim().toLowerCase().replace(/\\s+/g,' ').replace(/\\s*mbps\\s*$/i,'').trim();
+    const normalizePackageName=value=>String(value||'').trim().toLowerCase().replace(/\s+/g,' ').replace(/\s*mbps\s*$/i,'').trim();
     visiblePackages=packages.filter(p=>normalizePackageName(p.speed||p.name)===normalizePackageName(currentPackage.speed)&&Math.abs(Number(p.price??p.fee??0)-currentPackage.price)<0.01);
     // When package choice is OFF, the customer's saved package and fee are authoritative.
     // Do not block checkout just because the admin later renamed/removed that package.
