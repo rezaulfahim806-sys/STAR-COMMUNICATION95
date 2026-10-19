@@ -58,7 +58,7 @@ if(apiBase&&company){
   const r=await fetch(apiBase+'/api/public/packages?company='+encodeURIComponent(company)+'&customerCode='+encodeURIComponent(code),{cache:'no-store',signal:controller.signal});
   const data=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(data.error||'Could not load the latest company packages');
-  allowPackageChoice=data.allowPackageChoice===true || q.get('allowPackageChoice')==='true';
+  allowPackageChoice=data.allowPackageChoice===true; // Live server setting is authoritative; old payment-link parameters cannot override the lock.
   if(data.referralOffer&&typeof data.referralOffer==='object')referralOffer={enabled:data.referralOffer.enabled!==false,text:String(data.referralOffer.text||'৩ জন নতুন গ্রাহক সংযোগ করালে ১ মাসের বিল ফ্রি!')};
   currentPackageFromServer=data.currentPackage&&String(data.currentPackage.speed||'').trim()?{speed:String(data.currentPackage.speed).trim(),price:Number(data.currentPackage.price||0)}:null;
   if(!allowPackageChoice&&currentPackageFromServer){
@@ -75,7 +75,7 @@ if(apiBase&&company){
   else throw new Error('No saved packages found. Add packages in app Settings first.');
   if(data.merchantNumber&&!q.get('merchant'))merchant=String(data.merchantNumber);
  }catch(e){
-  allowPackageChoice=q.get('allowPackageChoice')==='true';
+  allowPackageChoice=false; // If live settings cannot be loaded, fail closed: do not allow package changes.
   if(fallbackPackages.length)packages=fallbackPackages;
   else packageLoadError=(e.name==='AbortError'?'Package service timed out. Please reopen the payment link.':e.message)||'Could not load the latest packages.';
  }finally{clearTimeout(timeoutId)}
