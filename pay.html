@@ -37,7 +37,7 @@ if(!fallbackPackages.length && String(c.package||'').trim() && Number.isFinite(c
 const app=document.getElementById('app');
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const money=n=>'৳'+Number(n||0).toLocaleString('en-BD');
-function findPackage(){if(!allowPackageChoice){const speed=String(currentPackageFromServer&&currentPackageFromServer.speed||c.package||'').trim();const price=Number(currentPackageFromServer&&currentPackageFromServer.price>0?currentPackageFromServer.price:c.bill);if(speed&&Number.isFinite(price)&&price>0)return {speed,price};}let p=packages.find(x=>x.speed.toLowerCase()===String(c.package).toLowerCase());return p||packages.find(x=>x.price===c.bill)||packages[0]}
+function findPackage(){if(!allowPackageChoice){const linkSpeed=String(c.package||'').trim();const linkPrice=Number(c.bill||0);if(linkSpeed&&Number.isFinite(linkPrice)&&linkPrice>0)return {speed:linkSpeed,price:linkPrice};const serverSpeed=String(currentPackageFromServer&&currentPackageFromServer.speed||'').trim();const serverPrice=Number(currentPackageFromServer&&currentPackageFromServer.price||0);if(serverSpeed&&Number.isFinite(serverPrice)&&serverPrice>0)return {speed:serverSpeed,price:serverPrice};}let p=packages.find(x=>x.speed.toLowerCase()===String(c.package).toLowerCase());return p||packages.find(x=>x.price===c.bill)||packages[0]}
 async function initPaymentPage(){
 if(paymentStatus&&(orderId||paymentStatus==='failed'||paymentStatus==='cancelled'||paymentStatus==='invalid')){
  if(paymentStatus==='success'){
