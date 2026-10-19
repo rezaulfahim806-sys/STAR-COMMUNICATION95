@@ -177,9 +177,18 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
           return res.status(409).json({ error: 'Selected package or price is no longer in the company package list. Sync package settings from the admin app to Render, then create a new payment link.' });
         }
       } else {
-        const currentSpeed = String(customer.pkg || '').trim();
-        const currentPrice = Number(customer.fee || 0);
-        if (selectedPackage !== currentSpeed || Math.abs(packagePrice - currentPrice) > 0.01) {
+        // Match the assigned package robustly: older customer records may store "30 Mbps"
+        // while payment links show "30", and package labels may differ only by case/spacing.
+        const normalizeAssignedPackage = value => String(value || '')
+          .trim()
+          .toLowerCase()
+          .replace(/\\s+/g, ' ')
+          .replace(/\\s*mbps\\s*$/i, '')
+          .trim();
+        const currentSpeed = String(customer.pkg || customer.packageName || customer.package || '').trim();
+        const currentPrice = Number(customer.fee ?? customer.monthlyFee ?? customer.price ?? 0);
+        if (normalizeAssignedPackage(selectedPackage) !== normalizeAssignedPackage(currentSpeed) ||
+            !Number.isFinite(currentPrice) || Math.abs(packagePrice - currentPrice) > 0.01) {
           return res.status(403).json({ error: 'Package selection is locked for this customer. Contact STAR COMMUNICATION to request a package change.' });
         }
       }
