@@ -20,7 +20,7 @@ function isOwner(u){return String(u&&u.role||'')==='owner'}
 function isSystemAdmin(u){return !!u&&String(u.username||'')===String(ADMIN_USER)&&String(u.role||'')==='owner'}
 function publicAccount(a){return {username:a.username,role:a.role,owner:a.owner,active:a.active!==false}}
 function flagEnabled(value){return value===true||['true','1','yes','on','enabled'].includes(String(value??'').trim().toLowerCase())}
-function packageChoiceEnabled(customer){return flagEnabled(customer&&customer.allowPackageChoice)||flagEnabled(customer&&customer.allowPackageChange)}
+function packageChoiceEnabled(customer){return false}
 
 let db=null;
 async function initDb(){
@@ -276,7 +276,7 @@ app.post('/api/sync',auth,async(req,res)=>{
  if(!data||!Array.isArray(data.customers)||!Array.isArray(data.payments)||!Array.isArray(data.expenses)||!Array.isArray(data.pending)||!Array.isArray(data.history))
    return res.status(400).json({error:'Invalid sync data'});
  const clean={
-   customers:data.customers.map(c=>({...c,allowPackageChoice:flagEnabled(c&&c.allowPackageChoice)||flagEnabled(c&&c.allowPackageChange)})),
+   customers:data.customers.map(c=>({...c,allowPackageChoice:false,allowPackageChange:false})),
    payments:data.payments,
    expenses:data.expenses,
    pending:data.pending,
