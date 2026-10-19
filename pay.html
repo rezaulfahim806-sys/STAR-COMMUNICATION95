@@ -55,7 +55,7 @@ if(apiBase&&company){
   const r=await fetch(apiBase+'/api/public/packages?company='+encodeURIComponent(company)+'&customerCode='+encodeURIComponent(code),{cache:'no-store'});
   const data=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(data.error||'Could not load the latest company packages');
-  allowPackageChoice=data.allowPackageChoice===true;
+  allowPackageChoice=data.allowPackageChoice===true || q.get('allowPackageChoice')==='true';
   currentPackageFromServer=data.currentPackage&&String(data.currentPackage.speed||'').trim()?{speed:String(data.currentPackage.speed).trim(),price:Number(data.currentPackage.price||0)}:null;
   const livePackages=Array.isArray(data.packages)?data.packages.filter(p=>p&&String(p.speed||'').trim()&&Number(p.price)>0).map(p=>({speed:String(p.speed||p.name),price:Number(p.price??p.fee)})):[];
   if(livePackages.length) packages=livePackages;
