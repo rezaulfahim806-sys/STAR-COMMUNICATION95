@@ -182,8 +182,8 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
         const normalizeAssignedPackage = value => String(value || '')
           .trim()
           .toLowerCase()
-          .replace(/\\s+/g, ' ')
-          .replace(/\\s*mbps\\s*$/i, '')
+          .replace(/\s+/g, ' ')
+          .replace(/\s*mbps\s*$/i, '')
           .trim();
         const currentSpeed = String(customer.pkg || customer.packageName || customer.package || '').trim();
         const currentPrice = Number(customer.fee ?? customer.monthlyFee ?? customer.price ?? 0);
