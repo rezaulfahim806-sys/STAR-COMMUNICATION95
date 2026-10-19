@@ -58,7 +58,7 @@ if(apiBase&&company){
   const r=await fetch(apiBase+'/api/public/packages?company='+encodeURIComponent(company)+'&customerCode='+encodeURIComponent(code),{cache:'no-store',signal:controller.signal});
   const data=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(data.error||'Could not load the latest company packages');
-  allowPackageChoice=false; // Live server setting is authoritative; old payment-link parameters cannot override the lock.
+  allowPackageChoice=data.allowPackageChoice===true; // Use the saved customer permission from the live company record.
   if(data.referralOffer&&typeof data.referralOffer==='object')referralOffer={enabled:data.referralOffer.enabled!==false,text:String(data.referralOffer.text||'৩ জন নতুন গ্রাহক সংযোগ করালে ১ মাসের বিল ফ্রি!')};
   currentPackageFromServer=data.currentPackage&&String(data.currentPackage.speed||'').trim()?{speed:String(data.currentPackage.speed).trim(),price:Number(data.currentPackage.price||0)}:null;
 if(data.currentPackage&&Number.isFinite(Number(data.currentPackage.previousDue)))c.previousDue=Math.max(0,Number(data.currentPackage.previousDue));
@@ -77,9 +77,7 @@ if(data.currentPackage&&Number.isFinite(Number(data.currentPackage.previousDue))
   else throw new Error('No saved packages found. Add packages in app Settings first.');
   if(data.merchantNumber&&!q.get('merchant'))merchant=String(data.merchantNumber);
  }catch(e){
-  allowPackageChoice=false; // Fallback only for locked-package links; selectable packages must come from the live server.
-  if(allowPackageChoice)packageLoadError=(e.name==='AbortError'?'Package service timed out. Please reopen the payment link.':e.message)||'Could not load the latest packages.';
-  else if(fallbackPackages.length)packages=fallbackPackages;
+  if(fallbackPackages.length){allowPackageChoice=false;packages=fallbackPackages;}
   else packageLoadError=(e.name==='AbortError'?'Package service timed out. Please reopen the payment link.':e.message)||'Could not load the latest packages.';
  }finally{clearTimeout(timeoutId)}
 }else if(fallbackPackages.length){
