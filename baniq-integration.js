@@ -165,6 +165,14 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
       if (!livePackage || Math.abs(Number(livePackage.price ?? livePackage.fee ?? 0) - packagePrice) > 0.01) {
         return res.status(409).json({ error: 'This package changed. Refresh the payment link and select a current package' });
       }
+      // Package changes are opt-in per customer. Default is locked to the current package.
+      if (customer.allowPackageChoice !== true) {
+        const currentSpeed = String(customer.pkg || '').trim();
+        const currentPrice = Number(customer.fee || 0);
+        if (selectedPackage !== currentSpeed || Math.abs(packagePrice - currentPrice) > 0.01) {
+          return res.status(403).json({ error: 'Package selection is locked for this customer. Contact STAR COMMUNICATION to request a package change.' });
+        }
+      }
       const previousDue = Math.max(0, Number(customer.prevDue ?? customer.previousDue ?? 0));
       const amountTaka = Number((packagePrice + previousDue).toFixed(2));
       if (!Number.isFinite(requestedAmount) || Math.abs(requestedAmount - amountTaka) > 0.01) {
