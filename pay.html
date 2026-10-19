@@ -24,6 +24,7 @@ const orderId=(q.get('paymentID')||q.get('orderId')||q.get('oid')||'').trim();
 let packages=[];
 let allowPackageChoice=false;
 let currentPackageFromServer=null;
+let referralOffer={enabled:true,text:'৩ জন নতুন গ্রাহক সংযোগ করালে ১ মাসের বিল ফ্রি!'};
 let packageLoadError='';
 let fallbackPackages=[];
 try {
@@ -58,6 +59,7 @@ if(apiBase&&company){
   const data=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(data.error||'Could not load the latest company packages');
   allowPackageChoice=data.allowPackageChoice===true || q.get('allowPackageChoice')==='true';
+  if(data.referralOffer&&typeof data.referralOffer==='object')referralOffer={enabled:data.referralOffer.enabled!==false,text:String(data.referralOffer.text||'৩ জন নতুন গ্রাহক সংযোগ করালে ১ মাসের বিল ফ্রি!')};
   currentPackageFromServer=data.currentPackage&&String(data.currentPackage.speed||'').trim()?{speed:String(data.currentPackage.speed).trim(),price:Number(data.currentPackage.price||0)}:null;
   if(!allowPackageChoice&&currentPackageFromServer){
    c.package=currentPackageFromServer.speed;c.bill=currentPackageFromServer.price;
@@ -88,6 +90,7 @@ else if(packageLoadError){app.innerHTML='<section class="card"><div class="error
 else{
 const selected=findPackage();
 app.innerHTML=`
+${referralOffer.enabled?'<section class="card" style="background:linear-gradient(135deg,#fff7d6,#fff0b3);border:1px solid #f2d36b"><h2 class="heading">🎁 গ্রাহক রেফারেল অফার</h2><div class="hint" style="font-size:15px;color:#6b4b00;font-weight:700">'+esc(referralOffer.text)+'</div></section>':''}
 <section class="card"><h2 class="heading">📄 Bill Details</h2><div class="rows">
 <div class="row"><span class="label">Client Code</span><span class="value">${esc(clientCode)}</span></div>
 <div class="row"><span class="label">Customer Name</span><span class="value">${esc(c.name)}</span></div>
