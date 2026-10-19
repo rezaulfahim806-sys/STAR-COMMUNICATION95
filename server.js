@@ -344,7 +344,8 @@ app.post('/api/bkash/create',async(req,res)=>{
   const normalizePackageName=value=>String(value||'').trim().toLowerCase().replace(/\s+/g,' ').replace(/\s*mbps\s*$/i,'');
   const livePackage=packages.find(p=>normalizePackageName(p.speed||p.name)===normalizePackageName(selectedPackage));
   if(packageChoiceAllowed&&(!livePackage||Math.abs(Number(livePackage.price??livePackage.fee??0)-packagePrice)>0.01))return res.status(409).json({error:'The selected package is not current. Please refresh the page and try again.'});
-  // When package choice is locked, the customer's saved package price is authoritative.\n  // A stale or changed package catalogue must not prevent payment of that assigned bill.
+  // When package choice is locked, the customer's saved package price is authoritative.
+  // A stale or changed package catalogue must not prevent payment of that assigned bill.
   const previousDue=Math.max(0,Number(customer.prevDue??customer.previousDue??0));
   const amount=Number((packagePrice+previousDue).toFixed(2));
   if(!Number.isFinite(requestedAmount)||Math.abs(requestedAmount-amount)>0.01)return res.status(409).json({error:'Payment amount does not match the current package and previous due'});
