@@ -164,7 +164,8 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
       // If package choice is enabled, the customer may only pay for a current company package.
       // If it is disabled, honor the package and fee already assigned to this customer even if
       // the company has since removed/renamed that package in Settings.
-      if (customer.allowPackageChoice === true) {
+      const packageChoiceAllowed = customer.allowPackageChoice === true || customer.allowPackageChange === true || String(customer.allowPackageChoice || customer.allowPackageChange || '').trim().toLowerCase() === 'true';
+      if (packageChoiceAllowed) {
         // Normalize legacy/current package records consistently (speed/name and price/fee),
         // so harmless casing/spacing or numeric-string differences do not reject a valid choice.
         const normalizePackageName = value => String(value || '').trim().replace(/\\s+/g, ' ').toLocaleLowerCase();
