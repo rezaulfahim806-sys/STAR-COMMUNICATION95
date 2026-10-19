@@ -67,7 +67,7 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
     const nextExpiry = new Date();
     nextExpiry.setDate(nextExpiry.getDate() + 30);
     customer.expiry = nextExpiry.toISOString().slice(0, 10);
-    customer.clientCode = String(session.clientCode || customer.clientCode || session.customerCode).replace(/\\s+/g, '').toUpperCase();
+    customer.clientCode = String(session.clientCode || customer.clientCode || session.customerCode).replace(/\s+/g, '').toUpperCase();
     const canonicalCustomerId = String(customer.id || session.customerCode);
     customer.lastPaymentStatus = 'paid';
     customer.lastPaymentMonth = now.slice(0, 7);
@@ -168,7 +168,7 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
       if (packageChoiceAllowed) {
         // Normalize legacy/current package records consistently (speed/name and price/fee),
         // so harmless casing/spacing or numeric-string differences do not reject a valid choice.
-        const normalizePackageName = value => String(value || '').trim().replace(/\\s+/g, ' ').toLocaleLowerCase();
+        const normalizePackageName = value => String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
         const livePackage = packages.find(p =>
           normalizePackageName(p && (p.speed || p.name)) === normalizePackageName(selectedPackage) &&
           Math.abs(Number(p && (p.price ?? p.fee ?? 0)) - packagePrice) < 0.01
