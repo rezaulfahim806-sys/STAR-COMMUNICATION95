@@ -75,7 +75,7 @@ app.get('/api/public/packages',async(req,res)=>{
    const customers=Array.isArray(state.data.customers)?state.data.customers:[];
    const customer=customers.find(x=>String(x.id||'')===customerCode)||customers.find(x=>String(x.clientCode||'').trim().toLowerCase()===customerCode.toLowerCase());
    if(!customer)return res.status(404).json({error:'Customer not found for this payment link'});
-   allowPackageChoice=customer.allowPackageChoice===true;
+   allowPackageChoice=customer.allowPackageChoice===true||customer.allowPackageChange===true||String(customer.allowPackageChoice||customer.allowPackageChange||'').trim().toLowerCase()==='true';
    currentPackage={speed:String(customer.pkg||''),price:Number(customer.fee||0)};
    if(!allowPackageChoice){
     visiblePackages=packages.filter(p=>String(p.speed||p.name||'').trim()===currentPackage.speed&&Math.abs(Number(p.price??p.fee??0)-currentPackage.price)<0.01);
@@ -330,13 +330,14 @@ app.post('/api/bkash/create',async(req,res)=>{
   const assignedPackage=String(customer.pkg||customer.packageName||'').trim();
   const assignedPrice=Number(customer.fee??customer.monthlyFee??0);
   // Enforce the package-choice permission on the server, not only in the page UI.
-  if(customer.allowPackageChoice!==true){
+  const packageChoiceAllowed=customer.allowPackageChoice===true||customer.allowPackageChange===true||String(customer.allowPackageChoice||customer.allowPackageChange||'').trim().toLowerCase()==='true';
+   if(!packageChoiceAllowed){
    if(!assignedPackage||!Number.isFinite(assignedPrice)||assignedPrice<=0)return res.status(409).json({error:'Customer package is not configured correctly'});
    if(selectedPackage!==assignedPackage||Math.abs(packagePrice-assignedPrice)>0.01)return res.status(403).json({error:'Package choice is locked. This customer can only pay for the assigned package'});
   }
   const livePackage=packages.find(p=>String(p.speed||p.name||'').trim()===selectedPackage);
-  if(customer.allowPackageChoice===true&&(!livePackage||Math.abs(Number(livePackage.price??livePackage.fee??0)-packagePrice)>0.01))return res.status(409).json({error:'This package changed. Refresh the payment link and select a current package'});
-  if(customer.allowPackageChoice!==true&&livePackage&&Math.abs(Number(livePackage.price??livePackage.fee??0)-packagePrice)>0.01)return res.status(409).json({error:'Assigned package price changed. Refresh the payment link'});
+  if(packageChoiceAllowed&&(!livePackage||Math.abs(Number(livePackage.price??livePackage.fee??0)-packagePrice)>0.01))return res.status(409).json({error:'This package changed. Refresh the payment link and select a current package'});
+  if(!packageChoiceAllowed&&livePackage&&Math.abs(Number(livePackage.price??livePackage.fee??0)-packagePrice)>0.01)return res.status(409).json({error:'Assigned package price changed. Refresh the payment link'});
   const previousDue=Math.max(0,Number(customer.prevDue??customer.previousDue??0));
   const amount=Number((packagePrice+previousDue).toFixed(2));
   if(!Number.isFinite(requestedAmount)||Math.abs(requestedAmount-amount)>0.01)return res.status(409).json({error:'Payment amount does not match the current package and previous due'});
