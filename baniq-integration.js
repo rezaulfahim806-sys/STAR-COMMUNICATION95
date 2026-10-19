@@ -129,9 +129,9 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
       const owner = String(body.company || '').trim().toLowerCase();
       let customerCode = String(body.customerCode || '').trim();
       const requestedClientCode = String(body.clientCode || '').trim();
-      const selectedPackage = String(body.selectedPackage || '').trim();
-      const packagePrice = Number(body.packagePrice || 0);
-      const requestedAmount = Number(body.amount || 0);
+      let selectedPackage = String(body.selectedPackage || '').trim();
+      let packagePrice = Number(body.packagePrice || 0);
+      let requestedAmount = Number(body.amount || 0);
       if (!owner || !customerCode || !selectedPackage || !Number.isFinite(packagePrice) || packagePrice <= 0) {
         return res.status(400).json({ error: 'Company, customer and selected package are required' });
       }
@@ -177,26 +177,24 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
           return res.status(409).json({ error: 'Selected package or price is no longer in the company package list. Sync package settings from the admin app to Render, then create a new payment link.' });
         }
       } else {
-        // Match the assigned package robustly: older customer records may store "30 Mbps"
-        // while payment links show "30", and package labels may differ only by case/spacing.
-        const normalizeAssignedPackage = value => String(value || '')
-          .trim()
-          .toLowerCase()
-          .replace(/\s+/g, ' ')
-          .replace(/\s*mbps\s*$/i, '')
-          .trim();
+        // OFF means the customer cannot choose a package: use the saved assignment as the
+        // source of truth instead of rejecting checkout because an old link has stale labels/prices.
         const currentSpeed = String(customer.pkg || customer.packageName || customer.package || '').trim();
         const currentPrice = Number(customer.fee ?? customer.monthlyFee ?? customer.price ?? 0);
-        if (normalizeAssignedPackage(selectedPackage) !== normalizeAssignedPackage(currentSpeed) ||
-            !Number.isFinite(currentPrice) || Math.abs(packagePrice - currentPrice) > 0.01) {
-          return res.status(403).json({ error: 'Package selection is locked for this customer. Contact STAR COMMUNICATION to request a package change.' });
+        if (!currentSpeed || !Number.isFinite(currentPrice) || currentPrice <= 0) {
+          return res.status(409).json({ error: 'This customer has no valid assigned package or monthly bill. Update the customer record first.' });
         }
+        selectedPackage = currentSpeed;
+        packagePrice = currentPrice;
       }
       const previousDue = Math.max(0, Number(customer.prevDue ?? customer.previousDue ?? 0));
       const amountTaka = Number((packagePrice + previousDue).toFixed(2));
-      if (!Number.isFinite(requestedAmount) || Math.abs(requestedAmount - amountTaka) > 0.01) {
-        return res.status(409).json({ error: 'Payment amount does not match the current package and previous due' });
+      // For locked customers, ignore the stale amount embedded in an older payment link.
+      // The checkout amount is always recalculated from the saved package and previous due.
+      if (packageChoiceAllowed && (!Number.isFinite(requestedAmount) || Math.abs(requestedAmount - amountTaka) > 0.01)) {
+        return res.status(409).json({ error: 'Payment amount does not match the selected package and previous due' });
       }
+      requestedAmount = amountTaka;
       const reference = ('SC-' + clientCode.replace(/\s+/g, '-') + '-' + Date.now()).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80);
       const amountPaisa = Math.round(amountTaka * 100);
       const callback = PUBLIC_URL + '/api/baniq/callback?reference=' + encodeURIComponent(reference);
