@@ -37,7 +37,7 @@ if(!fallbackPackages.length && String(c.package||'').trim() && Number.isFinite(c
 const app=document.getElementById('app');
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const money=n=>'৳'+Number(n||0).toLocaleString('en-BD');
-function findPackage(){if(!allowPackageChoice){const linkSpeed=String(c.package||'').trim();const linkPrice=Number(c.bill||0);if(linkSpeed&&Number.isFinite(linkPrice)&&linkPrice>0)return {speed:linkSpeed,price:linkPrice};const serverSpeed=String(currentPackageFromServer&&currentPackageFromServer.speed||'').trim();const serverPrice=Number(currentPackageFromServer&&currentPackageFromServer.price||0);if(serverSpeed&&Number.isFinite(serverPrice)&&serverPrice>0)return {speed:serverSpeed,price:serverPrice};}let p=packages.find(x=>x.speed.toLowerCase()===String(c.package).toLowerCase());return p||packages.find(x=>x.price===c.bill)||packages[0]}
+function findPackage(){if(!allowPackageChoice){const serverSpeed=String(currentPackageFromServer&&currentPackageFromServer.speed||'').trim();const serverPrice=Number(currentPackageFromServer&&currentPackageFromServer.price||0);if(serverSpeed&&Number.isFinite(serverPrice)&&serverPrice>0)return {speed:serverSpeed,price:serverPrice};const linkSpeed=String(c.package||'').trim();const linkPrice=Number(c.bill||0);if(linkSpeed&&Number.isFinite(linkPrice)&&linkPrice>0)return {speed:linkSpeed,price:linkPrice};}let p=packages.find(x=>x.speed.toLowerCase()===String(c.package).toLowerCase());return p||packages.find(x=>x.price===c.bill)||packages[0]}
 async function initPaymentPage(){
 if(paymentStatus&&(orderId||paymentStatus==='failed'||paymentStatus==='cancelled'||paymentStatus==='invalid')){
  if(paymentStatus==='success'){
@@ -55,8 +55,8 @@ if(apiBase&&company){
   const r=await fetch(apiBase+'/api/public/packages?company='+encodeURIComponent(company)+'&customerCode='+encodeURIComponent(code),{cache:'no-store'});
   const data=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(data.error||'Could not load the latest company packages');
-  allowPackageChoice=data.allowPackageChoice===true || q.get('allowPackageChoice')==='true';
-  currentPackageFromServer=data.currentPackage&&String(data.currentPackage.speed||'').trim()?{speed:String(data.currentPackage.speed).trim(),price:Number(data.currentPackage.price||0)}:null;
+  allowPackageChoice=data.allowPackageChoice===true;
+  currentPackageFromServer=data.currentPackage&&String(data.currentPackage.speed||'').trim()?{speed:String(data.currentPackage.speed).trim(),price:Number(data.currentPackage.price||0)}:null; if(!allowPackageChoice&&currentPackageFromServer){c.package=currentPackageFromServer.speed;c.bill=currentPackageFromServer.price;if(Number.isFinite(Number(data.currentPackage.previousDue)))c.previousDue=Math.max(0,Number(data.currentPackage.previousDue));}
   const livePackages=Array.isArray(data.packages)?data.packages.filter(p=>p&&String(p.speed||'').trim()&&Number(p.price)>0).map(p=>({speed:String(p.speed||p.name),price:Number(p.price??p.fee)})):[];
   if(livePackages.length) packages=livePackages;
   else if(fallbackPackages.length) packages=fallbackPackages;
