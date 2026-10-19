@@ -61,6 +61,7 @@ if(apiBase&&company){
   allowPackageChoice=data.allowPackageChoice===true; // Live server setting is authoritative; old payment-link parameters cannot override the lock.
   if(data.referralOffer&&typeof data.referralOffer==='object')referralOffer={enabled:data.referralOffer.enabled!==false,text:String(data.referralOffer.text||'৩ জন নতুন গ্রাহক সংযোগ করালে ১ মাসের বিল ফ্রি!')};
   currentPackageFromServer=data.currentPackage&&String(data.currentPackage.speed||'').trim()?{speed:String(data.currentPackage.speed).trim(),price:Number(data.currentPackage.price||0)}:null;
+if(data.currentPackage&&Number.isFinite(Number(data.currentPackage.previousDue)))c.previousDue=Math.max(0,Number(data.currentPackage.previousDue));
   if(!allowPackageChoice&&currentPackageFromServer){
    c.package=currentPackageFromServer.speed;c.bill=currentPackageFromServer.price;
    if(Number.isFinite(Number(data.currentPackage.previousDue)))c.previousDue=Math.max(0,Number(data.currentPackage.previousDue));
