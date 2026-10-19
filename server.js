@@ -76,7 +76,7 @@ app.get('/api/public/packages',async(req,res)=>{
    const customer=customers.find(x=>String(x.id||'')===customerCode)||customers.find(x=>String(x.clientCode||'').trim().toLowerCase()===customerCode.toLowerCase());
    if(!customer)return res.status(404).json({error:'Customer not found for this payment link'});
    allowPackageChoice=customer.allowPackageChoice===true||customer.allowPackageChange===true||String(customer.allowPackageChoice||customer.allowPackageChange||'').trim().toLowerCase()==='true';
-   currentPackage={speed:String(customer.pkg||''),price:Number(customer.fee||0)};
+   currentPackage={speed:String(customer.pkg||customer.packageName||customer.package||''),price:Number(customer.fee??customer.monthlyFee??customer.price??0),previousDue:Number(customer.prevDue??customer.previousDue??0)};
    if(!allowPackageChoice){
     visiblePackages=packages.filter(p=>String(p.speed||p.name||'').trim()===currentPackage.speed&&Math.abs(Number(p.price??p.fee??0)-currentPackage.price)<0.01);
     if(!visiblePackages.length&&currentPackage.speed&&currentPackage.price>0)visiblePackages=[currentPackage];
