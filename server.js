@@ -67,7 +67,22 @@ app.get('/api/public/packages',async(req,res)=>{
   if(!state||!state.data)return res.status(404).json({error:'Company package data not found'});
   const settings=state.data.settings||{};
   const packages=Array.isArray(settings.packages)&&settings.packages.length?settings.packages:[];
-  return send(res,{ok:true,companyName:settings.cloud&&settings.cloud.companyName||'',packages,merchantNumber:String(settings.merchantNumber||'')});
+  const customerCode=String(req.query.customerCode||'').trim();
+  let visiblePackages=packages;
+  let allowPackageChoice=false;
+  let currentPackage=null;
+  if(customerCode){
+   const customers=Array.isArray(state.data.customers)?state.data.customers:[];
+   const customer=customers.find(x=>String(x.id||'')===customerCode)||customers.find(x=>String(x.clientCode||'').trim().toLowerCase()===customerCode.toLowerCase());
+   if(!customer)return res.status(404).json({error:'Customer not found for this payment link'});
+   allowPackageChoice=customer.allowPackageChoice===true;
+   currentPackage={speed:String(customer.pkg||''),price:Number(customer.fee||0)};
+   if(!allowPackageChoice){
+    visiblePackages=packages.filter(p=>String(p.speed||p.name||'').trim()===currentPackage.speed&&Math.abs(Number(p.price??p.fee??0)-currentPackage.price)<0.01);
+    if(!visiblePackages.length&&currentPackage.speed&&currentPackage.price>0)visiblePackages=[currentPackage];
+   }
+  }
+  return send(res,{ok:true,companyName:settings.cloud&&settings.cloud.companyName||'',packages:visiblePackages,allowPackageChoice,currentPackage,merchantNumber:String(settings.merchantNumber||'')});
  }catch(e){return res.status(500).json({error:'Could not load company packages'})}
 });
 app.put('/api/settings/packages',auth,async(req,res)=>{
