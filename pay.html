@@ -10,7 +10,7 @@
 </head>
 <body><div class="wrap">
 <header class="hero"><img class="logo" src="logo.svg" alt="STAR COMMUNICATION" onerror="this.style.display='none'"><div class="brand">STAR COMMUNICATION</div><div class="tag">Customer Bill Payment Link</div></header>
-<main id="app"></main><div class="footer">STAR COMMUNICATION • Internet Service Provider</div></div>
+<main id="app"><section class="card"><div style="text-align:center;padding:18px"><strong>Loading payment details…</strong><p class="hint">Connecting to STAR COMMUNICATION billing service. If this stays here, refresh the page or contact support.</p></div></section></main><div class="footer">STAR COMMUNICATION • Internet Service Provider</div></div>
 <script>
 const q=new URLSearchParams(location.search);
 const code=(q.get('code')||'').trim();
@@ -67,6 +67,7 @@ if(apiBase&&company){
   const livePackages=Array.isArray(data.packages)?data.packages.filter(p=>p&&String(p.speed||p.name||'').trim()&&Number(p.price??p.fee)>0).map(p=>({speed:String(p.speed||p.name),price:Number(p.price??p.fee)})):[];
   if(allowPackageChoice&&livePackages.length)packages=livePackages;
   else if(!allowPackageChoice&&fallbackPackages.length)packages=fallbackPackages;
+  else if(!allowPackageChoice&&currentPackageFromServer&&currentPackageFromServer.speed&&currentPackageFromServer.price>0)packages=[{speed:currentPackageFromServer.speed,price:currentPackageFromServer.price}];
   else if(livePackages.length)packages=livePackages;
   else if(fallbackPackages.length)packages=fallbackPackages;
   else throw new Error('No saved packages found. Add packages in app Settings first.');
