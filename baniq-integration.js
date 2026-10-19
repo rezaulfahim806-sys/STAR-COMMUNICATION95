@@ -161,12 +161,15 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
         customer.clientCode = clientCode;
       }
       const packages = Array.isArray(state.data.settings && state.data.settings.packages) ? state.data.settings.packages : [];
-      const livePackage = packages.find(p => String(p.speed || p.name || '').trim() === selectedPackage);
-      if (!livePackage || Math.abs(Number(livePackage.price ?? livePackage.fee ?? 0) - packagePrice) > 0.01) {
-        return res.status(409).json({ error: 'This package changed. Refresh the payment link and select a current package' });
-      }
-      // Package changes are opt-in per customer. Default is locked to the current package.
-      if (customer.allowPackageChoice !== true) {
+      // If package choice is enabled, the customer may only pay for a current company package.
+      // If it is disabled, honor the package and fee already assigned to this customer even if
+      // the company has since removed/renamed that package in Settings.
+      if (customer.allowPackageChoice === true) {
+        const livePackage = packages.find(p => String(p.speed || p.name || '').trim() === selectedPackage);
+        if (!livePackage || Math.abs(Number(livePackage.price ?? livePackage.fee ?? 0) - packagePrice) > 0.01) {
+          return res.status(409).json({ error: 'This package changed. Refresh the payment link and select a current package' });
+        }
+      } else {
         const currentSpeed = String(customer.pkg || '').trim();
         const currentPrice = Number(customer.fee || 0);
         if (selectedPackage !== currentSpeed || Math.abs(packagePrice - currentPrice) > 0.01) {
