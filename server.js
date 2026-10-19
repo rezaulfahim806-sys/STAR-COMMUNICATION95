@@ -335,8 +335,9 @@ app.post('/api/bkash/create',async(req,res)=>{
    if(!assignedPackage||!Number.isFinite(assignedPrice)||assignedPrice<=0)return res.status(409).json({error:'Customer package is not configured correctly'});
    if(selectedPackage!==assignedPackage||Math.abs(packagePrice-assignedPrice)>0.01)return res.status(403).json({error:'Package choice is locked. This customer can only pay for the assigned package'});
   }
-  const livePackage=packages.find(p=>String(p.speed||p.name||'').trim()===selectedPackage);
-  if(packageChoiceAllowed&&(!livePackage||Math.abs(Number(livePackage.price??livePackage.fee??0)-packagePrice)>0.01))return res.status(409).json({error:'This package changed. Refresh the payment link and select a current package'});
+  const normalizePackageName=value=>String(value||'').trim().toLowerCase().replace(/\s+/g,' ').replace(/\s*mbps\s*$/i,'');
+  const livePackage=packages.find(p=>normalizePackageName(p.speed||p.name)===normalizePackageName(selectedPackage));
+  if(packageChoiceAllowed&&(!livePackage||Math.abs(Number(livePackage.price??livePackage.fee??0)-packagePrice)>0.01))return res.status(409).json({error:'The selected package is not current. Please refresh the page and try again.'});
   if(!packageChoiceAllowed&&livePackage&&Math.abs(Number(livePackage.price??livePackage.fee??0)-packagePrice)>0.01)return res.status(409).json({error:'Assigned package price changed. Refresh the payment link'});
   const previousDue=Math.max(0,Number(customer.prevDue??customer.previousDue??0));
   const amount=Number((packagePrice+previousDue).toFixed(2));
