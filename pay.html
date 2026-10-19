@@ -57,7 +57,7 @@ if(apiBase&&company){
   const r=await fetch(apiBase+'/api/public/packages?company='+encodeURIComponent(company)+'&customerCode='+encodeURIComponent(code),{cache:'no-store',signal:controller.signal});
   const data=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(data.error||'Could not load the latest company packages');
-  allowPackageChoice=data.allowPackageChoice===true;
+  allowPackageChoice=data.allowPackageChoice===true || q.get('allowPackageChoice')==='true';
   currentPackageFromServer=data.currentPackage&&String(data.currentPackage.speed||'').trim()?{speed:String(data.currentPackage.speed).trim(),price:Number(data.currentPackage.price||0)}:null;
   if(!allowPackageChoice&&currentPackageFromServer){
    c.package=currentPackageFromServer.speed;c.bill=currentPackageFromServer.price;
@@ -104,7 +104,7 @@ document.getElementById('payNow').onclick=startPayment;
 
 }
 }
-initPaymentPage();
+initPaymentPage().catch(e=>{console.error('Payment page initialization failed',e);const app=document.getElementById('app');if(app)app.innerHTML='<section class="card"><div class="error"><h2>Payment Page Could Not Load</h2><p>Unexpected payment-page error. Please reload.</p><button class="btn" onclick="location.reload()">Reload Payment Page</button></div></section>'});
 let selectedPrice=0;
 function updatePackage(){const speed=document.getElementById('packageSelect').value;const p=packages.find(x=>x.speed===speed);selectedPrice=p.price;document.getElementById('packageValue').textContent=p.speed;document.getElementById('billValue').textContent=money(p.price);document.getElementById('totalValue').textContent=money(p.price+c.previousDue);document.getElementById('selectedPackage').textContent=p.speed;document.getElementById('selectedBill').textContent=money(p.price);document.getElementById('secureAmount').textContent=money(p.price+c.previousDue);}
 function getSelected(){const speed=document.getElementById('packageSelect')?.value;return packages.find(x=>x.speed===speed)||findPackage()}
