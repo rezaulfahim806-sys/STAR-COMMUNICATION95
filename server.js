@@ -276,7 +276,7 @@ app.post('/api/sync',auth,async(req,res)=>{
  if(!data||!Array.isArray(data.customers)||!Array.isArray(data.payments)||!Array.isArray(data.expenses)||!Array.isArray(data.pending)||!Array.isArray(data.history))
    return res.status(400).json({error:'Invalid sync data'});
  const clean={
-   customers:data.customers,
+   customers:data.customers.map(c=>({...c,allowPackageChoice:flagEnabled(c&&c.allowPackageChoice)||flagEnabled(c&&c.allowPackageChange)})),
    payments:data.payments,
    expenses:data.expenses,
    pending:data.pending,
