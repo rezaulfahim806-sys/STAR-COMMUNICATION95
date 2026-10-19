@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 
-module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, PAYMENT_PAGE_URL }) {
+module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, PAYMENT_PAGE_URL, integrationSettings, callConfiguredApi }) {
   const API_BASE = (process.env.BANIQ_API_BASE || 'https://api.baniq.app').replace(/\/$/, '');
   const KEY_ID = process.env.BANIQ_KEY_ID || '';
   const API_SECRET = process.env.BANIQ_SECRET || '';
@@ -100,7 +100,27 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
       verifiedAt: now,
       updatedAt: now
     } });
-    return { ...session, status: 'PAID' };
+    // Send a payment receipt only after the verified bill is saved. SMS failure must not undo a verified payment.
+    try {
+      const latestSession = await sessions.findOne({ orderId: session.orderId });
+      if (latestSession && !latestSession.receiptSmsSentAt && typeof integrationSettings === 'function' && typeof callConfiguredApi === 'function') {
+        const settings = await integrationSettings(session.owner);
+        const sms = settings.smsApi || {};
+        const phone = String(session.customerMobile || customer.mobile || customer.phone || '').trim();
+        if (sms.url && sms.apiKey && phone) {
+          const message = 'STAR COMMUNICATION: Dear ' + String(customer.name || session.customerName || 'Customer') +
+            ', your payment of Tk ' + amountTaka.toFixed(2) + ' has been verified successfully. Client Code: ' +
+            String(customer.clientCode || session.clientCode || '') + '. Your bill is PAID. Thank you.';
+          await callConfiguredApi({ ...sms, apiKeyField: sms.apiKeyField, senderId: sms.senderId }, { phone, message, amount: amountTaka, customerId: canonicalCustomerId, transactionId: String(providerData.reference || session.reference || session.orderId) });
+          await sessions.updateOne({ orderId: session.orderId, receiptSmsSentAt: { $exists: false } }, { $set: { receiptSmsSentAt: new Date().toISOString(), receiptSmsStatus: 'accepted' } });
+        } else {
+          await sessions.updateOne({ orderId: session.orderId, receiptSmsStatus: { $exists: false } }, { $set: { receiptSmsStatus: 'not_configured_or_no_phone' } });
+        }
+      }
+    } catch (smsError) {
+      await sessions.updateOne({ orderId: session.orderId }, { $set: { receiptSmsStatus: 'failed', receiptSmsError: String(smsError.message || 'SMS failed').slice(0, 180) } }).catch(() => {});
+    }
+    return { ...session, status: 'PAID', clientCode: String(customer.clientCode || session.clientCode || '') };
   }
 
   app.post('/api/baniq/create', async (req, res) => {
@@ -189,12 +209,12 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
       if (!session) return res.status(404).json({ ok: true, verified: false, status: 'NOT_FOUND' });
       if (session.status === 'PAID') {
         await markPaid(session, { amount: Number(session.verifiedAmountPaisa || session.amountPaisa), reference: session.reference, paidAt: session.paidAt });
-        return res.json({ ok: true, verified: true, status: 'PAID', customerCode: session.customerCode, clientCode: session.clientCode || session.customerCode, customerName: session.customerName || '', orderId });
+        const state = await col('app_state').findOne({ owner: session.owner }); const customers = Array.isArray(state?.data?.customers) ? state.data.customers : []; const customer = customers.find(x => String(x.id) === String(session.customerCode)) || customers.find(x => String(x.clientCode || '').toLowerCase() === String(session.clientCode || '').toLowerCase()); return res.json({ ok: true, verified: true, status: 'PAID', customerCode: customer?.id || session.customerCode, clientCode: String(customer?.clientCode || session.clientCode || ''), customerName: customer?.name || session.customerName || '', orderId });
       }
       const verification = await verifyOrder(orderId, session.amountPaisa);
       if (!verification.verified) return res.json({ ok: true, verified: false, status: verification.providerStatus, customerCode: session.customerCode, orderId });
       const paid = await markPaid(session, verification.data);
-      return res.json({ ok: true, verified: true, status: paid.status, customerCode: session.customerCode, clientCode: session.clientCode || session.customerCode, customerName: session.customerName || '', orderId });
+      return res.json({ ok: true, verified: true, status: paid.status, customerCode: session.customerCode, clientCode: String(paid.clientCode || session.clientCode || ''), customerName: session.customerName || '', orderId });
     } catch (e) {
       return res.status(502).json({ ok: false, verified: false, error: String(e.message || 'Baniq verification failed').slice(0, 200) });
     }

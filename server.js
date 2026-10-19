@@ -470,6 +470,6 @@ app.post('/api/billing/verify-payment',auth,async(req,res)=>{
  }catch(e){res.status(502).json({ok:false,verified:false,error:'Payment verification failed: '+String(e.message||'Request failed').slice(0,180)})}
 });
 
-require('./baniq-integration')(app,{col,ownerOf,PUBLIC_URL, PAYMENT_PAGE_URL});
+require('./baniq-integration')(app,{col,ownerOf,PUBLIC_URL, PAYMENT_PAGE_URL, integrationSettings, callConfiguredApi});
 
 app.listen(PORT,async()=>{try{await initDb();console.log('STAR COMMUNICATION server on '+PORT)}catch(e){console.error(e);process.exit(1)}});
