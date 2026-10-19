@@ -22,6 +22,7 @@ const customerMobile=(q.get('mobile')||'').trim();
 const paymentStatus=(q.get('status')||'').toLowerCase();
 const orderId=(q.get('orderId')||q.get('oid')||'').trim();
 let packages=[];
+let allowPackageChoice=false;
 let packageLoadError='';
 let fallbackPackages=[];
 try {
@@ -50,10 +51,11 @@ if(paymentStatus&&(orderId||paymentStatus==='failed'||paymentStatus==='cancelled
 }
 if(apiBase&&company){
  try{
-  const r=await fetch(apiBase+'/api/public/packages?company='+encodeURIComponent(company),{cache:'no-store'});
+  const r=await fetch(apiBase+'/api/public/packages?company='+encodeURIComponent(company)+'&customerCode='+encodeURIComponent(code),{cache:'no-store'});
   const data=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(data.error||'Could not load the latest company packages');
-  const livePackages=Array.isArray(data.packages)?data.packages.filter(p=>p&&String(p.speed||'').trim()&&Number(p.price)>0).map(p=>({speed:String(p.speed),price:Number(p.price)})):[];
+  allowPackageChoice=data.allowPackageChoice===true;
+  const livePackages=Array.isArray(data.packages)?data.packages.filter(p=>p&&String(p.speed||'').trim()&&Number(p.price)>0).map(p=>({speed:String(p.speed||p.name),price:Number(p.price??p.fee)})):[];
   if(livePackages.length) packages=livePackages;
   else if(fallbackPackages.length) packages=fallbackPackages;
   else throw new Error('No saved packages found. Add packages in app Settings first.');
@@ -80,15 +82,11 @@ app.innerHTML=`
 <div class="row"><span class="label">Monthly Bill</span><span class="value" id="billValue">${money(selected.price)}</span></div>
 <div class="row"><span class="label">Previous Due</span><span class="value">${money(c.previousDue)}</span></div>
 <div class="row total"><span class="label">Total Payable</span><span class="value" id="totalValue">${money(selected.price+c.previousDue)}</span></div></div></section>
-<section class="card pay"><h2 class="heading">📶 Select Your Package</h2>
-<div class="hint">Choose the package you want for this billing period. The full package price is required; a lower amount cannot be paid.</div>
-<select class="select" id="packageSelect">${packages.map(p=>`<option value="${p.speed}" ${p.speed===selected.speed?'selected':''}>${p.speed} — ${money(p.price)}/month</option>`).join('')}</select>
-<div class="packageNote">Selected package: <b id="selectedPackage">${esc(selected.speed)}</b> • Bill: <b id="selectedBill">${money(selected.price)}</b></div>
-</section><section class="card pay"><h2 class="heading">💳 Pay with Baniq Pay</h2><div class="bkash">Secure hosted checkout</div><div class="hint">Pay this bill using supported payment methods in Baniq Pay. Your bill is marked paid only after server-side verification.</div>
+${allowPackageChoice?'<section class="card pay"><h2 class="heading">📶 Choose Your Package</h2><div class="hint">Your company has allowed you to choose another package. The selected package and price will be applied only after verified payment.</div><select class="select" id="packageSelect">'+packages.map(p=>'<option value="'+esc(p.speed)+'" '+(p.speed===selected.speed?'selected':'')+'>'+esc(p.speed)+' — '+money(p.price)+'/month</option>').join('')+'</select><div class="packageNote">Selected package: <b id="selectedPackage">'+esc(selected.speed)+'</b> • Bill: <b id="selectedBill">'+money(selected.price)+'</b></div></section>':'<section class="card pay"><h2 class="heading">📶 Your Current Package</h2><div class="hint">Package choice is locked by STAR COMMUNICATION for this customer. Contact the company if you need to change it.</div><div class="packageNote" style="font-size:15px">Package: <b>'+esc(selected.speed)+'</b> • Monthly bill: <b>'+money(selected.price)+'</b></div></section>'}<section class="card pay"><h2 class="heading">💳 Pay with Baniq Pay</h2><div class="bkash">Secure hosted checkout</div><div class="hint">Pay this bill using supported payment methods in Baniq Pay. Your bill is marked paid only after server-side verification.</div>
 <button class="btn" id="payNow">Pay with Baniq Pay</button>
 <div class="status" id="status"></div><div class="secure">🔒 Secure checkout • Amount: <b id="secureAmount">${money(selected.price+c.previousDue)}</b></div></section>`;
 
-document.getElementById('packageSelect').onchange=updatePackage;
+if(document.getElementById('packageSelect'))document.getElementById('packageSelect').onchange=updatePackage;
 document.getElementById('payNow').onclick=startPayment;
 
 }
