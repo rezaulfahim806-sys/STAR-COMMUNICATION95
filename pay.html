@@ -67,16 +67,18 @@ if(apiBase&&company){
    fallbackPackages=[{speed:c.package,price:c.bill}];
   }
   const livePackages=Array.isArray(data.packages)?data.packages.filter(p=>p&&String(p.speed||p.name||'').trim()&&Number(p.price??p.fee)>0).map(p=>({speed:String(p.speed||p.name),price:Number(p.price??p.fee)})):[];
-  if(allowPackageChoice&&livePackages.length)packages=livePackages;
-  else if(!allowPackageChoice&&fallbackPackages.length)packages=fallbackPackages;
-  else if(!allowPackageChoice&&currentPackageFromServer&&currentPackageFromServer.speed&&currentPackageFromServer.price>0)packages=[{speed:currentPackageFromServer.speed,price:currentPackageFromServer.price}];
+  if(allowPackageChoice){
+   if(!livePackages.length)throw new Error('Package choice is enabled, but no current packages were returned by the server. Save/publish packages in admin Settings and refresh this link.');
+   packages=livePackages;
+  }else if(fallbackPackages.length)packages=fallbackPackages;
+  else if(currentPackageFromServer&&currentPackageFromServer.speed&&currentPackageFromServer.price>0)packages=[{speed:currentPackageFromServer.speed,price:currentPackageFromServer.price}];
   else if(livePackages.length)packages=livePackages;
-  else if(fallbackPackages.length)packages=fallbackPackages;
   else throw new Error('No saved packages found. Add packages in app Settings first.');
   if(data.merchantNumber&&!q.get('merchant'))merchant=String(data.merchantNumber);
  }catch(e){
-  allowPackageChoice=q.get('allowPackageChoice')==='true'; // Fallback to the link permission only when the live API is unavailable; a successful API response always wins.
-  if(fallbackPackages.length)packages=fallbackPackages;
+  allowPackageChoice=q.get('allowPackageChoice')==='true'; // Fallback only for locked-package links; selectable packages must come from the live server.
+  if(allowPackageChoice)packageLoadError=(e.name==='AbortError'?'Package service timed out. Please reopen the payment link.':e.message)||'Could not load the latest packages.';
+  else if(fallbackPackages.length)packages=fallbackPackages;
   else packageLoadError=(e.name==='AbortError'?'Package service timed out. Please reopen the payment link.':e.message)||'Could not load the latest packages.';
  }finally{clearTimeout(timeoutId)}
 }else if(fallbackPackages.length){
