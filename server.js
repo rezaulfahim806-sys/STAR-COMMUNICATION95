@@ -336,7 +336,7 @@ app.post('/api/bkash/create',async(req,res)=>{
   const assignedPackage=String(customer.pkg||customer.packageName||'').trim();
   const assignedPrice=Number(customer.fee??customer.monthlyFee??0);
   // Enforce the package-choice permission on the server, not only in the page UI.
-  const packageChoiceAllowed=customer.allowPackageChoice===true||customer.allowPackageChange===true||String(customer.allowPackageChoice||customer.allowPackageChange||'').trim().toLowerCase()==='true';
+  const packageChoiceAllowed=packageChoiceEnabled(customer);
    if(!packageChoiceAllowed){
    if(!assignedPackage||!Number.isFinite(assignedPrice)||assignedPrice<=0)return res.status(409).json({error:'Customer package is not configured correctly'});
    if(selectedPackage!==assignedPackage||Math.abs(packagePrice-assignedPrice)>0.01)return res.status(403).json({error:'Package choice is locked. This customer can only pay for the assigned package'});
@@ -344,7 +344,7 @@ app.post('/api/bkash/create',async(req,res)=>{
   const normalizePackageName=value=>String(value||'').trim().toLowerCase().replace(/\s+/g,' ').replace(/\s*mbps\s*$/i,'');
   const livePackage=packages.find(p=>normalizePackageName(p.speed||p.name)===normalizePackageName(selectedPackage));
   if(packageChoiceAllowed&&(!livePackage||Math.abs(Number(livePackage.price??livePackage.fee??0)-packagePrice)>0.01))return res.status(409).json({error:'The selected package is not current. Please refresh the page and try again.'});
-  if(!packageChoiceAllowed&&livePackage&&Math.abs(Number(livePackage.price??livePackage.fee??0)-packagePrice)>0.01)return res.status(409).json({error:'Assigned package price changed. Refresh the payment link'});
+  // When package choice is locked, the customer's saved package price is authoritative.\n  // A stale or changed package catalogue must not prevent payment of that assigned bill.
   const previousDue=Math.max(0,Number(customer.prevDue??customer.previousDue??0));
   const amount=Number((packagePrice+previousDue).toFixed(2));
   if(!Number.isFinite(requestedAmount)||Math.abs(requestedAmount-amount)>0.01)return res.status(409).json({error:'Payment amount does not match the current package and previous due'});
