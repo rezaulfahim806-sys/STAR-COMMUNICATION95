@@ -168,7 +168,7 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
       if (packageChoiceAllowed) {
         // Normalize legacy/current package records consistently (speed/name and price/fee),
         // so harmless casing/spacing or numeric-string differences do not reject a valid choice.
-        const normalizePackageName = value => String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+        const normalizePackageName = value => String(value || '').trim().replace(/\s+/g, ' ').replace(/\s*mbps\s*$/i, '').trim().toLocaleLowerCase();
         const livePackage = packages.find(p =>
           normalizePackageName(p && (p.speed || p.name)) === normalizePackageName(selectedPackage) &&
           Math.abs(Number(p && (p.price ?? p.fee ?? 0)) - packagePrice) < 0.01
