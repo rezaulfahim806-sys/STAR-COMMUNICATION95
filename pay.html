@@ -51,22 +51,33 @@ if(paymentStatus&&(orderId||paymentStatus==='failed'||paymentStatus==='cancelled
  if(['failed','cancelled','invalid'].includes(paymentStatus)){app.innerHTML='<section class="card"><div class="error"><h2>Payment Not Completed</h2><p>Your payment was not confirmed. Return to the original payment link and try again.</p><button class="btn secondary" onclick="history.back()">Go Back</button></div></section>';return}
 }
 if(apiBase&&company){
+ const controller=new AbortController();
+ const timeoutId=setTimeout(()=>controller.abort(),7000);
  try{
-  const r=await fetch(apiBase+'/api/public/packages?company='+encodeURIComponent(company)+'&customerCode='+encodeURIComponent(code),{cache:'no-store'});
+  const r=await fetch(apiBase+'/api/public/packages?company='+encodeURIComponent(company)+'&customerCode='+encodeURIComponent(code),{cache:'no-store',signal:controller.signal});
   const data=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(data.error||'Could not load the latest company packages');
   allowPackageChoice=data.allowPackageChoice===true;
-  currentPackageFromServer=data.currentPackage&&String(data.currentPackage.speed||'').trim()?{speed:String(data.currentPackage.speed).trim(),price:Number(data.currentPackage.price||0)}:null; if(!allowPackageChoice&&currentPackageFromServer){c.package=currentPackageFromServer.speed;c.bill=currentPackageFromServer.price;if(Number.isFinite(Number(data.currentPackage.previousDue)))c.previousDue=Math.max(0,Number(data.currentPackage.previousDue));}
-  const livePackages=Array.isArray(data.packages)?data.packages.filter(p=>p&&String(p.speed||'').trim()&&Number(p.price)>0).map(p=>({speed:String(p.speed||p.name),price:Number(p.price??p.fee)})):[];
-  if(livePackages.length) packages=livePackages;
-  else if(fallbackPackages.length) packages=fallbackPackages;
+  currentPackageFromServer=data.currentPackage&&String(data.currentPackage.speed||'').trim()?{speed:String(data.currentPackage.speed).trim(),price:Number(data.currentPackage.price||0)}:null;
+  if(!allowPackageChoice&&currentPackageFromServer){
+   c.package=currentPackageFromServer.speed;c.bill=currentPackageFromServer.price;
+   if(Number.isFinite(Number(data.currentPackage.previousDue)))c.previousDue=Math.max(0,Number(data.currentPackage.previousDue));
+   fallbackPackages=[{speed:c.package,price:c.bill}];
+  }
+  const livePackages=Array.isArray(data.packages)?data.packages.filter(p=>p&&String(p.speed||p.name||'').trim()&&Number(p.price??p.fee)>0).map(p=>({speed:String(p.speed||p.name),price:Number(p.price??p.fee)})):[];
+  if(allowPackageChoice&&livePackages.length)packages=livePackages;
+  else if(!allowPackageChoice&&fallbackPackages.length)packages=fallbackPackages;
+  else if(livePackages.length)packages=livePackages;
+  else if(fallbackPackages.length)packages=fallbackPackages;
   else throw new Error('No saved packages found. Add packages in app Settings first.');
   if(data.merchantNumber&&!q.get('merchant'))merchant=String(data.merchantNumber);
  }catch(e){
-  if(fallbackPackages.length) packages=fallbackPackages;
-  else packageLoadError=e.message||'Could not load the latest packages. Please refresh.';
- }
+  allowPackageChoice=q.get('allowPackageChoice')==='true';
+  if(fallbackPackages.length)packages=fallbackPackages;
+  else packageLoadError=(e.name==='AbortError'?'Package service timed out. Please reopen the payment link.':e.message)||'Could not load the latest packages.';
+ }finally{clearTimeout(timeoutId)}
 }else if(fallbackPackages.length){
+ allowPackageChoice=q.get('allowPackageChoice')==='true';
  packages=fallbackPackages;
 }else{
  packageLoadError='This payment link is not connected to the live company package system.';
