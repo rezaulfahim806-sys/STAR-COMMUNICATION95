@@ -42,7 +42,7 @@ async function initPaymentPage(){
 if(paymentStatus&&(orderId||paymentStatus==='failed'||paymentStatus==='cancelled'||paymentStatus==='invalid')){
  if(paymentStatus==='success'){
   try{
-   const vr=await fetch(apiBase+'/api/bkash/status?paymentID='+encodeURIComponent(orderId),{cache:'no-store'});
+   const vr=await fetch(apiBase+'/api/baniq/status?orderId='+encodeURIComponent(orderId),{cache:'no-store'});
    const vs=await vr.json().catch(()=>({}));
    if(vr.ok&&vs.verified){app.innerHTML='<section class="card"><div class="status" style="font-size:18px;color:#087443">✓ Payment Verified Successfully</div><h2 class="heading" style="text-align:center">Thank you!</h2><p class="hint" style="text-align:center">Your Baniq Pay payment has been verified and your bill has been marked PAID.</p><div class="rows"><div class="row"><span class="label">Client Code</span><span class="value">'+esc(vs.clientCode||clientCode||vs.customerCode||'')+'</span></div><div class="row"><span class="label">Payment ID</span><span class="value">'+esc(orderId)+'</span></div></div></section>';return}
    app.innerHTML='<section class="card"><div class="error"><h2>Payment Not Yet Verified</h2><p>We could not confirm this payment yet. Please wait briefly and refresh, or contact STAR COMMUNICATION.</p></div></section>';return
@@ -84,7 +84,7 @@ app.innerHTML=`
 <div class="row"><span class="label">Monthly Bill</span><span class="value" id="billValue">${money(selected.price)}</span></div>
 <div class="row"><span class="label">Previous Due</span><span class="value">${money(c.previousDue)}</span></div>
 <div class="row total"><span class="label">Total Payable</span><span class="value" id="totalValue">${money(selected.price+c.previousDue)}</span></div></div></section>
-${allowPackageChoice?'<section class="card pay"><h2 class="heading">📶 Choose Your Package</h2><div class="hint">Your company has allowed you to choose another package. The selected package and price will be applied only after verified payment.</div><select class="select" id="packageSelect">'+packages.map(p=>'<option value="'+esc(p.speed)+'" '+(p.speed===selected.speed?'selected':'')+'>'+esc(p.speed)+' — '+money(p.price)+'/month</option>').join('')+'</select><div class="packageNote">Selected package: <b id="selectedPackage">'+esc(selected.speed)+'</b> • Bill: <b id="selectedBill">'+money(selected.price)+'</b></div></section>':'<section class="card pay"><h2 class="heading">📶 Your Current Package</h2><div class="hint">Package choice is locked by STAR COMMUNICATION for this customer. Contact the company if you need to change it.</div><div class="packageNote" style="font-size:15px">Package: <b>'+esc(selected.speed)+'</b> • Monthly bill: <b>'+money(selected.price)+'</b></div></section>'}<section class="card pay"><h2 class="heading">💳 Pay with bKash</h2><div class="bkash">Secure bKash checkout</div><div class="hint">Pay this bill using bKash. Your bill is marked paid only after server-side verification.</div>
+${allowPackageChoice?'<section class="card pay"><h2 class="heading">📶 Choose Your Package</h2><div class="hint">Your company has allowed you to choose another package. The selected package and price will be applied only after verified payment.</div><select class="select" id="packageSelect">'+packages.map(p=>'<option value="'+esc(p.speed)+'" '+(p.speed===selected.speed?'selected':'')+'>'+esc(p.speed)+' — '+money(p.price)+'/month</option>').join('')+'</select><div class="packageNote">Selected package: <b id="selectedPackage">'+esc(selected.speed)+'</b> • Bill: <b id="selectedBill">'+money(selected.price)+'</b></div></section>':'<section class="card pay"><h2 class="heading">📶 Your Current Package</h2><div class="hint">Package choice is locked by STAR COMMUNICATION for this customer. Contact the company if you need to change it.</div><div class="packageNote" style="font-size:15px">Package: <b>'+esc(selected.speed)+'</b> • Monthly bill: <b>'+money(selected.price)+'</b></div></section>'}<section class="card pay"><h2 class="heading">💳 Pay securely with Baniq</h2><div class="bkash">Secure Baniq Pay checkout</div><div class="hint">Pay this bill using Baniq Pay. Your bill is marked paid only after server-side verification.</div>
 <button class="btn" id="payNow">Pay with Baniq Pay</button>
 <div class="status" id="status"></div><div class="secure">🔒 Secure checkout • Amount: <b id="secureAmount">${money(selected.price+c.previousDue)}</b></div></section>`;
 
@@ -105,11 +105,11 @@ async function startPayment(){
  if(!Number.isFinite(amount)||amount<=0){s.textContent='No payable amount found.';return}
  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Connecting to Baniq Pay...';s.textContent='';
  try{
-   const r=await fetch(apiBase+'/api/bkash/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({company:company,customerCode:code,clientCode:clientCode,customerName:c.name,customerMobile:customerMobile,selectedPackage:p.speed,packagePrice:p.price,previousDue:c.previousDue,amount:amount,merchantInvoiceNumber:'SC-'+code+'-'+Date.now()})});
+   const r=await fetch(apiBase+'/api/baniq/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({company:company,customerCode:code,clientCode:clientCode,customerName:c.name,customerMobile:customerMobile,selectedPackage:p.speed,packagePrice:p.price,previousDue:c.previousDue,amount:amount,merchantInvoiceNumber:'SC-'+code+'-'+Date.now()})});
    const data=await r.json().catch(()=>({}));
-   if(!r.ok||!data.bkashURL)throw new Error(data.error||'Unable to start bKash checkout');
-   location.href=data.bkashURL;
- }catch(e){s.textContent=e.message||'Payment service unavailable.';btn.disabled=false;btn.textContent='Pay with bKash'}
+   if(!r.ok||!data.checkoutUrl)throw new Error(data.error||'Unable to start Baniq checkout');
+   location.href=data.checkoutUrl;
+ }catch(e){s.textContent=e.message||'Payment service unavailable.';btn.disabled=false;btn.textContent='Pay with Baniq Pay'}
 }
 
 </script></body></html>
