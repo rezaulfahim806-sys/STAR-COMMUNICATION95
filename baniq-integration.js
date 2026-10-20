@@ -63,6 +63,9 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
     const payments = Array.isArray(data.payments) ? data.payments : (data.payments = []);
     const alreadyAdded = payments.some(p => String(p.baniqOrderId || '') === String(session.orderId));
     const now = new Date().toISOString();
+    const paidAt = providerData.paidAt || providerData.paid_at || providerData.completedAt || providerData.completed_at || now;
+    const trxIdValue = providerData.trxId || providerData.trxID || providerData.trx_id || providerData.transactionId || providerData.transactionID || providerData.transaction_id || providerData.paymentReference || providerData.payment_reference || '';
+    const trxId = String(trxIdValue || '').trim();
     customer.pkg = session.selectedPackage;
     customer.fee = Number(session.packagePrice);
     customer.prevDue = 0;
@@ -93,8 +96,11 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
         status: 'paid',
         source: 'baniq',
         ref: String(providerData.reference || session.reference),
+        trxId: trxId || undefined,
         baniqOrderId: String(session.orderId),
         createdAt: now,
+        paidAt: String(paidAt),
+        verifiedAt: now,
         updatedAt: now
       });
     }
@@ -102,7 +108,8 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
     await sessions.updateOne({ orderId: session.orderId }, { $set: {
       status: 'PAID',
       verifiedAmountPaisa: Number(providerData.amount),
-      paidAt: providerData.paidAt || now,
+      paidAt: String(paidAt),
+      trxId: trxId || undefined,
       verifiedAt: now,
       updatedAt: now
     } });
