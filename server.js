@@ -108,9 +108,9 @@ app.put('/api/settings/offers',auth,async(req,res)=>{
  if(offers.some(o=>!o.text||o.text.length>500))return res.status(400).json({error:'Offer text is required and must be 500 characters or fewer'});
  const c=col('app_state');if(!c)return res.status(503).json({error:'Cloud database is not configured'});
  const owner=ownerOf(req.user),now=new Date().toISOString();
- const state=await c.findOne({owner});
- if(!state||!state.data)return res.status(404).json({error:'Company cloud data not found. Login & Sync first.'});
- await c.updateOne({owner},{$set:{'data.settings.offers':offers,updatedAt:now}});
+ // Persist offers independently so first-time cloud accounts can save them before a full sync.
+ // Target only the offers field; never replace existing customer, payment, or settings data.
+ await c.updateOne({owner},{$set:{'data.settings.offers':offers,updatedAt:now},$setOnInsert:{owner,data:{customers:[],payments:[],expenses:[],pending:[],history:[],settings:{}}}}, {upsert:true});
  return send(res,{ok:true,offers,updatedAt:now,message:'Offers saved'});
 });
 app.put('/api/settings/packages',auth,async(req,res)=>{
