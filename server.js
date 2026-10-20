@@ -317,6 +317,11 @@ app.post('/api/sync',auth,async(req,res)=>{
    return res.status(409).json({error:'Cloud data changed on another device; sync before upload',updatedAt:existing.updatedAt,data:existing.data});
  }
  if(existing&&existing.data){
+   // Offers are managed through /api/settings/offers. Preserve the canonical cloud list during normal device sync,
+   // because older/local app state may not contain offers and must never erase offers before a payment link opens.
+   if(existing.data.settings&&Array.isArray(existing.data.settings.offers)){
+     clean.settings.offers=existing.data.settings.offers;
+   }
    const backups=db.collection('app_state_backups');
    await backups.insertOne({owner,sourceUpdatedAt:existing.updatedAt||null,savedAt:now,data:existing.data});
    const oldBackups=await backups.find({owner}).sort({savedAt:-1}).skip(20).toArray();
