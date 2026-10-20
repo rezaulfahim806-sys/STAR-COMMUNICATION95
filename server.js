@@ -436,7 +436,32 @@ app.post('/api/bkash/transactions/:id/manual-paid',auth,async(req,res)=>{await u
 app.post('/api/bkash/transactions/:id/cancel',auth,async(req,res)=>{await update('bkash',req.params.id,{status:'CANCELLED'},ownerOf(req.user));send(res,{ok:true})});
 
 function sshExec({host,port,user,password,command,timeout=12000}){return new Promise((resolve,reject)=>{const c=new SSHClient();let out='',err='';const timer=setTimeout(()=>{c.end();reject(new Error('OLT SSH timeout'))},timeout);c.on('ready',()=>c.exec(command,(e,s)=>{if(e){clearTimeout(timer);c.end();return reject(e)}s.on('data',d=>out+=d.toString());s.stderr.on('data',d=>err+=d.toString());s.on('close',()=>{clearTimeout(timer);c.end();resolve({out,err})})})).on('error',e=>{clearTimeout(timer);reject(e)}).connect({host,port:Number(port||22),username:user,password,readyTimeout:timeout,hostVerifier:()=>true})})}
-function vsolSshExec({host,port,user,password,command,timeout=18000}){return new Promise((resolve,reject)=>{const c=new SSHClient();let out='',err='',stage='start',done=false;const timer=setTimeout(()=>finish(new Error('VSOL SSH timeout')),timeout);const finish=(e)=>{if(done)return;done=true;clearTimeout(timer);try{c.end()}catch{};e?reject(e):resolve({out,err})};c.on('ready',()=>c.shell({term:'vt100'},(e,stream)=>{if(e)return finish(e);const write=x=>{try{stream.write(x+'\n')}catch(err){finish(err)}};stream.on('data',d=>{out+=d.toString();const tail=out.slice(-1400);if(/(?:login|username)\s*[:>]/i.test(tail)&&stage==='start'){write(user);stage='login';return}if(/password\s*[:>]/i.test(tail)&&stage!=='password'&&stage!=='config'&&stage!=='command'){write(password);stage='password';return}if(stage==='start'&&/>\s*$/.test(tail)){write('enable');stage='enable';return}if(stage==='start'&&/#\s*$/.test(tail)){write('configure terminal');stage='config';return}if((stage==='enable'||stage==='password')&&/#\s*$/.test(tail)){write('configure terminal');stage='config';return}if(stage==='config'&&/\(config[^)]*\)#\s*$/.test(tail)){write(command);stage='command';return}if(stage==='command'&&/\n[^\r\n]{0,100}[#>]\s*$/.test(tail)){setTimeout(()=>finish(),900)}});stream.stderr?.on('data',d=>err+=d.toString());stream.on('close',()=>finish())})).on('error',e=>finish(e)).connect({host,port:Number(port||22),username:user,password,readyTimeout:timeout,hostVerifier:()=>true})})}
+function vsolSshExec({host,port,user,password,command,timeout=18000}){
+ const allowed=new Set(['show version','show onu status all','show running-config']);
+ if(!allowed.has(String(command||'').trim().toLowerCase()))return Promise.reject(new Error('Only approved read-only VSOL commands are allowed'));
+ return new Promise((resolve,reject)=>{
+  const c=new SSHClient();let out='',err='',stage='start',done=false,commandSent=false;
+  const timer=setTimeout(()=>finish(new Error('VSOL SSH timeout')),timeout);
+  const finish=(e)=>{if(done)return;done=true;clearTimeout(timer);try{c.end()}catch{};e?reject(e):resolve({out,err})};
+  c.on('ready',()=>c.shell({term:'vt100'},(e,stream)=>{
+   if(e)return finish(e);
+   const write=x=>{try{stream.write(x+'\n')}catch(error){finish(error)}};
+   stream.on('data',d=>{
+    out+=d.toString();const tail=out.slice(-1400);
+    if(stage==='start'&&/(?:login|username)\s*[:>]\s*$/i.test(tail)){write(user);stage='login';return}
+    if((stage==='start'||stage==='login'||stage==='enable')&&/password\s*[:>]\s*$/i.test(tail)){write(password);stage='password';return}
+    if(stage==='start'&&/>\s*$/.test(tail)){write('enable');stage='enable';return}
+    // A privileged # prompt is already in EXEC mode: never enter configuration mode.
+    if(!commandSent&&(stage==='start'||stage==='login'||stage==='password'||stage==='enable')&&/#\s*$/.test(tail)){
+     write(command);commandSent=true;stage='command';return;
+    }
+    if(stage==='command'&&/\n[^\r\n]{0,100}[#>]\s*$/.test(tail)){setTimeout(()=>finish(),700)}
+   });
+   stream.stderr?.on('data',d=>err+=d.toString());
+   stream.on('close',()=>finish());
+  })).on('error',e=>finish(e)).connect({host,port:Number(port||22),username:user,password,readyTimeout:timeout,hostVerifier:()=>true});
+ });
+}
 
 function telnetExec({host,port,user,password,command,timeout=12000}){return new Promise((resolve,reject)=>{const s=net.createConnection({host,port:Number(port||23)});let buf='',lastAction='';const timer=setTimeout(()=>{s.destroy();reject(new Error('OLT Telnet timeout'))},timeout);const sendOnce=(x)=>{if(lastAction===x)return;lastAction=x;s.write(x+'\n')};s.on('data',d=>{buf+=d.toString();const tail=buf.slice(-500);if(/password\s*[:>]/i.test(tail))sendOnce(password);else if(/login|username\s*[:>]/i.test(tail))sendOnce(user);else if(/[#>]\s*$/.test(tail)){sendOnce(command);setTimeout(()=>s.end(),2200)}});s.on('close',()=>{clearTimeout(timer);resolve({out:buf,err:''})});s.on('error',e=>{clearTimeout(timer);reject(e)})})}
 function parseVsolOnuRows(raw){
