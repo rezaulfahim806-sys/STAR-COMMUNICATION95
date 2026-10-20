@@ -109,8 +109,13 @@ app.put('/api/settings/offers',auth,async(req,res)=>{
  const c=col('app_state');if(!c)return res.status(503).json({error:'Cloud database is not configured'});
  const owner=ownerOf(req.user),now=new Date().toISOString();
  // Persist offers independently so first-time cloud accounts can save them before a full sync.
- // Target only the offers field; never replace existing customer, payment, or settings data.
- await c.updateOne({owner},{$set:{'data.settings.offers':offers,updatedAt:now},$setOnInsert:{owner,data:{customers:[],payments:[],expenses:[],pending:[],history:[],settings:{}}}}, {upsert:true});
+ // Create a minimal state only when none exists; otherwise update just the offers field.
+ const state=await c.findOne({owner});
+ if(!state){
+  await c.insertOne({owner,data:{customers:[],payments:[],expenses:[],pending:[],history:[],settings:{offers}},updatedAt:now});
+ }else{
+  await c.updateOne({owner},{$set:{'data.settings.offers':offers,updatedAt:now}});
+ }
  return send(res,{ok:true,offers,updatedAt:now,message:'Offers saved'});
 });
 app.put('/api/settings/packages',auth,async(req,res)=>{
