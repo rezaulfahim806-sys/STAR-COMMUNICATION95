@@ -475,6 +475,60 @@ function parseVsolOnuRows(raw){
 function parseOnuCounts(raw,vendor){const t=String(raw||'');let online=0,offline=0,total=0;const v=String(vendor||'').toLowerCase();if(v==='vsol'){const lines=t.split(/\r?\n/);for(const line of lines){if(!/EPON\d+\/\d+\s*:\s*\d+/i.test(line))continue;const m=line.match(/EPON\d+\/\d+\s*:\s*\d+\s+(online|offline)\b/i);if(m){total++;if(m[1].toLowerCase()==='online')online++;else offline++}}return {total:total||null,online:total?online:null,offline:total?offline:null}}const m=t.match(/(?:total|all|onu)\D{0,20}(\d+)\D{0,20}(?:online|up)\D{0,20}(\d+)\D{0,20}(?:offline|down)\D{0,20}(\d+)/i);if(m){total=+m[1];online=+m[2];offline=+m[3]}return {total:total||null,online:online||null,offline:offline||null}}
 function commandFor(vendor,action){const v=String(vendor||'generic').toLowerCase();if(action==='summary'){if(v==='vsol')return 'show onu status all';if(v==='huawei')return 'display ont info summary';if(v==='zte')return 'show gpon onu state';if(v==='fiberhome')return 'show onu status';return 'show onu status'}if(action==='version'){if(v==='vsol')return 'show version';if(v==='huawei')return 'display version';if(v==='zte')return 'show version';return 'show version'}if(action==='config'){if(v==='vsol')return 'show running-config';return 'show running-config'}return action}
 async function runOltCommand({host,port,user,password,protocol,vendor,command}){const isTelnet=String(protocol||'ssh').toLowerCase()==='telnet';if(isTelnet)return telnetExec({host,port:port||23,user,password,command});if(String(vendor||'').toLowerCase()==='vsol')return vsolSshExec({host,port:port||22,user,password,command});return sshExec({host,port:port||22,user,password,command})}
+
+// Read-only SNMP interface traffic. Rates are calculated from two counter samples.
+// Does not write to or configure the OLT.
+const snmp=require('net-snmp');
+const oltTrafficSamples=new Map();
+function snmpWalkTable(session,oid){
+ return new Promise((resolve,reject)=>{
+  const values=[];
+  session.subtree(oid,20,(varbinds)=>{
+   for(const vb of varbinds||[]){
+    if(snmp.isVarbindError(vb)){reject(new Error(snmp.varbindError(vb)));return}
+    values.push({oid:vb.oid,value:vb.value});
+   }
+  },err=>err?reject(err):resolve(values));
+ });
+}
+function oidIndex(oid,base){return String(oid).startsWith(base+'.')?String(oid).slice(base.length+1):null}
+app.post('/api/olt/traffic',auth,async(req,res)=>{
+ const {host,community='public'}=req.body||{};
+ if(!host)return res.status(400).json({error:'OLT IP is required'});
+ if(typeof community!=='string'||!community||community.length>128)return res.status(400).json({error:'Valid read-only SNMP community is required'});
+ let session;
+ try{
+  session=snmp.createSession(host,community,{version:snmp.Version2c,timeout:3500,retries:0,transport:'udp4'});
+  const bases={name:'1.3.6.1.2.1.31.1.1.1.1',in64:'1.3.6.1.2.1.31.1.1.1.6',out64:'1.3.6.1.2.1.31.1.1.1.10',in32:'1.3.6.1.2.1.2.2.1.10',out32:'1.3.6.1.2.1.2.2.1.16'};
+  const [names,ins64,outs64,ins32,outs32]=await Promise.all([
+   snmpWalkTable(session,bases.name),snmpWalkTable(session,bases.in64),snmpWalkTable(session,bases.out64),snmpWalkTable(session,bases.in32),snmpWalkTable(session,bases.out32)
+  ]);
+  const mapByIndex=(arr,base)=>new Map(arr.map(x=>[oidIndex(x.oid,base),x.value]));
+  const nm=mapByIndex(names,bases.name),i64=mapByIndex(ins64,bases.in64),o64=mapByIndex(outs64,bases.out64),i32=mapByIndex(ins32,bases.in32),o32=mapByIndex(outs32,bases.out32);
+  const now=Date.now(),key=String(host),prev=oltTrafficSamples.get(key)||new Map(),next=new Map();
+  const interfaces=[];
+  for(const [idx,rawName] of nm){
+   const name=Buffer.isBuffer(rawName)?rawName.toString():String(rawName);
+   const inRaw=i64.get(idx)??i32.get(idx),outRaw=o64.get(idx)??o32.get(idx);
+   if(inRaw==null||outRaw==null)continue;
+   const inbound=BigInt(inRaw.toString()),outbound=BigInt(outRaw.toString());
+   const old=prev.get(idx);let inMbps=null,outMbps=null;
+   if(old&&now>old.time&&inbound>=old.inbound&&outbound>=old.outbound){
+    const sec=(now-old.time)/1000;
+    inMbps=Number((inbound-old.inbound)*8n)/sec/1000000;
+    outMbps=Number((outbound-old.outbound)*8n)/sec/1000000;
+   }
+   next.set(idx,{inbound,outbound,time:now});
+   interfaces.push({index:idx,name,downloadMbps:inMbps,uploadMbps:outMbps,totalInBytes:inbound.toString(),totalOutBytes:outbound.toString()});
+  }
+  oltTrafficSamples.set(key,next);
+  const rates=interfaces.filter(x=>x.downloadMbps!=null&&x.uploadMbps!=null);
+  res.json({ok:true,connected:true,method:'SNMPv2c read-only IF-MIB',sampleReady:rates.length>0,updatedAt:new Date(now).toISOString(),downloadMbps:rates.reduce((a,x)=>a+x.downloadMbps,0),uploadMbps:rates.reduce((a,x)=>a+x.uploadMbps,0),interfaces});
+ }catch(e){
+  res.status(502).json({error:'SNMP traffic read failed. Check SNMP reachability/community and server network access. '+(e.message||e)});
+ }finally{try{session?.close()}catch{}}
+});
+
 app.post('/api/olt/test',auth,async(req,res)=>{const {host,port,protocol,user,password,vendor}=req.body||{};if(!host||!user||!password)return res.status(400).json({error:'OLT IP, username and password are required'});try{const cmd=commandFor(vendor,'version');const r=await runOltCommand({host,port,user,password,protocol,vendor,command:cmd});send(res,{ok:true,connected:true,protocol:protocol||'ssh',vendor:vendor||'generic',output:r.out.slice(-8000)})}catch(e){res.status(502).json({error:'OLT connection failed: '+e.message})}});
 app.post('/api/olt/monitor',auth,async(req,res)=>{const {host,port,protocol,user,password,vendor}=req.body||{};if(!host||!user||!password)return res.status(400).json({error:'OLT IP, username and password are required'});try{const cmd=commandFor(vendor,'summary');const r=await runOltCommand({host,port,user,password,protocol,vendor,command:cmd});const counts=parseOnuCounts(r.out,vendor);send(res,{ok:true,connected:true,vendor:vendor||'generic',raw:r.out.slice(-15000),...counts,parser:'heuristic'})}catch(e){res.status(502).json({error:'OLT monitor failed: '+e.message})}});
 app.post('/api/olt/onu-list',auth,async(req,res)=>{const {host,port,protocol,user,password,vendor}=req.body||{};if(!host||!user||!password)return res.status(400).json({error:'OLT IP, username and password are required'});if(String(vendor||'').toLowerCase()!=='vsol')return res.status(400).json({error:'Live ONU list is currently implemented for VSOL EPON'});try{const r=await runOltCommand({host,port, user,password,protocol,vendor,command:'show onu status all'});const rows=parseVsolOnuRows(r.out);const counts=parseOnuCounts(r.out,'vsol');send(res,{ok:true,connected:true,vendor:'vsol',rows,...counts,raw:r.out.slice(-20000)})}catch(e){res.status(502).json({error:'VSOL ONU list failed: '+e.message})}});
