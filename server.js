@@ -91,6 +91,28 @@ app.get('/api/public/packages',async(req,res)=>{
   return send(res,{ok:true,companyName:settings.cloud&&settings.cloud.companyName||'',packages:visiblePackages,allowPackageChoice,currentPackage,merchantNumber:String(settings.merchantNumber||''),offers});
  }catch(e){return res.status(500).json({error:'Could not load company packages'})}
 });
+// Dedicated owner-only offer storage: do not rely on a full-device sync to keep offers.
+app.get('/api/settings/offers',auth,async(req,res)=>{
+ if(!isOwner(req.user))return res.status(403).json({error:'Company owner access required'});
+ const c=col('app_state');if(!c)return res.status(503).json({error:'Cloud database is not configured'});
+ const state=await c.findOne({owner:ownerOf(req.user)});
+ const settings=state&&state.data&&state.data.settings||{};
+ const offers=Array.isArray(settings.offers)?settings.offers:[];
+ return send(res,{ok:true,offers,updatedAt:state&&state.updatedAt||null});
+});
+app.put('/api/settings/offers',auth,async(req,res)=>{
+ if(!isOwner(req.user))return res.status(403).json({error:'Company owner access required'});
+ const raw=req.body&&req.body.offers;
+ if(!Array.isArray(raw))return res.status(400).json({error:'An offer list is required'});
+ const offers=raw.map((o,i)=>({id:String(o&&o.id||('offer-'+Date.now()+'-'+i)),text:String(o&&o.text||'').trim(),enabled:o&&o.enabled===true,createdAt:String(o&&o.createdAt||new Date().toISOString()),updatedAt:new Date().toISOString()}));
+ if(offers.some(o=>!o.text||o.text.length>500))return res.status(400).json({error:'Offer text is required and must be 500 characters or fewer'});
+ const c=col('app_state');if(!c)return res.status(503).json({error:'Cloud database is not configured'});
+ const owner=ownerOf(req.user),now=new Date().toISOString();
+ const state=await c.findOne({owner});
+ if(!state||!state.data)return res.status(404).json({error:'Company cloud data not found. Login & Sync first.'});
+ await c.updateOne({owner},{$set:{'data.settings.offers':offers,updatedAt:now}});
+ return send(res,{ok:true,offers,updatedAt:now,message:'Offers saved'});
+});
 app.put('/api/settings/packages',auth,async(req,res)=>{
  if(!isOwner(req.user))return res.status(403).json({error:'Company owner access required'});
  const raw=req.body&&req.body.packages;
