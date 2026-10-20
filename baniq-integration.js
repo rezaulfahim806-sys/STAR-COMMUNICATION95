@@ -6,6 +6,12 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
   const API_SECRET = process.env.BANIQ_SECRET || '';
   const WEBHOOK_SECRET = process.env.BANIQ_WEBHOOK_SECRET || '';
 
+  // Keep permission parsing local to this module; Node modules do not share server.js scope.
+  function packageChoiceEnabled(customer) {
+    const enabled = value => value === true || ['true', '1', 'yes', 'on', 'enabled'].includes(String(value ?? '').trim().toLowerCase());
+    return !!customer && (enabled(customer.allowPackageChoice) || enabled(customer.allowPackageChange));
+  }
+
   function requireConfig() {
     if (!KEY_ID || !API_SECRET) throw new Error('Baniq API credentials are not configured in Render Environment Variables');
   }
