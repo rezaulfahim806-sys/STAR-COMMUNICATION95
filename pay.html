@@ -24,7 +24,7 @@ const orderId=(q.get('paymentID')||q.get('orderId')||q.get('oid')||'').trim();
 let packages=[];
 let allowPackageChoice=false;
 let currentPackageFromServer=null;
-let referralOffer={enabled:true,text:'৩ জন নতুন গ্রাহক সংযোগ করালে ১ মাসের বিল ফ্রি!'};
+let offers=[];
 let packageLoadError='';
 let fallbackPackages=[];
 try {
@@ -59,7 +59,7 @@ if(apiBase&&company){
   const data=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(data.error||'Could not load the latest company packages');
   allowPackageChoice=data.allowPackageChoice===true; // Use the saved customer permission from the live company record.
-  if(data.referralOffer&&typeof data.referralOffer==='object')referralOffer={enabled:data.referralOffer.enabled!==false,text:String(data.referralOffer.text||'৩ জন নতুন গ্রাহক সংযোগ করালে ১ মাসের বিল ফ্রি!')};
+  offers=Array.isArray(data.offers)?data.offers.filter(o=>o&&o.enabled===true&&String(o.text||'').trim()):[];
   currentPackageFromServer=data.currentPackage&&String(data.currentPackage.speed||'').trim()?{speed:String(data.currentPackage.speed).trim(),price:Number(data.currentPackage.price||0)}:null;
 if(data.currentPackage&&Number.isFinite(Number(data.currentPackage.previousDue)))c.previousDue=Math.max(0,Number(data.currentPackage.previousDue));
   if(!allowPackageChoice&&currentPackageFromServer){
@@ -91,7 +91,7 @@ else if(packageLoadError){app.innerHTML='<section class="card"><div class="error
 else{
 const selected=findPackage();
 app.innerHTML=`
-${referralOffer.enabled?'<section class="card" style="background:linear-gradient(135deg,#fff7d6,#fff0b3);border:1px solid #f2d36b"><h2 class="heading">🎁 গ্রাহক রেফারেল অফার</h2><div class="hint" style="font-size:15px;color:#6b4b00;font-weight:700">'+esc(referralOffer.text)+'</div></section>':''}
+${offers.map(o=>'<section class="card" style="background:linear-gradient(135deg,#fff7d6,#fff0b3);border:1px solid #f2d36b"><h2 class="heading">🎁 বিশেষ অফার</h2><div class="hint" style="font-size:15px;color:#6b4b00;font-weight:700">'+esc(o.text)+'</div></section>').join('')}
 <section class="card"><h2 class="heading">📄 Bill Details</h2><div class="rows">
 <div class="row"><span class="label">Client Code</span><span class="value">${esc(clientCode)}</span></div>
 <div class="row"><span class="label">Customer Name</span><span class="value">${esc(c.name)}</span></div>
