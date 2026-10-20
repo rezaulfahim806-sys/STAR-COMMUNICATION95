@@ -20,7 +20,7 @@ function isOwner(u){return String(u&&u.role||'')==='owner'}
 function isSystemAdmin(u){return !!u&&String(u.username||'')===String(ADMIN_USER)&&String(u.role||'')==='owner'}
 function publicAccount(a){return {username:a.username,role:a.role,owner:a.owner,active:a.active!==false}}
 function flagEnabled(value){return value===true||['true','1','yes','on','enabled'].includes(String(value??'').trim().toLowerCase())}
-function packageChoiceEnabled(customer){return !!customer&&(customer.allowPackageChoice===true||customer.allowPackageChange===true)}
+function packageChoiceEnabled(customer){return !!customer&&(flagEnabled(customer.allowPackageChoice)||flagEnabled(customer.allowPackageChange))}
 
 let db=null;
 async function initDb(){
