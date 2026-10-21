@@ -567,6 +567,74 @@ function oltFailureReason(err,host,port,protocol){
 app.post('/api/olt/test',auth,async(req,res)=>{const {host,port,protocol,user,password,vendor}=req.body||{};if(!host||!user||!password)return res.status(400).json({error:'OLT IP, username and password are required'});try{const cmd=commandFor(vendor,'version');const r=await runOltCommand({host,port,user,password,protocol,vendor,command:cmd});send(res,{ok:true,connected:true,protocol:protocol||'ssh',vendor:vendor||'generic',output:r.out.slice(-8000)})}catch(e){res.status(502).json({ok:false,connected:false,reasonCode:/timeout|ETIMEDOUT/i.test(String(e.message))?'TIMEOUT':/ECONNREFUSED/i.test(String(e.message))?'PORT_CLOSED':/authentication|password|denied/i.test(String(e.message))?'AUTH_FAILED':'UNREACHABLE',error:'OLT connection failed: '+oltFailureReason(e,host,port,protocol)})}});
 app.post('/api/olt/monitor',auth,async(req,res)=>{const {host,port,protocol,user,password,vendor}=req.body||{};if(!host||!user||!password)return res.status(400).json({error:'OLT IP, username and password are required'});try{const cmd=commandFor(vendor,'summary');const r=await runOltCommand({host,port,user,password,protocol,vendor,command:cmd});const counts=parseOnuCounts(r.out,vendor);send(res,{ok:true,connected:true,vendor:vendor||'generic',raw:r.out.slice(-15000),...counts,parser:'heuristic'})}catch(e){res.status(502).json({ok:false,connected:false,reasonCode:/timeout|ETIMEDOUT/i.test(String(e.message))?'TIMEOUT':/ECONNREFUSED/i.test(String(e.message))?'PORT_CLOSED':/authentication|password|denied/i.test(String(e.message))?'AUTH_FAILED':'UNREACHABLE',error:'OLT monitor failed: '+oltFailureReason(e,host,port,protocol)})}});
 app.post('/api/olt/onu-list',auth,async(req,res)=>{const {host,port,protocol,user,password,vendor}=req.body||{};if(!host||!user||!password)return res.status(400).json({error:'OLT IP, username and password are required'});if(String(vendor||'').toLowerCase()!=='vsol')return res.status(400).json({error:'Live ONU list is currently implemented for VSOL EPON'});try{const r=await runOltCommand({host,port, user,password,protocol,vendor,command:'show onu status all'});const rows=parseVsolOnuRows(r.out);const counts=parseOnuCounts(r.out,'vsol');send(res,{ok:true,connected:true,vendor:'vsol',rows,...counts,raw:r.out.slice(-20000)})}catch(e){res.status(502).json({ok:false,connected:false,reasonCode:/timeout|ETIMEDOUT/i.test(String(e.message))?'TIMEOUT':/ECONNREFUSED/i.test(String(e.message))?'PORT_CLOSED':/authentication|password|denied/i.test(String(e.message))?'AUTH_FAILED':'UNREACHABLE',error:'VSOL ONU list failed: '+oltFailureReason(e,host,port,protocol)})}});
+
+// MikroTik PPPoE discovery: credentials are supplied per request and never stored by this API.
+// RouterOS REST must be reachable over HTTPS from this backend; restrict router access by firewall/VPN.
+function parseMikrotikComment(raw){
+ const out={}; String(raw||'').split(/[;|\n,]+/).forEach(part=>{
+  const i=part.indexOf('='); if(i<1)return;
+  const k=part.slice(0,i).trim().toLowerCase(),v=part.slice(i+1).trim();
+  const map={name:'name',customer:'name',phone:'phone',mobile:'phone',address:'address',package:'pkg',pkg:'pkg',profile:'pkg',fee:'fee',bill:'fee',clientcode:'clientCode'};
+  if(map[k]&&v)out[map[k]]=map[k]==='fee'?Number(v)||0:v;
+ }); return out;
+}
+async function mikrotikRequest(cfg,path,method='GET',body){
+ const raw=String(cfg&&cfg.host||'').trim();
+ let url; try{url=new URL(/^https:\/\//i.test(raw)?raw:'https://'+raw)}catch(e){throw new Error('সঠিক MikroTik HTTPS address দিন')}
+ if(url.protocol!=='https:')throw new Error('নিরাপত্তার জন্য MikroTik REST-এ HTTPS ব্যবহার করুন');
+ if(url.username||url.password||url.search||url.hash)throw new Error('MikroTik address-এ username/password বা extra URL দেবেন না');
+ if(!cfg.username||!cfg.password)throw new Error('MikroTik username ও password দিন');
+ url.pathname=(url.pathname.replace(/\/$/,'')||'')+'/rest/'+path.replace(/^\/+/,'');
+ const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),10000);
+ try{
+  const response=await fetch(url,{method,headers:{authorization:'Basic '+Buffer.from(String(cfg.username)+':'+String(cfg.password)).toString('base64'),'accept':'application/json','content-type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:controller.signal});
+  const txt=await response.text();
+  if(!response.ok)throw new Error('MikroTik REST HTTP '+response.status+'; API permission বা HTTPS port পরীক্ষা করুন');
+  try{return txt?JSON.parse(txt):{}}catch(e){return txt}
+ }catch(e){if(e.name==='AbortError')throw new Error('MikroTik connection timeout');throw e}finally{clearTimeout(timeout)}
+}
+function validateMikrotikCfg(body){return {host:String(body&&body.host||''),username:String(body&&body.username||''),password:String(body&&body.password||'')}}
+app.post('/api/mikrotik/test',auth,async(req,res)=>{
+ if(!isOwner(req.user))return res.status(403).json({error:'Company owner access required'});
+ try{const cfg=validateMikrotikCfg(req.body);const identity=await mikrotikRequest(cfg,'system/identity');return send(res,{ok:true,connected:true,identity:Array.isArray(identity)?identity[0]:identity})}
+ catch(e){return res.status(502).json({ok:false,connected:false,error:e.message||'MikroTik connection failed'})}
+});
+app.post('/api/mikrotik/pppoe/pending',auth,async(req,res)=>{
+ if(!isOwner(req.user))return res.status(403).json({error:'Company owner access required'});
+ try{
+  const cfg=validateMikrotikCfg(req.body),secrets=await mikrotikRequest(cfg,'ppp/secret');
+  if(!Array.isArray(secrets))return res.status(502).json({error:'Unexpected MikroTik PPP secret response'});
+  const c=col('app_state');if(!c)return res.status(503).json({error:'Cloud database is not configured'});
+  const state=await c.findOne({owner:ownerOf(req.user)}),customers=state&&state.data&&Array.isArray(state.data.customers)?state.data.customers:[];
+  const known=new Set(customers.map(x=>String(x.pppoe||'').trim().toLowerCase()).filter(Boolean));
+  const pending=secrets.filter(x=>String(x.name||'').trim()&&!known.has(String(x.name).trim().toLowerCase())).map(x=>({
+   username:String(x.name||''),profile:String(x.profile||''),service:String(x.service||''),disabled:String(x.disabled||'false')==='true',
+   comment:String(x.comment||''),...parseMikrotikComment(x.comment),lastLoggedOut:String(x['last-logged-out']||'')
+  }));
+  return send(res,{ok:true,count:pending.length,pending});
+ }catch(e){return res.status(502).json({error:e.message||'Could not read PPPoE users'})}
+});
+app.post('/api/mikrotik/pppoe/approve',auth,async(req,res)=>{
+ if(!isOwner(req.user))return res.status(403).json({error:'Company owner access required'});
+ const b=req.body||{},username=String(b.username||'').trim();
+ if(!username)return res.status(400).json({error:'PPPoE username is required'});
+ const c=col('app_state');if(!c)return res.status(503).json({error:'Cloud database is not configured'});
+ try{
+  const cfg=validateMikrotikCfg(b),secrets=await mikrotikRequest(cfg,'ppp/secret');
+  if(!Array.isArray(secrets)||!secrets.some(x=>String(x.name||'').trim()===username))return res.status(404).json({error:'PPPoE user no longer exists on MikroTik'});
+  const owner=ownerOf(req.user),state=await c.findOne({owner}),data=state&&state.data||{};
+  const customers=Array.isArray(data.customers)?data.customers:[];
+  if(customers.some(x=>String(x.pppoe||'').trim().toLowerCase()===username.toLowerCase()))return res.status(409).json({error:'This PPPoE username is already a customer'});
+  const comment=String(secrets.find(x=>String(x.name||'').trim()===username).comment||''),fromComment=parseMikrotikComment(comment);
+  const name=String(b.name||fromComment.name||'').trim(),phone=String(b.phone||fromComment.phone||'').trim();
+  if(!name||!phone)return res.status(400).json({error:'Approve করার আগে customer name ও phone পূরণ করুন'});
+  const customer={id:Date.now().toString(),name,phone,address:String(b.address||fromComment.address||'').trim(),pkg:String(b.pkg||fromComment.pkg||secrets.find(x=>x.name===username).profile||'').trim(),fee:Number(b.fee??fromComment.fee??0),pppoe:username,pppoePassword:'',onu:'',connectionDate:String(b.connectionDate||new Date().toISOString().slice(0,10)),expiry:String(b.expiry||''),prevDue:0,status:'active',createdAt:new Date().toISOString().slice(0,10),updatedAt:new Date().toISOString(),mikrotikComment:comment,approvalSource:'mikrotik'};
+  customers.push(customer);data.customers=customers;
+  await c.updateOne({owner},{$set:{data,updatedAt:new Date().toISOString()}},{upsert:true});
+  return send(res,{ok:true,customer,message:'PPPoE user approved and added to Active Customers'});
+ }catch(e){return res.status(502).json({error:e.message||'Could not approve PPPoE user'})}
+});
+
 app.use(express.static(require('path').join(__dirname,'app','src','main','assets')));
 
 function readApiPath(obj,path){
