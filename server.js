@@ -728,6 +728,20 @@ app.post('/api/integrations/sms/send',auth,async(req,res)=>{
   send(res,{ok:true,message:'SMS request accepted by provider',providerResponse:d});
  }catch(e){res.status(502).json({error:'SMS API failed: '+String(e.message||'Request failed').slice(0,180)})}
 });
+app.post('/api/integrations/sms/balance',auth,async(req,res)=>{
+ try{
+  const settings=await integrationSettings(ownerOf(req.user)),cfg=settings.smsApi||{};
+  if(!cfg.balanceUrl)return res.status(400).json({error:'Add the SMS Balance API URL in Settings first'});
+  if(!cfg.apiKey)return res.status(400).json({error:'SMS API key/token is missing in Settings'});
+  const result=await callConfiguredApi({url:cfg.balanceUrl,method:cfg.balanceMethod||cfg.method,apiKey:cfg.apiKey,apiKeyField:cfg.apiKeyField,senderId:cfg.senderId},{});
+  const d=result.data||{};
+  if(d.success===false||d.ok===false||String(d.status||'').toLowerCase()==='error')return res.status(502).json({error:String(d.message||d.error||'SMS provider reported failure').slice(0,180)});
+  const nested=d.data&&typeof d.data==='object'?d.data:{};
+  const candidates=[d.balance,d.sms_balance,d.smsBalance,d.remaining,d.credits,d.available,nested.balance,nested.sms_balance,nested.smsBalance,nested.remaining,nested.credits,nested.available];
+  const balance=candidates.find(v=>v!==undefined&&v!==null&&String(v).trim()!=='');
+  send(res,{ok:true,balance:balance===undefined?null:String(balance),providerResponse:d,message:balance===undefined?'Balance endpoint responded, but balance field was not recognized. Check provider response format.':'SMS balance loaded'});
+ }catch(e){res.status(502).json({error:'SMS balance check failed: '+String(e.message||'Request failed').slice(0,180)})}
+});
 app.post('/api/billing/verify-payment',auth,async(req,res)=>{
  try{
   const transactionId=String(req.body&&req.body.transactionId||'').trim();
