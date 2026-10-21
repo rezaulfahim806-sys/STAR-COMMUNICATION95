@@ -1,9 +1,7 @@
 const crypto = require('crypto');
 
-module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, PAYMENT_PAGE_URL, integrationSettings, callConfiguredApi }) {
+module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, PAYMENT_PAGE_URL, integrationSettings, callConfiguredApi, getBaniqCredentials }) {
   const API_BASE = (process.env.BANIQ_API_BASE || 'https://api.baniq.app').replace(/\/$/, '');
-  const KEY_ID = process.env.BANIQ_KEY_ID || '';
-  const API_SECRET = process.env.BANIQ_SECRET || '';
   const WEBHOOK_SECRET = process.env.BANIQ_WEBHOOK_SECRET || '';
 
   // Keep permission parsing local to this module; Node modules do not share server.js scope.
@@ -12,18 +10,17 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
     return !!customer && (enabled(customer.allowPackageChoice) || enabled(customer.allowPackageChange));
   }
 
-  function requireConfig() {
-    if (!KEY_ID || !API_SECRET) throw new Error('Baniq API credentials are not configured in Render Environment Variables');
-  }
-  async function baniqFetch(path, options = {}) {
-    requireConfig();
+  async function baniqFetch(owner, path, options = {}) {
+    if (typeof getBaniqCredentials !== 'function') throw new Error('Company-specific Baniq settings are unavailable');
+    const credentials = await getBaniqCredentials(owner);
+    if (!credentials.keyId || !credentials.secret) throw new Error('This company must configure its own Baniq API Key ID and Secret in Settings');
     const response = await fetch(API_BASE + path, {
       ...options,
       headers: {
         accept: 'application/json',
         'content-type': 'application/json',
-        'x-api-key-id': KEY_ID,
-        'x-api-secret': API_SECRET,
+        'x-api-key-id': credentials.keyId,
+        'x-api-secret': credentials.secret,
         ...(options.headers || {})
       }
     });
@@ -38,8 +35,8 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
     if (reference) return c.findOne({ reference: String(reference) });
     return null;
   }
-  async function verifyOrder(orderId, expectedAmount) {
-    const data = await baniqFetch('/api/v1/orders/' + encodeURIComponent(orderId), { method: 'GET' });
+  async function verifyOrder(orderId, expectedAmount, owner) {
+    const data = await baniqFetch(owner, '/api/v1/orders/' + encodeURIComponent(orderId), { method: 'GET' });
     if (data.paid !== true || String(data.status || '').toLowerCase() !== 'paid') {
       return { verified: false, providerStatus: String(data.status || 'unknown') };
     }
@@ -212,7 +209,7 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
       const reference = ('SC-' + clientCode.replace(/\s+/g, '-') + '-' + Date.now()).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80);
       const amountPaisa = Math.round(amountTaka * 100);
       const callback = PUBLIC_URL + '/api/baniq/callback?reference=' + encodeURIComponent(reference);
-      const created = await baniqFetch('/api/v1/orders', {
+      const created = await baniqFetch(owner, '/api/v1/orders', {
         method: 'POST',
         body: JSON.stringify({
           amount: amountPaisa,
@@ -250,7 +247,7 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
         await markPaid(session, { amount: Number(session.verifiedAmountPaisa || session.amountPaisa), reference: session.reference, paidAt: session.paidAt });
         const state = await col('app_state').findOne({ owner: session.owner }); const customers = Array.isArray(state?.data?.customers) ? state.data.customers : []; const customer = customers.find(x => String(x.id) === String(session.customerCode)) || customers.find(x => String(x.clientCode || '').toLowerCase() === String(session.clientCode || '').toLowerCase()); return res.json({ ok: true, verified: true, status: 'PAID', customerCode: customer?.id || session.customerCode, clientCode: String(customer?.clientCode || session.clientCode || ''), customerName: customer?.name || session.customerName || '', orderId });
       }
-      const verification = await verifyOrder(orderId, session.amountPaisa);
+      const verification = await verifyOrder(orderId, session.amountPaisa, session.owner);
       if (!verification.verified) return res.json({ ok: true, verified: false, status: verification.providerStatus, customerCode: session.customerCode, orderId });
       const paid = await markPaid(session, verification.data);
       return res.json({ ok: true, verified: true, status: paid.status, customerCode: session.customerCode, clientCode: String(paid.clientCode || session.clientCode || ''), customerName: session.customerName || '', orderId });
@@ -271,7 +268,7 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
     try {
       const session = await findSession({ orderId: orderIdFromQuery, reference });
       if (!session) return page('failed');
-      const result = await verifyOrder(session.orderId, session.amountPaisa);
+      const result = await verifyOrder(session.orderId, session.amountPaisa, session.owner);
       if (!result.verified) return page('pending', session.orderId);
       await markPaid(session, result.data);
       return page('success', session.orderId);
