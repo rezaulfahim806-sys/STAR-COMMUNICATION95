@@ -188,6 +188,24 @@ app.post('/api/auth/register',async(req,res)=>{
  }catch(e){res.status(500).json({error:'Registration service error'})}
 });
 
+// System-admin controls for every company account.
+app.get('/api/admin/companies',auth,async(req,res)=>{
+ if(!isSystemAdmin(req.user))return res.status(403).json({error:'System administrator access required'});
+ const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
+ const accounts=await ac.find({$or:[{role:'owner'},{approvalStatus:{$exists:true}}]}).sort({createdAt:-1}).project({passwordHash:0}).toArray();
+ send(res,{ok:true,companies:accounts.filter(a=>String(a.username||'')!==String(ADMIN_USER)).map(a=>({username:a.username,email:a.email||a.username,companyName:a.companyName||'',role:a.role||'owner',status:a.accountStatus==='disabled'?'disabled':(a.approvalStatus||((a.active===false)?'disabled':'approved')),active:a.active!==false&&a.accountStatus!=='disabled',disabledMessage:a.disabledMessage||'',createdAt:a.createdAt||''}))});
+});
+app.post('/api/admin/companies/:username/status',auth,async(req,res)=>{
+ if(!isSystemAdmin(req.user))return res.status(403).json({error:'System administrator access required'});
+ const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
+ const u=String(req.params.username||'').trim().toLowerCase(), enabled=req.body&&req.body.enabled===true, message=String(req.body&&req.body.message||'').trim().slice(0,500);
+ if(!u||u===String(ADMIN_USER).toLowerCase())return res.status(400).json({error:'Cannot change system administrator account'});
+ const account=await ac.findOne({username:u});if(!account||account.role==='worker')return res.status(404).json({error:'Company account not found'});
+ const fields=enabled?{accountStatus:'enabled',active:true,disabledMessage:'',updatedAt:new Date().toISOString()}:{accountStatus:'disabled',active:false,disabledMessage:message||'আপনার কোম্পানির অ্যাকাউন্ট প্রশাসক সাময়িকভাবে বন্ধ রেখেছেন। অনুগ্রহ করে STAR COMMUNICATION Admin-এর সঙ্গে যোগাযোগ করুন।',updatedAt:new Date().toISOString()};
+ await ac.updateOne({username:u},{$set:fields});
+ send(res,{ok:true,username:u,enabled,message:enabled?'Company account enabled':'Company account disabled',disabledMessage:fields.disabledMessage||''});
+});
+
 // System-admin approval queue for newly registered ISP/company accounts.
 app.get('/api/admin/registrations',auth,async(req,res)=>{
  if(!isSystemAdmin(req.user))return res.status(403).json({error:'System administrator access required'});
@@ -233,8 +251,9 @@ app.post('/api/auth/login',async(req,res)=>{
   let account=null;
   const ac=col(ACCOUNT_COLLECTION);  if(ac)account=await ac.findOne({username:u});  if(account){
    if(!bcrypt.compareSync(p,account.passwordHash))return res.status(401).json({error:'Invalid username or password'});
+   if(account.accountStatus==='disabled')return res.status(403).json({error:String(account.disabledMessage||'এই কোম্পানির অ্যাকাউন্ট প্রশাসক সাময়িকভাবে বন্ধ রেখেছেন। অনুগ্রহ করে STAR COMMUNICATION Admin-এর সঙ্গে যোগাযোগ করুন।').slice(0,500)});
    if(account.approvalStatus==='pending'||account.active===false)return res.status(403).json({error:'Your registration is pending administrator approval'});
-   if(account.approvalStatus==='rejected')return res.status(403).json({error:'Your registration was not approved. Contact the administrator'});
+   if(account.approvalStatus==='rejected')return res.status(403).json({error:String(account.disabledMessage||'Your registration was not approved. Contact the administrator').slice(0,500)});
    const claims={username:account.username,role:account.role||'worker',owner:account.owner||account.username,permissions:Array.isArray(account.permissions)?account.permissions:(account.role==='worker'?['dashboard','customers','billing']:['dashboard','customers','billing','accounts','reports','sms'])};
    const token=jwt.sign(claims,JWT_SECRET,{expiresIn:'30d'});
    return send(res,{token,expiresIn:30*24*60*60,role:claims.role,owner:claims.owner,username:claims.username,permissions:claims.permissions});
