@@ -607,6 +607,23 @@ app.post('/api/mikrotik/pppoe/active-list',auth,async(req,res)=>{
   return send(res,{ok:true,count:active.length,active:active.map(x=>({name:String(x.name||''),uptime:String(x.uptime||''),address:String(x.address||''),'caller-id':String(x['caller-id']||'')}))});
  }catch(e){return res.status(502).json({ok:false,error:e.message||'Could not read active PPPoE sessions'})}
 });
+app.post('/api/mikrotik/pppoe/traffic',auth,async(req,res)=>{
+ if(!isOwner(req.user))return res.status(403).json({error:'Company owner access required'});
+ try{
+  const cfg=validateMikrotikCfg(req.body),username=String(req.body&&req.body.pppoe||'').trim();
+  if(!username)return res.status(400).json({error:'Customer PPPoE username is required'});
+  const active=await mikrotikRequest(cfg,'ppp/active');
+  if(!Array.isArray(active))return res.status(502).json({error:'Unexpected MikroTik PPP active response'});
+  const session=active.find(x=>String(x.name||'').trim().toLowerCase()===username.toLowerCase())||null;
+  if(!session)return send(res,{ok:true,online:false,username,uptime:'',address:'',callerId:'',rxBps:0,txBps:0});
+  const iface=String(session.interface||('pppoe-'+username));
+  let traffic=null,trafficError='';
+  try{traffic=await mikrotikRequest(cfg,'interface/monitor-traffic','POST',{interface:iface,once:''})}catch(e){trafficError=e.message||'Traffic monitor unavailable'}
+  const row=Array.isArray(traffic)?traffic[0]:(traffic&&typeof traffic==='object'?traffic:null);
+  const num=v=>{const n=Number(String(v??'0').replace(/[^0-9.-]/g,''));return Number.isFinite(n)?n:0};
+  return send(res,{ok:true,online:true,username:String(session.name||username),uptime:String(session.uptime||''),address:String(session.address||''),callerId:String(session['caller-id']||''),interface:iface,rxBps:num(row&&row['rx-bits-per-second']),txBps:num(row&&row['tx-bits-per-second']),trafficAvailable:!!row,trafficError});
+ }catch(e){return res.status(502).json({ok:false,error:e.message||'Could not read live PPPoE status'})}
+});
 app.post('/api/mikrotik/pppoe/active',auth,async(req,res)=>{
  if(!isOwner(req.user))return res.status(403).json({error:'Company owner access required'});
  try{
