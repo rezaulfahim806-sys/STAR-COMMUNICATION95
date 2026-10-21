@@ -140,7 +140,7 @@ app.get('/api/subpanels',auth,async(req,res)=>{
  const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
  try{
   const rows=await ac.find({owner:ownerOf(req.user),role:'worker'}).sort({createdAt:1}).project({passwordHash:0}).toArray();
-  return send(res,{ok:true,accounts:rows.map(a=>({username:a.username,role:a.role,active:a.active!==false,createdAt:a.createdAt||''}))});
+  return send(res,{ok:true,accounts:rows.map(a=>({username:a.username,role:a.role,active:a.active!==false,permissions:Array.isArray(a.permissions)?a.permissions:['dashboard','customers','billing'],createdAt:a.createdAt||''}))});
  }catch(e){return res.status(500).json({error:'Could not load sub-panel accounts'})}
 });
 app.post('/api/subpanels',auth,async(req,res)=>{
@@ -153,8 +153,10 @@ app.post('/api/subpanels',auth,async(req,res)=>{
  try{
   if(await ac.findOne({username}))return res.status(409).json({error:'This Gmail is already registered'});
   const owner=ownerOf(req.user);
-  await ac.insertOne({username,email:username,passwordHash:bcrypt.hashSync(password,12),role:'worker',owner,active:true,approvalStatus:'approved',createdAt:new Date().toISOString()});
-  return send(res,{ok:true,account:{username,role:'worker',active:true},message:'Sub-panel account created'});
+  const allowed=['dashboard','customers','billing','accounts','reports','sms'];
+  const permissions=Array.isArray(req.body&&req.body.permissions)?[...new Set(req.body.permissions.map(String).filter(x=>allowed.includes(x)))]:['dashboard','customers','billing'];
+  await ac.insertOne({username,email:username,passwordHash:bcrypt.hashSync(password,12),role:'worker',owner,permissions,active:true,approvalStatus:'approved',createdAt:new Date().toISOString()});
+  return send(res,{ok:true,account:{username,role:'worker',active:true,permissions},message:'Sub-panel account created'});
  }catch(e){return res.status(500).json({error:'Could not create sub-panel account'})}
 });
 app.delete('/api/subpanels/:username',auth,async(req,res)=>{
@@ -229,9 +231,9 @@ app.post('/api/auth/login',async(req,res)=>{
    if(!bcrypt.compareSync(p,account.passwordHash))return res.status(401).json({error:'Invalid username or password'});
    if(account.approvalStatus==='pending'||account.active===false)return res.status(403).json({error:'Your registration is pending administrator approval'});
    if(account.approvalStatus==='rejected')return res.status(403).json({error:'Your registration was not approved. Contact the administrator'});
-   const claims={username:account.username,role:account.role||'worker',owner:account.owner||account.username};
+   const claims={username:account.username,role:account.role||'worker',owner:account.owner||account.username,permissions:Array.isArray(account.permissions)?account.permissions:(account.role==='worker'?['dashboard','customers','billing']:['dashboard','customers','billing','accounts','reports','sms'])};
    const token=jwt.sign(claims,JWT_SECRET,{expiresIn:'30d'});
-   return send(res,{token,expiresIn:30*24*60*60,role:claims.role,owner:claims.owner,username:claims.username});
+   return send(res,{token,expiresIn:30*24*60*60,role:claims.role,owner:claims.owner,username:claims.username,permissions:claims.permissions});
   }
   if(u!==ADMIN_USER||!ADMIN_HASH||!bcrypt.compareSync(p,ADMIN_HASH))return res.status(401).json({error:'Invalid username or password'});
   const token=jwt.sign({username:u,role:'owner',owner:u},JWT_SECRET,{expiresIn:'30d'});
