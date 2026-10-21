@@ -545,7 +545,7 @@ app.post('/api/olt/system',auth,async(req,res)=>{
    walk('1.3.6.1.2.1.2.2.1.8').catch(()=>[]),
    walk('1.3.6.1.2.1.2.2.1.5').catch(()=>[])
   ]);
-  const idx=(x,base)=>oidIndex(x.oid,base), names=new Map(ifNames.map(x=>[idx(x,'1.3.6.1.2.1.31.1.1.1.1'),Buffer.isBuffer(x.value)?x.value.toString():String(x.value)]), statuses=new Map(ifStatuses.map(x=>[idx(x,'1.3.6.1.2.1.2.2.1.8'),Number(x.value)])), speeds=new Map(ifSpeeds.map(x=>[idx(x,'1.3.6.1.2.1.2.2.1.5'),Number(x.value)]));
+  const idx=(x,base)=>oidIndex(x.oid,base), names=new Map(ifNames.map(x=>[idx(x,'1.3.6.1.2.1.31.1.1.1.1'),Buffer.isBuffer(x.value)?x.value.toString():String(x.value)])), statuses=new Map(ifStatuses.map(x=>[idx(x,'1.3.6.1.2.1.2.2.1.8'),Number(x.value)])), speeds=new Map(ifSpeeds.map(x=>[idx(x,'1.3.6.1.2.1.2.2.1.5'),Number(x.value)]));
   const interfaces=[...names].map(([index,name])=>({index,name,linkStatus:({1:'UP',2:'DOWN',3:'TESTING',4:'UNKNOWN',5:'DORMANT',6:'NOT_PRESENT',7:'LOWER_LAYER_DOWN'})[statuses.get(index)]||'UNKNOWN',ifOperStatus:statuses.get(index)??null,speedMbps:speeds.has(index)?speeds.get(index)/1000000:null}));
   res.json({ok:true,connected:true,method:'SNMPv2c read-only IF-MIB',systemDescription:descr==null?null:(Buffer.isBuffer(descr)?descr.toString():String(descr)),uptimeTicks:uptime==null?null:String(uptime),uptimeSeconds:uptime==null?null:Math.floor(Number(uptime)/100),interfaceCount:interfaces.length,interfaces,updatedAt:new Date().toISOString()});
  }catch(e){res.status(502).json({ok:false,connected:false,error:'OLT system/uplink SNMP read failed: '+(e.message||e)+'. Check that UDP/161 and the read-only SNMP community are enabled and reachable from the backend.'})}
