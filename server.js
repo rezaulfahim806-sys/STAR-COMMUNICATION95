@@ -599,6 +599,14 @@ app.post('/api/mikrotik/test',auth,async(req,res)=>{
  try{const cfg=validateMikrotikCfg(req.body);const identity=await mikrotikRequest(cfg,'system/identity');return send(res,{ok:true,connected:true,identity:Array.isArray(identity)?identity[0]:identity})}
  catch(e){return res.status(502).json({ok:false,connected:false,error:e.message||'MikroTik connection failed'})}
 });
+app.post('/api/mikrotik/pppoe/active-list',auth,async(req,res)=>{
+ if(!isOwner(req.user))return res.status(403).json({error:'Company owner access required'});
+ try{
+  const cfg=validateMikrotikCfg(req.body),active=await mikrotikRequest(cfg,'ppp/active');
+  if(!Array.isArray(active))return res.status(502).json({error:'Unexpected MikroTik PPP active response'});
+  return send(res,{ok:true,count:active.length,active:active.map(x=>({name:String(x.name||''),uptime:String(x.uptime||''),address:String(x.address||''),'caller-id':String(x['caller-id']||'')}))});
+ }catch(e){return res.status(502).json({ok:false,error:e.message||'Could not read active PPPoE sessions'})}
+});
 app.post('/api/mikrotik/pppoe/active',auth,async(req,res)=>{
  if(!isOwner(req.user))return res.status(403).json({error:'Company owner access required'});
  try{
