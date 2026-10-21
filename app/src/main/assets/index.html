@@ -215,7 +215,9 @@ function openIspAccount(){
 }
 async function ispRegister(){
  try{
-  let x=await cloudRegister(ispapi.value,ispcompany.value,ispemail.value,isppass.value);
+  let api=ispapi.value,user=ispemail.value;
+  let x=await cloudRegister(api,ispcompany.value,user,isppass.value);
+  activateAccountData(api,user,x);
   await cloudPush();
   closeSheet();toast('ISP account created successfully');
  }catch(e){toast(e.message||'ISP registration failed')}
