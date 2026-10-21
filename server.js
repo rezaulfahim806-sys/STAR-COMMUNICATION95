@@ -529,6 +529,29 @@ app.post('/api/olt/traffic',auth,async(req,res)=>{
  }finally{try{session?.close()}catch{}}
 });
 
+app.post('/api/olt/system',auth,async(req,res)=>{
+ const {host,community='public'}=req.body||{};
+ if(!host)return res.status(400).json({error:'OLT IP is required'});
+ if(typeof community!=='string'||!community||community.length>128)return res.status(400).json({error:'Valid read-only SNMP community is required'});
+ let session;
+ try{
+  session=snmp.createSession(host,community,{version:snmp.Version2c,timeout:3500,retries:0,transport:'udp4'});
+  const get=(oid)=>new Promise((resolve,reject)=>session.get([oid],(err,varbinds)=>{if(err)return reject(err);const v=varbinds&&varbinds[0];if(!v||snmp.isVarbindError(v))return reject(new Error(v?snmp.varbindError(v):'SNMP value unavailable'));resolve(v.value)}));
+  const walk=(base)=>snmpWalkTable(session,base);
+  const [descr,uptime,ifNames,ifStatuses,ifSpeeds]=await Promise.all([
+   get('1.3.6.1.2.1.1.1.0').catch(()=>null),
+   get('1.3.6.1.2.1.1.3.0').catch(()=>null),
+   walk('1.3.6.1.2.1.31.1.1.1.1').catch(()=>[]),
+   walk('1.3.6.1.2.1.2.2.1.8').catch(()=>[]),
+   walk('1.3.6.1.2.1.2.2.1.5').catch(()=>[])
+  ]);
+  const idx=(x,base)=>oidIndex(x.oid,base), names=new Map(ifNames.map(x=>[idx(x,'1.3.6.1.2.1.31.1.1.1.1'),Buffer.isBuffer(x.value)?x.value.toString():String(x.value)]), statuses=new Map(ifStatuses.map(x=>[idx(x,'1.3.6.1.2.1.2.2.1.8'),Number(x.value)])), speeds=new Map(ifSpeeds.map(x=>[idx(x,'1.3.6.1.2.1.2.2.1.5'),Number(x.value)]));
+  const interfaces=[...names].map(([index,name])=>({index,name,linkStatus:({1:'UP',2:'DOWN',3:'TESTING',4:'UNKNOWN',5:'DORMANT',6:'NOT_PRESENT',7:'LOWER_LAYER_DOWN'})[statuses.get(index)]||'UNKNOWN',ifOperStatus:statuses.get(index)??null,speedMbps:speeds.has(index)?speeds.get(index)/1000000:null}));
+  res.json({ok:true,connected:true,method:'SNMPv2c read-only IF-MIB',systemDescription:descr==null?null:(Buffer.isBuffer(descr)?descr.toString():String(descr)),uptimeTicks:uptime==null?null:String(uptime),uptimeSeconds:uptime==null?null:Math.floor(Number(uptime)/100),interfaceCount:interfaces.length,interfaces,updatedAt:new Date().toISOString()});
+ }catch(e){res.status(502).json({ok:false,connected:false,error:'OLT system/uplink SNMP read failed: '+(e.message||e)+'. Check that UDP/161 and the read-only SNMP community are enabled and reachable from the backend.'})}
+ finally{try{session?.close()}catch{}}
+});
+
 function oltFailureReason(err,host,port,protocol){
  const m=String(err&&err.message||err||'Unknown error');
  const h=String(host||'');
