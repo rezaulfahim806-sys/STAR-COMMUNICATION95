@@ -231,5 +231,6 @@ function referrals(){let rows=d.customers.map(ref=>{let count=d.customers.filter
 setTimeout(()=>{if(cloudConfig().token)cloudSync(false)},900);
 setInterval(()=>{if(cloudConfig().token)cloudSync(false)},30000);
 setInterval(()=>{if(page==='monitor'&&d.settings.olt?.ip&&d.settings.olt?.user&&d.settings.olt?.password)refreshOltDashboard()},30000);
-try{resumeOltLiveMonitoring()}catch(e){}\n</script><style>#oltWebLoginShortcut{position:fixed;right:12px;top:72px;z-index:1000;background:#0b4f91;color:#fff;text-decoration:none;padding:10px 12px;border-radius:10px;font-weight:800;font-size:12px;box-shadow:0 3px 12px #0003}#oltWebLoginShortcut:focus{outline:3px solid #ffbf47;outline-offset:2px}</style><a id="oltWebLoginShortcut" href="https://103.112.204.32:5255/action/main.html" target="_blank" rel="noopener noreferrer" aria-label="Open VSOL OLT Web Management login">🔐 OLT Web Login</a></body></html>
+try{resumeOltLiveMonitoring()}catch(e){}
+</script><style>#oltWebLoginShortcut{position:fixed;right:12px;top:72px;z-index:1000;background:#0b4f91;color:#fff;text-decoration:none;padding:10px 12px;border-radius:10px;font-weight:800;font-size:12px;box-shadow:0 3px 12px #0003}#oltWebLoginShortcut:focus{outline:3px solid #ffbf47;outline-offset:2px}</style><a id="oltWebLoginShortcut" href="https://103.112.204.32:5255/action/main.html" target="_blank" rel="noopener noreferrer" aria-label="Open VSOL OLT Web Management login">🔐 OLT Web Login</a></body></html>
 <!-- Rebuild trigger: validate restored dashboard source on GitHub Actions. -->
