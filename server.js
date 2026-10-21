@@ -5,6 +5,7 @@ const bcrypt=require('bcryptjs');
 const {MongoClient}=require('mongodb');
 const {Client:SSHClient}=require('ssh2');
 const net=require('net');
+const crypto=require('crypto');
 const nodemailer=require('nodemailer');
 require('dotenv').config();
 
@@ -641,6 +642,52 @@ async function callConfiguredApi(cfg,{transactionId,amount,customerId,phone,mess
   return {data,status:response.status};
  }finally{clearTimeout(timer)}
 }
+
+function integrationEncryptionKey(){
+ const raw=String(process.env.COMPANY_INTEGRATION_ENCRYPTION_KEY||'');
+ if(raw.length<32)throw new Error('COMPANY_INTEGRATION_ENCRYPTION_KEY must be configured with at least 32 characters');
+ return crypto.createHash('sha256').update(raw).digest();
+}
+function encryptIntegrationSecret(value){
+ const iv=crypto.randomBytes(12),cipher=crypto.createCipheriv('aes-256-gcm',integrationEncryptionKey(),iv);
+ const data=Buffer.concat([cipher.update(String(value),'utf8'),cipher.final()]);
+ return {iv:iv.toString('base64'),tag:cipher.getAuthTag().toString('base64'),data:data.toString('base64')};
+}
+function decryptIntegrationSecret(box){
+ if(!box||!box.iv||!box.tag||!box.data)return '';
+ const decipher=crypto.createDecipheriv('aes-256-gcm',integrationEncryptionKey(),Buffer.from(box.iv,'base64'));
+ decipher.setAuthTag(Buffer.from(box.tag,'base64'));
+ return Buffer.concat([decipher.update(Buffer.from(box.data,'base64')),decipher.final()]).toString('utf8');
+}
+async function getBaniqCredentials(owner){
+ const c=col('company_integrations');
+ if(!c)throw new Error('Cloud database is not configured');
+ const row=await c.findOne({owner:String(owner)});
+ const baniq=row&&row.baniq||{};
+ return {keyId:String(baniq.keyId||''),secret:decryptIntegrationSecret(baniq.secret)};
+}
+app.get('/api/integrations/baniq/settings',auth,async(req,res)=>{
+ if(!isOwner(req.user))return res.status(403).json({error:'Company owner access required'});
+ try{
+  const c=col('company_integrations');if(!c)return res.status(503).json({error:'Cloud database is not configured'});
+  const row=await c.findOne({owner:ownerOf(req.user)});
+  const cfg=row&&row.baniq||{};
+  return send(res,{ok:true,configured:!!(cfg.keyId&&cfg.secret&&cfg.secret.data),keyId:cfg.keyId||'',apiBase:(process.env.BANIQ_API_BASE||'https://api.baniq.app').replace(/\/$/,'')});
+ }catch(e){return res.status(503).json({error:String(e.message||'Could not read Baniq settings').slice(0,160)})}
+});
+app.put('/api/integrations/baniq/settings',auth,async(req,res)=>{
+ if(!isOwner(req.user))return res.status(403).json({error:'Company owner access required'});
+ const keyId=String(req.body&&req.body.keyId||'').trim(),secret=String(req.body&&req.body.secret||'');
+ if(!keyId||keyId.length>200||!secret||secret.length>1000)return res.status(400).json({error:'Baniq API Key ID and API Secret are required'});
+ try{
+  const c=col('company_integrations');if(!c)return res.status(503).json({error:'Cloud database is not configured'});
+  const owner=ownerOf(req.user),now=new Date().toISOString();
+  const encrypted=encryptIntegrationSecret(secret);
+  await c.updateOne({owner},{$set:{owner,baniq:{keyId,secret:encrypted,updatedAt:now},updatedAt:now}},{upsert:true});
+  return send(res,{ok:true,configured:true,keyId,message:'Baniq credentials encrypted and saved for this company only'});
+ }catch(e){return res.status(503).json({error:String(e.message||'Could not save Baniq settings').slice(0,180)})}
+});
+
 app.post('/api/integrations/sms/send',auth,async(req,res)=>{
  try{
   const phone=String(req.body&&req.body.phone||'').trim(),message=String(req.body&&req.body.message||'').trim();
@@ -678,6 +725,6 @@ app.post('/api/billing/verify-payment',auth,async(req,res)=>{
  }catch(e){res.status(502).json({ok:false,verified:false,error:'Payment verification failed: '+String(e.message||'Request failed').slice(0,180)})}
 });
 
-require('./baniq-integration')(app,{col,ownerOf,PUBLIC_URL, PAYMENT_PAGE_URL, integrationSettings, callConfiguredApi});
+require('./baniq-integration')(app,{col,ownerOf,PUBLIC_URL, PAYMENT_PAGE_URL, integrationSettings, callConfiguredApi, getBaniqCredentials});
 
 app.listen(PORT,async()=>{try{await initDb();console.log('STAR COMMUNICATION server on '+PORT)}catch(e){console.error(e);process.exit(1)}});
