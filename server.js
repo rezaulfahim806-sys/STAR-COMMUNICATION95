@@ -5,6 +5,7 @@ const bcrypt=require('bcryptjs');
 const {MongoClient}=require('mongodb');
 const {Client:SSHClient}=require('ssh2');
 const net=require('net');
+const nodemailer=require('nodemailer');
 require('dotenv').config();
 
 const app=express();
@@ -18,6 +19,7 @@ const ACCOUNT_COLLECTION='accounts';
 function ownerOf(u){return String(u&&u.owner||u&&u.username||'')}
 function isOwner(u){return String(u&&u.role||'')==='owner'}
 function isSystemAdmin(u){return !!u&&String(u.username||'')===String(ADMIN_USER)&&String(u.role||'')==='owner'}
+async function sendApprovalEmail(to,companyName){const host=process.env.SMTP_HOST,user=process.env.SMTP_USER,pass=process.env.SMTP_PASS,from=process.env.SMTP_FROM||user;if(!host||!user||!pass||!from)return {sent:false,reason:'SMTP is not configured'};const transporter=nodemailer.createTransport({host,port:Number(process.env.SMTP_PORT||587),secure:String(process.env.SMTP_SECURE||'false')==='true',auth:{user,pass}});await transporter.sendMail({from,to,subject:'STAR COMMUNICATION account approved',text:'Hello '+companyName+',\n\nYour STAR COMMUNICATION company account has been approved. You can now log in to the STAR COMMUNICATION app using this Gmail address and the password you created.\n\nSTAR COMMUNICATION',html:'<p>Hello '+String(companyName||'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]))+',</p><p>Your STAR COMMUNICATION company account has been approved. You can now log in to the STAR COMMUNICATION app using this Gmail address and the password you created.</p><p>STAR COMMUNICATION</p>'});return {sent:true}}
 function publicAccount(a){return {username:a.username,role:a.role,owner:a.owner,active:a.active!==false}}
 function flagEnabled(value){return value===true||['true','1','yes','on','enabled'].includes(String(value??'').trim().toLowerCase())}
 function packageChoiceEnabled(customer){return !!customer&&(flagEnabled(customer.allowPackageChoice)||flagEnabled(customer.allowPackageChange))}
@@ -197,9 +199,11 @@ app.post('/api/admin/registrations/:username/approve',auth,async(req,res)=>{
  if(!isSystemAdmin(req.user))return res.status(403).json({error:'System administrator access required'});
  const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
  const u=String(req.params.username||'').trim().toLowerCase();
+ const account=await ac.findOne({username:u,approvalStatus:'pending'});if(!account)return res.status(404).json({error:'Pending registration not found'});
  const result=await ac.updateOne({username:u,approvalStatus:'pending'},{$set:{active:true,approvalStatus:'approved',approvedAt:new Date().toISOString(),approvedBy:req.user.username}});
  if(!result.matchedCount)return res.status(404).json({error:'Pending registration not found'});
- send(res,{ok:true,message:'Registration approved',username:u});
+ let emailStatus={sent:false,reason:'No email address on registration'};try{emailStatus=await sendApprovalEmail(account.email||account.username,account.companyName||'Company')}catch(e){console.error('Approval email failed:',e.message);emailStatus={sent:false,reason:'Email send failed; check SMTP configuration'}}
+ send(res,{ok:true,message:'Registration approved',username:u,emailSent:emailStatus.sent,emailMessage:emailStatus.sent?'Approval email sent':'Account approved; email notification not sent. '+emailStatus.reason});
 });
 app.post('/api/admin/registrations/:username/reject',auth,async(req,res)=>{
  if(!isSystemAdmin(req.user))return res.status(403).json({error:'System administrator access required'});
