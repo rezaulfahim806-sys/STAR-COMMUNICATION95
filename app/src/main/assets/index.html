@@ -57,12 +57,13 @@
 function cloudConfig(){return d.settings&&d.settings.cloud||{}}
 function cloudHeaders(){let h={'Content-Type':'application/json'};let tok=cloudConfig().token;if(tok)h.Authorization='Bearer '+tok;return h}
 async function cloudLogin(api,user,pass){
- api=String(api||'').trim().replace(/\/$/,''); user=String(user||'').trim();
+ api=String(api||'').trim().replace(/\/$/,''); user=String(user||'').trim().toLowerCase();
  if(!/^https:\/\//i.test(api))throw new Error('HTTPS API URL required');
  let r=await fetch(api+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:user,password:String(pass||'')})});
- if(!r.ok)throw new Error('Login failed');
- let x=await r.json();if(!x.token)throw new Error('No login token');
- d.settings.cloud={apiUrl:api,username:user,token:x.token};save(false);return x
+ let x={};try{x=await r.json()}catch(e){}
+ if(!r.ok)throw new Error(x.error||('Login failed ('+r.status+')'));
+ if(!x.token)throw new Error(x.error||'No login token');
+ d.settings.cloud={...(d.settings.cloud||{}),apiUrl:api,username:x.username||user,token:x.token,role:x.role||'worker',owner:x.owner||x.username||user,permissions:Array.isArray(x.permissions)?x.permissions:[]};save(false);return x
 }
 async function cloudRegister(api,company,email,pass){
  api=String(api||'').trim().replace(/\/$/,''); company=String(company||'').trim(); email=String(email||'').trim().toLowerCase(); pass=String(pass||'');
@@ -71,14 +72,15 @@ async function cloudRegister(api,company,email,pass){
  let r=await fetch(api+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({companyName:company,email,password:pass})});
  let x={};try{x=await r.json()}catch(e){}
  if(!r.ok)throw new Error(x.error||'Registration failed');
- if(!x.token)throw new Error('No login token');
- d.settings.cloud={apiUrl:api,username:x.username||email,token:x.token,companyName:x.companyName||company};
+ if(x.pending)return {pending:true,message:x.message||'Registration submitted. Wait for administrator approval.',username:x.username||email,companyName:x.companyName||company};
+ if(!x.token)throw new Error(x.error||'No login token');
+ d.settings.cloud={...(d.settings.cloud||{}),apiUrl:api,username:x.username||email,token:x.token,role:x.role||'owner',owner:x.owner||x.username||email,permissions:Array.isArray(x.permissions)?x.permissions:[],companyName:x.companyName||company};
  save(false);return x
 }
 async function cloudRegisterAndSync(){
  try{
   let api=document.getElementById('capi')?.value||'', company=document.getElementById('ccompany')?.value||'', email=document.getElementById('cuser')?.value||'', pass=document.getElementById('cpass')?.value||'';
-  let x=await cloudRegister(api,company,email,pass); await cloudPush(); closeSheet(); toast('ISP account created');
+  let x=await cloudRegister(api,company,email,pass); if(x.pending){let m=document.getElementById('createCompanyMsg');if(m)m.textContent=x.message||'Registration submitted. Wait for administrator approval.';toast(x.message||'Wait for admin approval');return} await cloudPush(); closeSheet(); toast('ISP account created');
  }catch(e){toast(e.message||'Registration failed')}
 }
 let cloudLastUpdatedAt='';
