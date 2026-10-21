@@ -18,7 +18,7 @@ const ADMIN_HASH=process.env.ADMIN_PASSWORD_HASH||((process.env.ADMIN_PASSWORD)?
 const ACCOUNT_COLLECTION='accounts';
 function ownerOf(u){return String(u&&u.owner||u&&u.username||'')}
 function isOwner(u){return String(u&&u.role||'')==='owner'}
-function isSystemAdmin(u){return !!u&&String(u.username||'')===String(ADMIN_USER)&&String(u.role||'')==='owner'}
+function isSystemAdmin(u){return !!u&&!!ADMIN_USER&&String(u.username||'').trim().toLowerCase()===String(ADMIN_USER).trim().toLowerCase()&&String(u.role||'')==='owner'}
 async function sendApprovalEmail(to,companyName){const host=process.env.SMTP_HOST,user=process.env.SMTP_USER,pass=process.env.SMTP_PASS,from=process.env.SMTP_FROM||user;if(!host||!user||!pass||!from)return {sent:false,reason:'SMTP is not configured'};const transporter=nodemailer.createTransport({host,port:Number(process.env.SMTP_PORT||587),secure:String(process.env.SMTP_SECURE||'false')==='true',auth:{user,pass}});await transporter.sendMail({from,to,subject:'STAR COMMUNICATION account approved',text:'Hello '+companyName+',\n\nYour STAR COMMUNICATION company account has been approved. You can now log in to the STAR COMMUNICATION app using this Gmail address and the password you created.\n\nSTAR COMMUNICATION',html:'<p>Hello '+String(companyName||'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]))+',</p><p>Your STAR COMMUNICATION company account has been approved. You can now log in to the STAR COMMUNICATION app using this Gmail address and the password you created.</p><p>STAR COMMUNICATION</p>'});return {sent:true}}
 function publicAccount(a){return {username:a.username,role:a.role,owner:a.owner,active:a.active!==false}}
 function flagEnabled(value){return value===true||['true','1','yes','on','enabled'].includes(String(value??'').trim().toLowerCase())}
@@ -245,9 +245,16 @@ app.post('/api/auth/password',auth,async(req,res)=>{
 });
 app.post('/api/auth/login',async(req,res)=>{
  const {username,password}=req.body||{};
- const u=String(username||'').trim(), p=String(password||'');
+ const u=String(username||'').trim().toLowerCase(), p=String(password||'');
  if(!u||!p)return res.status(400).json({error:'Username and password are required'});
  try{
+  // The configured system administrator must always receive the system-admin role,
+  // even if an older account document exists with a stale role value.
+  if(ADMIN_USER&&u===String(ADMIN_USER).trim().toLowerCase()){
+   if(!ADMIN_HASH||!bcrypt.compareSync(p,ADMIN_HASH))return res.status(401).json({error:'Invalid system administrator credentials'});
+   const token=jwt.sign({username:u,role:'owner',owner:u},JWT_SECRET,{expiresIn:'30d'});
+   return send(res,{token,expiresIn:30*24*60*60,role:'owner',owner:u,username:u,permissions:['dashboard','customers','billing','accounts','reports','sms'],systemAdmin:true});
+  }
   let account=null;
   const ac=col(ACCOUNT_COLLECTION);  if(ac)account=await ac.findOne({username:u});  if(account){
    if(!bcrypt.compareSync(p,account.passwordHash))return res.status(401).json({error:'Invalid username or password'});
@@ -258,9 +265,7 @@ app.post('/api/auth/login',async(req,res)=>{
    const token=jwt.sign(claims,JWT_SECRET,{expiresIn:'30d'});
    return send(res,{token,expiresIn:30*24*60*60,role:claims.role,owner:claims.owner,username:claims.username,permissions:claims.permissions});
   }
-  if(u!==ADMIN_USER||!ADMIN_HASH||!bcrypt.compareSync(p,ADMIN_HASH))return res.status(401).json({error:'Invalid username or password'});
-  const token=jwt.sign({username:u,role:'owner',owner:u},JWT_SECRET,{expiresIn:'30d'});
-  send(res,{token,expiresIn:30*24*60*60,role:'owner',owner:u,username:u});
+  return res.status(401).json({error:'Invalid username or password'});
  }catch(e){res.status(500).json({error:'Login service error'})}
 });
 
