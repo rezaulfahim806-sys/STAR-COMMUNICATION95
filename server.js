@@ -730,10 +730,35 @@ app.post('/api/integrations/sms/send',auth,async(req,res)=>{
   if(!phone||!message)return res.status(400).json({error:'Phone and message are required'});
   if(message.length>1200)return res.status(400).json({error:'Message is too long'});
   const settings=await integrationSettings(ownerOf(req.user)),cfg=settings.smsApi||{};
-  if(!cfg.url)return res.status(400).json({error:'Configure the SMS API endpoint in Settings first'});
-  const result=await callConfiguredApi({...cfg,apiKeyField:cfg.apiKeyField,senderId:cfg.senderId},{phone,message});
-  const d=result.data||{};
-  if(d.success===false||d.ok===false||String(d.status||'').toLowerCase()==='error')return res.status(502).json({error:'SMS provider reported failure',providerMessage:String(d.message||d.error||'').slice(0,180)});
+  const notifyKey=String(process.env.NOTIFYBD_API_KEY||'').trim();
+  const notifySender=String(process.env.NOTIFYBD_SENDER_ID||cfg.senderId||'').trim();
+  let d={};
+  if(notifyKey){
+   if(!notifySender)return res.status(400).json({error:'NOTIFYBD_SENDER_ID is missing in Render Environment Variables'});
+   const digits=phone.replace(/[^0-9+]/g,'').replace(/^\+/,'');
+   if(!digits)return res.status(400).json({error:'A valid customer phone number is required'});
+   const unicode=/[\u0980-\u09FF]/.test(message);
+   const u=new URL('https://portal.notifybd.com/api/v1/sms/send');
+   u.searchParams.set('api_key',notifyKey);
+   u.searchParams.set('type',unicode?'unicode':'text');
+   u.searchParams.set('contacts',digits);
+   u.searchParams.set('senderid',notifySender);
+   u.searchParams.set('msg',message);
+   u.searchParams.set('label','transactional');
+   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
+   try{
+    const response=await fetch(u.toString(),{method:'GET',headers:{Accept:'application/json'},signal:controller.signal,redirect:'error'});
+    const raw=await response.text();
+    try{d=raw?JSON.parse(raw):{}}catch(e){d={message:raw.slice(0,300)}}
+    if(!response.ok)throw new Error('NotifyBD returned HTTP '+response.status);
+    if(d.success===false||d.ok===false||String(d.status||'').toLowerCase()==='error'||String(d.status||'').toLowerCase()==='failed'||String(d.status||'').toLowerCase()==='failure')return res.status(502).json({error:'NotifyBD reported SMS failure',providerMessage:String(d.message||d.error||d.status||'').slice(0,180)});
+   }finally{clearTimeout(timer)}
+  }else{
+   if(!cfg.url)return res.status(400).json({error:'Configure NOTIFYBD_API_KEY in Render, or configure an SMS API endpoint in Settings'});
+   const result=await callConfiguredApi({...cfg,apiKeyField:cfg.apiKeyField,senderId:cfg.senderId},{phone,message});
+   d=result.data||{};
+   if(d.success===false||d.ok===false||String(d.status||'').toLowerCase()==='error')return res.status(502).json({error:'SMS provider reported failure',providerMessage:String(d.message||d.error||'').slice(0,180)});
+  }
   send(res,{ok:true,message:'SMS request accepted by provider',providerResponse:d});
  }catch(e){res.status(502).json({error:'SMS API failed: '+String(e.message||'Request failed').slice(0,180)})}
 });
