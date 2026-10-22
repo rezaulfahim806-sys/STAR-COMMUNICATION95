@@ -77,8 +77,10 @@ module.exports = function startScheduledExpirySms({ col, integrationSettings, ca
         const owner = String(state.owner || '').trim().toLowerCase();
         const data = state.data || {};
         const settings = data.settings || {};
-        const sms = settings.smsApi || {};
-        if (!owner || !sms.url || !sms.apiKey) continue;
+        const notifyKey = String(process.env.NOTIFYBD_API_KEY || '').trim();
+        const notifySender = String(process.env.NOTIFYBD_SENDER_ID || '').trim();
+        const sms = notifyKey ? { url: 'https://portal.notifybd.com/api/v1/sms/send', apiKey: notifyKey, senderId: notifySender, apiKeyField: 'api_key', method: 'GET' } : (settings.smsApi || {});
+        if (!owner || !sms.url || !sms.apiKey || !sms.senderId) continue;
         const customers = Array.isArray(data.customers) ? data.customers : [];
         for (const customer of customers) {
           const phone = String(customer.phone || customer.mobile || '').trim();
