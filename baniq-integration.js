@@ -10,6 +10,26 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
     return !!customer && (enabled(customer.allowPackageChoice) || enabled(customer.allowPackageChange));
   }
 
+  app.get('/api/integrations/baniq/health', async (req,res) => {
+    // Auth is verified through the main app middleware on this status endpoint.
+    const h = req.headers.authorization || '';
+    if (!h.startsWith('Bearer ')) return res.status(401).json({ok:false,error:'Login required'});
+    try {
+      const credentials = await getBaniqCredentials(req.user && req.user.owner || req.user && req.user.username || '');
+      const configured = !!(credentials.keyId && credentials.secret);
+      const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 6000);
+      let reachable = false, httpStatus = null;
+      try {
+        const response = await fetch(API_BASE + '/', { method:'GET', headers:{accept:'application/json'}, signal:controller.signal, redirect:'error' });
+        reachable = true; httpStatus = response.status;
+      } catch(e) {
+        // Some API hosts do not serve a root page. A 404/405 still counts as reachable,
+        // but DNS/TLS/network failures do not.
+        reachable = false;
+      } finally { clearTimeout(timer); }
+      return res.json({ok:true,configured,reachable,httpStatus,apiBase:API_BASE});
+    } catch(e) { return res.status(503).json({ok:false,error:String(e.message||'Baniq status check failed').slice(0,160)}); }
+  });
   async function baniqFetch(owner, path, options = {}) {
     if (typeof getBaniqCredentials !== 'function') throw new Error('Company-specific Baniq settings are unavailable');
     const credentials = await getBaniqCredentials(owner);
