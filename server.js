@@ -749,4 +749,4 @@ app.post('/api/billing/verify-payment',auth,async(req,res)=>{
 
 require('./baniq-integration')(app,{col,ownerOf,PUBLIC_URL, PAYMENT_PAGE_URL, integrationSettings, callConfiguredApi, getBaniqCredentials});
 
-app.listen(PORT,async()=>{try{await initDb();console.log('STAR COMMUNICATION server on '+PORT)}catch(e){console.error(e);process.exit(1)}});
+app.listen(PORT,'0.0.0.0',async()=>{try{await initDb();console.log('STAR COMMUNICATION server on '+PORT+' at 0.0.0.0')}catch(e){console.error(e);process.exit(1)}});
