@@ -236,7 +236,7 @@ function masterSidebarAction(action){
  setMasterCompanyFilter(map[action]||'all');
  const navs=document.querySelectorAll('.master-nav');navs.forEach(n=>n.classList.toggle('active',n.getAttribute('onclick')?.includes("'"+action+"'")));
 }
-async function loadMasterAdmin(){
+async async function loadMasterAdmin(){
  const el=document.getElementById('masterAdminBody');if(!el)return;
  el.innerHTML='<div style="padding:24px;text-align:center;color:#dbeafe">Loading Master Admin dashboard…</div>';
  try{
