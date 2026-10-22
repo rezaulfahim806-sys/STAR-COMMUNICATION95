@@ -207,6 +207,28 @@ app.post('/api/admin/companies/:username/status',auth,async(req,res)=>{
  send(res,{ok:true,username:u,enabled,message:enabled?'Company account enabled':'Company account disabled',disabledMessage:fields.disabledMessage||''});
 });
 
+// System-admin feature switches for each company.
+const ADMIN_FEATURES=['dashboard','customers','billing','collected','analytics','accounts','monitor','referrals','sms','packages','settings'];
+app.get('/api/admin/companies/:username/features',auth,async(req,res)=>{
+ if(!isSystemAdmin(req.user))return res.status(403).json({error:'System administrator access required'});
+ const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
+ const u=String(req.params.username||'').trim().toLowerCase();
+ if(!u||u===String(ADMIN_USER).toLowerCase())return res.status(400).json({error:'Invalid company account'});
+ const account=await ac.findOne({username:u});if(!account||account.role==='worker')return res.status(404).json({error:'Company account not found'});
+ return send(res,{ok:true,username:u,features:Array.isArray(account.features)?account.features:ADMIN_FEATURES});
+});
+app.put('/api/admin/companies/:username/features',auth,async(req,res)=>{
+ if(!isSystemAdmin(req.user))return res.status(403).json({error:'System administrator access required'});
+ const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
+ const u=String(req.params.username||'').trim().toLowerCase();
+ if(!u||u===String(ADMIN_USER).toLowerCase())return res.status(400).json({error:'Invalid company account'});
+ const account=await ac.findOne({username:u});if(!account||account.role==='worker')return res.status(404).json({error:'Company account not found'});
+ const input=Array.isArray(req.body&&req.body.features)?req.body.features:[];
+ const features=[...new Set(input.map(String).filter(x=>ADMIN_FEATURES.includes(x)))];
+ await ac.updateOne({username:u},{$set:{features,featuresUpdatedAt:new Date().toISOString(),featuresUpdatedBy:req.user.username}});
+ return send(res,{ok:true,username:u,features});
+});
+
 // System-admin approval queue for newly registered ISP/company accounts.
 app.get('/api/admin/registrations',auth,async(req,res)=>{
  if(!isSystemAdmin(req.user))return res.status(403).json({error:'System administrator access required'});
@@ -254,7 +276,7 @@ app.post('/api/auth/login',async(req,res)=>{
   if(ADMIN_USER&&u===String(ADMIN_USER).trim().toLowerCase()){
    if(!ADMIN_HASH||!bcrypt.compareSync(p,ADMIN_HASH))return res.status(401).json({error:'Invalid system administrator credentials'});
    const token=jwt.sign({username:u,role:'owner',owner:u},JWT_SECRET,{expiresIn:'30d'});
-   return send(res,{token,expiresIn:30*24*60*60,role:'owner',owner:u,username:u,permissions:['dashboard','customers','billing','accounts','reports','sms'],systemAdmin:true});
+   return send(res,{token,expiresIn:30*24*60*60,role:'owner',owner:u,username:u,permissions:['dashboard','customers','billing','accounts','reports','sms'],features:['dashboard','customers','billing','collected','analytics','accounts','monitor','referrals','sms','packages','settings'],systemAdmin:true});
   }
   let account=null;
   const ac=col(ACCOUNT_COLLECTION);  if(ac)account=await ac.findOne({username:u});  if(account){
@@ -264,7 +286,7 @@ app.post('/api/auth/login',async(req,res)=>{
    if(account.approvalStatus==='rejected')return res.status(403).json({error:String(account.disabledMessage||'Your registration was not approved. Contact the administrator').slice(0,500)});
    const claims={username:account.username,role:account.role||'worker',owner:account.owner||account.username,permissions:Array.isArray(account.permissions)?account.permissions:(account.role==='worker'?['dashboard','customers','billing']:['dashboard','customers','billing','accounts','reports','sms'])};
    const token=jwt.sign(claims,JWT_SECRET,{expiresIn:'30d'});
-   return send(res,{token,expiresIn:30*24*60*60,role:claims.role,owner:claims.owner,username:claims.username,permissions:claims.permissions});
+   return send(res,{token,expiresIn:30*24*60*60,role:claims.role,owner:claims.owner,username:claims.username,permissions:claims.permissions,features:Array.isArray(account.features)?account.features:['dashboard','customers','billing','collected','analytics','accounts','monitor','referrals','sms','packages','settings']});
   }
   return res.status(401).json({error:'Invalid username or password'});
  }catch(e){res.status(500).json({error:'Login service error'})}
