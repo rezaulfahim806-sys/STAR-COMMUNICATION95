@@ -488,9 +488,26 @@ app.get('/api/bkash/callback',async(req,res)=>{
   const duplicate=payments.some(p=>String(p.ref||'')===trxID||String(p.paymentID||'')===paymentID);
   const now=new Date(),iso=now.toISOString();
   customer.pkg=session.selectedPackage;  customer.fee=Number(session.packagePrice);
-  customer.prevDue=0;  if(!duplicate)payments.push({id:'bkash-'+paymentID,customer:String(session.customerCode),amount:Number(session.amount),date:iso.slice(0,10),month:iso.slice(0,7),status:'paid',source:'bkash',ref:trxID||paymentID,paymentID,createdAt:iso,updatedAt:iso});
+  customer.prevDue=0; customer.status='active'; customer.left=false; customer.disconnected=false; const nextExpiry=new Date(); nextExpiry.setDate(nextExpiry.getDate()+30); customer.expiry=nextExpiry.toISOString().slice(0,10); customer.lastPaymentStatus='paid'; customer.lastPaymentMonth=iso.slice(0,7); customer.lastPaymentAmount=Number(session.amount); customer.lastPaymentSource='bkash'; customer.lastPaymentAt=iso; customer.updatedAt=iso; if(!duplicate)payments.push({id:'bkash-'+paymentID,customer:String(session.customerCode),amount:Number(session.amount),date:iso.slice(0,10),month:iso.slice(0,7),status:'paid',source:'bkash',ref:trxID||paymentID,paymentID,createdAt:iso,updatedAt:iso});
   await stateCol.updateOne({owner:session.owner},{$set:{data,updatedAt:iso}});
   await sessions.updateOne({paymentID},{$set:{status:'PAID',trxID,verifiedAmount:Number(result.amount),verifiedAt:iso,updatedAt:iso}});
+  // Receipt SMS only after provider verification and bill update. SMS failure never reverses payment.
+  try{
+   const latestSession=await sessions.findOne({paymentID});
+   if(latestSession&&!latestSession.receiptSmsSentAt){
+    const settings=await integrationSettings(session.owner),sms=settings.smsApi||{};
+    const phone=String(session.customerMobile||customer.phone||customer.mobile||'').trim();
+    if(sms.url&&sms.apiKey&&phone){
+     const message='STAR COMMUNICATION: Dear '+String(customer.name||session.customerName||'Customer')+', your payment of Tk '+Number(session.amount).toFixed(2)+' has been verified successfully. Client Code: '+String(customer.clientCode||session.customerCode||'')+'. Your bill is PAID. Thank you.';
+     await callConfiguredApi({...sms,apiKeyField:sms.apiKeyField,senderId:sms.senderId},{phone,message,amount:Number(session.amount),customerId:String(customer.id||session.customerCode),transactionId:trxID||paymentID});
+     await sessions.updateOne({paymentID,receiptSmsSentAt:{$exists:false}},{$set:{receiptSmsSentAt:new Date().toISOString(),receiptSmsStatus:'accepted'}});
+    }else{
+     await sessions.updateOne({paymentID,receiptSmsStatus:{$exists:false}},{$set:{receiptSmsStatus:'not_configured_or_no_phone'}});
+    }
+   }
+  }catch(smsError){
+   await sessions.updateOne({paymentID},{$set:{receiptSmsStatus:'failed',receiptSmsError:String(smsError.message||'SMS failed').slice(0,180)}}).catch(()=>{});
+  }
   return page('success');
  }catch(e){
   await sessions.updateOne({paymentID},{$set:{status:'FAILED',verificationError:String(e.message||'verification failed').slice(0,200),updatedAt:new Date().toISOString()}}).catch(()=>{});
