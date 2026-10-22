@@ -189,12 +189,26 @@ app.post('/api/auth/register',async(req,res)=>{
  }catch(e){res.status(500).json({error:'Registration service error'})}
 });
 
+// Company presence: refreshed by signed-in company apps every 45 seconds.
+app.post('/api/presence/heartbeat',auth,async(req,res)=>{
+ if(isSystemAdmin(req.user))return send(res,{ok:true,systemAdmin:true});
+ const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
+ const owner=String(req.user.owner||req.user.username||'').trim().toLowerCase();
+ if(!owner)return res.status(400).json({error:'Company owner missing'});
+ const account=await ac.findOne({username:owner});
+ if(!account)return res.status(403).json({error:'Company account unavailable'});
+ if(account.approvalStatus!=='approved'||account.active===false||account.accountStatus==='disabled')return res.status(403).json({error:'Company account is not active'});
+ const now=new Date().toISOString();
+ await ac.updateOne({username:owner},{$set:{lastSeenAt:now}});
+ return send(res,{ok:true,lastSeenAt:now});
+});
+
 // System-admin controls for every company account.
 app.get('/api/admin/companies',auth,async(req,res)=>{
  if(!isSystemAdmin(req.user))return res.status(403).json({error:'System administrator access required'});
  const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
  const accounts=await ac.find({$or:[{role:'owner'},{approvalStatus:{$exists:true}}]}).sort({createdAt:-1}).project({passwordHash:0}).toArray();
- send(res,{ok:true,companies:accounts.filter(a=>String(a.username||'')!==String(ADMIN_USER)).map(a=>({username:a.username,email:a.email||a.username,companyName:a.companyName||'',role:a.role||'owner',status:a.accountStatus==='disabled'?'disabled':(a.approvalStatus||((a.active===false)?'disabled':'approved')),active:a.active!==false&&a.accountStatus!=='disabled',disabledMessage:a.disabledMessage||'',createdAt:a.createdAt||''}))});
+ send(res,{ok:true,companies:accounts.filter(a=>String(a.username||'')!==String(ADMIN_USER)).map(a=>({username:a.username,email:a.email||a.username,companyName:a.companyName||'',role:a.role||'owner',status:a.accountStatus==='disabled'?'disabled':(a.approvalStatus||((a.active===false)?'disabled':'approved')),active:a.active!==false&&a.accountStatus!=='disabled'&&a.approvalStatus!=='pending'&&a.approvalStatus!=='rejected',online:!!a.lastSeenAt&&(Date.now()-new Date(a.lastSeenAt).getTime()<120000)&&a.active!==false&&a.accountStatus!=='disabled'&&a.approvalStatus!=='pending'&&a.approvalStatus!=='rejected',lastSeenAt:a.lastSeenAt||'',disabledMessage:a.disabledMessage||'',createdAt:a.createdAt||''}))});
 });
 app.post('/api/admin/companies/:username/status',auth,async(req,res)=>{
  if(!isSystemAdmin(req.user))return res.status(403).json({error:'System administrator access required'});
