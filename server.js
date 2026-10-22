@@ -825,6 +825,6 @@ app.post('/api/billing/verify-payment',auth,async(req,res)=>{
  }catch(e){res.status(502).json({ok:false,verified:false,error:'Payment verification failed: '+String(e.message||'Request failed').slice(0,180)})}
 });
 
-require('./baniq-integration')(app,{col,ownerOf,PUBLIC_URL, PAYMENT_PAGE_URL, integrationSettings, callConfiguredApi, getBaniqCredentials});
+require('./baniq-integration')(app,{col,ownerOf,PUBLIC_URL, PAYMENT_PAGE_URL, integrationSettings, callConfiguredApi, getBaniqCredentials, auth});
 
 app.listen(PORT,'0.0.0.0',async()=>{try{await initDb();startScheduledExpirySms({col,integrationSettings,callConfiguredApi,paymentPageUrl:PAYMENT_PAGE_URL,publicUrl:PUBLIC_URL});console.log('STAR COMMUNICATION server on '+PORT+' at 0.0.0.0')}catch(e){console.error(e);process.exit(1)}});
