@@ -307,11 +307,14 @@ async function adminCompanyStatus(username,enabled,message=''){
 async function adminRegistration(username,action){
  if(!['approve','reject'].includes(action)){toast('Invalid registration action');return}
  if(!confirm((action==='approve'?'Approve':'Reject')+' registration for '+username+'?'))return;
+ const buttons=[...document.querySelectorAll('button[onclick*="adminRegistration("]')];buttons.forEach(b=>{if(b.getAttribute('onclick')&&b.getAttribute('onclick').includes(encodeURIComponent(username)))b.disabled=true});
  try{
-  const r=await fetch(masterApiBase()+'/api/admin/registrations/'+encodeURIComponent(username)+'/'+action,{method:'POST',headers:cloudHeaders(),body:JSON.stringify({})});
+  const url=masterApiBase()+'/api/admin/registrations/'+encodeURIComponent(String(username).trim().toLowerCase())+'/'+action;
+  const r=await fetch(url,{method:'POST',headers:{...cloudHeaders(),'Cache-Control':'no-cache'},body:JSON.stringify({}),cache:'no-store'});
   const x=await r.json().catch(()=>({}));if(!r.ok)throw new Error(x.error||'Registration update failed (HTTP '+r.status+')');
-  toast(x.emailSent?'Approved; Gmail notification sent':(x.emailMessage||x.message||'Registration updated'));await loadMasterAdmin();
- }catch(e){toast(e.message||'Registration update failed')}
+  toast(action==='approve'?(x.emailSent?'Company approved; Gmail notification sent':'Company approved and moved out of Pending'): 'Company rejected and removed from Pending');
+  await loadMasterAdmin();
+ }catch(e){toast((e.message||'Registration update failed')+' — refresh and retry');await loadMasterAdmin()}
 }
 async function loadCompanyFeatures(username){
  const target=document.getElementById('features-'+encodeURIComponent(username));if(!target)return;target.textContent='Loading feature permissions…';
