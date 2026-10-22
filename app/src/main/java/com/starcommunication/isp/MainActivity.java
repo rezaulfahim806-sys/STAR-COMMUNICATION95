@@ -124,16 +124,21 @@ public class MainActivity extends Activity {
                     return;
                 }
                 if (cacheFile.isFile()) {
-                    try {
-                        try (FileInputStream cacheIn = new FileInputStream(cacheFile); ByteArrayOutputStream cacheOut = new ByteArrayOutputStream()) {
-                            byte[] cacheBuffer = new byte[8192]; int cacheCount;
-                            while ((cacheCount = cacheIn.read(cacheBuffer)) != -1 && cacheOut.size() < 2 * 1024 * 1024) cacheOut.write(cacheBuffer, 0, cacheCount);
-                            String cached = cacheOut.toString("UTF-8");
+                    try (FileInputStream cacheIn = new FileInputStream(cacheFile);
+                         ByteArrayOutputStream cacheOut = new ByteArrayOutputStream()) {
+                        byte[] cacheBuffer = new byte[8192];
+                        int cacheCount;
+                        while ((cacheCount = cacheIn.read(cacheBuffer)) != -1
+                                && cacheOut.size() < 2 * 1024 * 1024) {
+                            cacheOut.write(cacheBuffer, 0, cacheCount);
+                        }
+                        String cached = cacheOut.toString("UTF-8");
                         if (cached.contains("<html") && cached.contains("STAR COMMUNICATION")) {
                             webView.loadDataWithBaseURL("file:///android_asset/", cached, "text/html", "UTF-8", null);
                             return;
                         }
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) {
+                    }
                 }
                 webView.loadUrl("file:///android_asset/index.html");
             });
