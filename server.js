@@ -7,6 +7,7 @@ const {Client:SSHClient}=require('ssh2');
 const net=require('net');
 const crypto=require('crypto');
 const nodemailer=require('nodemailer');
+const startScheduledExpirySms=require('./scheduled-expiry-sms');
 require('dotenv').config();
 
 const app=express();
@@ -788,4 +789,4 @@ app.post('/api/billing/verify-payment',auth,async(req,res)=>{
 
 require('./baniq-integration')(app,{col,ownerOf,PUBLIC_URL, PAYMENT_PAGE_URL, integrationSettings, callConfiguredApi, getBaniqCredentials});
 
-app.listen(PORT,'0.0.0.0',async()=>{try{await initDb();console.log('STAR COMMUNICATION server on '+PORT+' at 0.0.0.0')}catch(e){console.error(e);process.exit(1)}});
+app.listen(PORT,'0.0.0.0',async()=>{try{await initDb();startScheduledExpirySms({col,integrationSettings,callConfiguredApi,paymentPageUrl:PAYMENT_PAGE_URL,publicUrl:PUBLIC_URL});console.log('STAR COMMUNICATION server on '+PORT+' at 0.0.0.0')}catch(e){console.error(e);process.exit(1)}});
