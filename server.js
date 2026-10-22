@@ -32,7 +32,7 @@ async function initDb(){
  if(!ADMIN_USER||!ADMIN_HASH)throw new Error('ADMIN_USER and ADMIN_PASSWORD (or ADMIN_PASSWORD_HASH) are required');
  const client=new MongoClient(process.env.MONGODB_URI); await client.connect(); db=client.db(process.env.MONGODB_DB||'star_communication');
 }
-function auth(req,res,next){try{const h=req.headers.authorization||'';if(!h.startsWith('Bearer '))throw 0;req.user=jwt.verify(h.slice(7),JWT_SECRET);next()}catch(e){res.status(401).json({error:'Unauthorized'})}}
+async function auth(req,res,next){try{const h=req.headers.authorization||'';if(!h.startsWith('Bearer '))throw 0;req.user=jwt.verify(h.slice(7),JWT_SECRET);if(isSystemAdmin(req.user))return next();const ac=col(ACCOUNT_COLLECTION);if(ac){const u=String(req.user.username||'').trim().toLowerCase();const owner=String(req.user.owner||u).trim().toLowerCase();const account=await ac.findOne({username:owner});if(account&&(account.accountStatus==='disabled'||account.active===false||account.approvalStatus==='pending'||account.approvalStatus==='rejected'))return res.status(403).json({error:String(account.disabledMessage||(account.approvalStatus==='pending'?'Your company registration is awaiting approval':'এই কোম্পানির অ্যাকাউন্ট STAR COMMUNICATION Admin বন্ধ রেখেছেন। অনুগ্রহ করে Admin-এর সঙ্গে যোগাযোগ করুন।')).slice(0,500),accountDisabled:true});}next()}catch(e){res.status(401).json({error:'Unauthorized'})}}
 function send(res,payload){res.json(payload)}
 const BKASH_BASE_URL=(process.env.BKASH_BASE_URL||'https://checkout.sandbox.bka.sh/v1.2.0-beta').replace(/\/$/,'');
 const BKASH_APP_KEY=process.env.BKASH_APP_KEY||'';
