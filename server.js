@@ -742,6 +742,25 @@ app.put('/api/integrations/baniq/settings',auth,async(req,res)=>{
  }catch(e){return res.status(503).json({error:String(e.message||'Could not save Baniq settings').slice(0,180)})}
 });
 
+app.get('/api/integrations/sms/dashboard',auth,async(req,res)=>{
+ try{
+  const key=String(process.env.NOTIFYBD_API_KEY||'').trim();
+  const logs=col('sms_delivery_logs');
+  const now=new Date();
+  const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dhaka',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+  const month=day.slice(0,7),owner=ownerOf(req.user);
+  const history=logs?await logs.find({owner}).sort({createdAt:-1}).limit(50).toArray():[];
+  const todayCount=logs?await logs.countDocuments({owner,createdAt:{$regex:'^'+day}}):0;
+  const monthCount=logs?await logs.countDocuments({owner,createdAt:{$regex:'^'+month}}):0;
+  if(!key)return send(res,{ok:true,providerConfigured:false,providerReachable:false,balance:null,sms_quantity:null,todayCount,monthCount,history:history.map(x=>({phone:x.phone,message:x.message,status:x.status,deliveryStatus:x.deliveryStatus||'Unknown',createdAt:x.createdAt}))});
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
+  let response,data={};
+  try{response=await fetch('https://portal.notifybd.com/api/v1/user/'+encodeURIComponent(key)+'/balance-summary',{headers:{Accept:'application/json'},signal:controller.signal,redirect:'error'});const raw=await response.text();try{data=raw?JSON.parse(raw):{}}catch(e){data={message:raw.slice(0,200)}}}finally{clearTimeout(timer)}
+  if(!response.ok)throw new Error('NotifyBD balance API HTTP '+response.status);
+  const payload=data.data&&typeof data.data==='object'?data.data:data;
+  send(res,{ok:true,providerConfigured:true,providerReachable:!(data.success===false||data.ok===false||String(data.status||'').toLowerCase()==='error'),balance:payload.balance??payload.credit_balance??payload.wallet_balance??null,sms_quantity:payload.sms_quantity??payload.smsQuantity??null,todayCount,monthCount,history:history.map(x=>({phone:x.phone,message:x.message,status:x.status,deliveryStatus:x.deliveryStatus||'Unknown',createdAt:x.createdAt}))});
+ }catch(e){res.status(502).json({ok:false,error:String(e.message||'NotifyBD balance check failed').slice(0,180)})}
+});
 app.post('/api/integrations/sms/send',auth,async(req,res)=>{
  try{
   const phone=String(req.body&&req.body.phone||'').trim(),message=String(req.body&&req.body.message||'').trim();
@@ -777,6 +796,8 @@ app.post('/api/integrations/sms/send',auth,async(req,res)=>{
    d=result.data||{};
    if(d.success===false||d.ok===false||String(d.status||'').toLowerCase()==='error')return res.status(502).json({error:'SMS provider reported failure',providerMessage:String(d.message||d.error||'').slice(0,180)});
   }
+  const log=col('sms_delivery_logs');
+  if(log)await log.insertOne({owner:ownerOf(req.user),phone,message:message.slice(0,1200),status:'accepted',deliveryStatus:'Unknown',providerMessageId:String(d.sms_shoot_id||d.smsShootId||d.shoot_id||d.id||''),providerResponse:JSON.stringify(d).slice(0,500),createdAt:new Date().toISOString()}).catch(e=>console.error('[sms-log] insert failed',e.message));
   send(res,{ok:true,message:'SMS request accepted by provider',providerResponse:d});
  }catch(e){res.status(502).json({error:'SMS API failed: '+String(e.message||'Request failed').slice(0,180)})}
 });
