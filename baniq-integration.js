@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 
-module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, PAYMENT_PAGE_URL, integrationSettings, callConfiguredApi, getBaniqCredentials }) {
+module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, PAYMENT_PAGE_URL, integrationSettings, callConfiguredApi, getBaniqCredentials, auth }) {
   const API_BASE = (process.env.BANIQ_API_BASE || 'https://api.baniq.app').replace(/\/$/, '');
   const WEBHOOK_SECRET = process.env.BANIQ_WEBHOOK_SECRET || '';
 
@@ -10,10 +10,7 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
     return !!customer && (enabled(customer.allowPackageChoice) || enabled(customer.allowPackageChange));
   }
 
-  app.get('/api/integrations/baniq/health', async (req,res) => {
-    // Auth is verified through the main app middleware on this status endpoint.
-    const h = req.headers.authorization || '';
-    if (!h.startsWith('Bearer ')) return res.status(401).json({ok:false,error:'Login required'});
+  app.get('/api/integrations/baniq/health', auth, async (req,res) => {
     try {
       const credentials = await getBaniqCredentials(req.user && req.user.owner || req.user && req.user.username || '');
       const configured = !!(credentials.keyId && credentials.secret);
