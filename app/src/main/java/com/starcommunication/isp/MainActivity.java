@@ -22,6 +22,7 @@ import java.io.InputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileInputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.SimpleDateFormat;
@@ -124,8 +125,10 @@ public class MainActivity extends Activity {
                 }
                 if (cacheFile.isFile()) {
                     try {
-                        byte[] bytes = java.nio.file.Files.readAllBytes(cacheFile.toPath());
-                        String cached = new String(bytes, "UTF-8");
+                        try (FileInputStream cacheIn = new FileInputStream(cacheFile); ByteArrayOutputStream cacheOut = new ByteArrayOutputStream()) {
+                            byte[] cacheBuffer = new byte[8192]; int cacheCount;
+                            while ((cacheCount = cacheIn.read(cacheBuffer)) != -1 && cacheOut.size() < 2 * 1024 * 1024) cacheOut.write(cacheBuffer, 0, cacheCount);
+                            String cached = cacheOut.toString("UTF-8");
                         if (cached.contains("<html") && cached.contains("STAR COMMUNICATION")) {
                             webView.loadDataWithBaseURL("file:///android_asset/", cached, "text/html", "UTF-8", null);
                             return;
