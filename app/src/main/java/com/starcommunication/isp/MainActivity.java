@@ -18,6 +18,12 @@ import android.graphics.pdf.PdfDocument;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import java.io.OutputStream;
+import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -73,7 +79,62 @@ public class MainActivity extends Activity {
             @Override public boolean shouldOverrideUrlLoading(WebView v,String u){return handleUrl(u);}
             @Override public void onPageFinished(WebView v,String u){super.onPageFinished(v,u); if(u != null && u.startsWith("file:///android_asset/")) { migrateStorage(v); injectFeatures(); }}
         });
-        webView.loadUrl("file:///android_asset/index.html");
+        loadLatestAppPage();
+    }
+
+    // Fetch the latest web UI at launch. Native Android features still require an APK update.
+    private void loadLatestAppPage() {
+        final File cacheFile = new File(getFilesDir(), "star-remote-index.html");
+        new Thread(() -> {
+            String html = null;
+            HttpURLConnection connection = null;
+            try {
+                URL url = new URL("https://raw.githubusercontent.com/rezaulfahim806-sys/STAR-COMMUNICATION95/main/app/src/main/assets/index.html");
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setConnectTimeout(4000);
+                connection.setReadTimeout(4000);
+                connection.setUseCaches(false);
+                connection.setRequestProperty("Cache-Control", "no-cache");
+                int status = connection.getResponseCode();
+                if (status == 200) {
+                    try (InputStream in = connection.getInputStream(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                        byte[] buffer = new byte[8192];
+                        int count;
+                        while ((count = in.read(buffer)) != -1 && out.size() < 2 * 1024 * 1024) out.write(buffer, 0, count);
+                        String candidate = out.toString("UTF-8");
+                        if (candidate.contains("<html") && candidate.contains("STAR COMMUNICATION")) {
+                            html = candidate;
+                            try (FileOutputStream fileOut = new FileOutputStream(cacheFile)) {
+                                fileOut.write(candidate.getBytes("UTF-8"));
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+            final String page = html;
+            runOnUiThread(() -> {
+                if (isFinishing() || webView == null) return;
+                if (page != null) {
+                    webView.loadDataWithBaseURL("file:///android_asset/", page, "text/html", "UTF-8", null);
+                    Toast.makeText(MainActivity.this, "Latest app features loaded", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (cacheFile.isFile()) {
+                    try {
+                        byte[] bytes = java.nio.file.Files.readAllBytes(cacheFile.toPath());
+                        String cached = new String(bytes, "UTF-8");
+                        if (cached.contains("<html") && cached.contains("STAR COMMUNICATION")) {
+                            webView.loadDataWithBaseURL("file:///android_asset/", cached, "text/html", "UTF-8", null);
+                            return;
+                        }
+                    } catch (Exception ignored) { }
+                }
+                webView.loadUrl("file:///android_asset/index.html");
+            });
+        }).start();
     }
 
     private void migrateStorage(WebView v){
