@@ -810,7 +810,7 @@ app.post('/api/integrations/sms/send',auth,async(req,res)=>{
     const raw=await response.text();
     try{d=raw?JSON.parse(raw):{}}catch(e){d={message:raw.slice(0,300)}}
     if(!response.ok)throw new Error('NotifyBD returned HTTP '+response.status);
-    if(d.success===false||d.ok===false||String(d.status||'').toLowerCase()==='error'||String(d.status||'').toLowerCase()==='failed'||String(d.status||'').toLowerCase()==='failure')return res.status(502).json({error:'NotifyBD reported SMS failure',providerMessage:String(d.message||d.error||d.status||'').slice(0,180)});
+    if(d.success===false||d.ok===false||String(d.status||'').toLowerCase()==='error'||String(d.status||'').toLowerCase()==='failed'||String(d.status||'').toLowerCase()==='failure'||(d.code!==undefined&&String(d.code)!=='1000'))return res.status(502).json({error:'NotifyBD reported SMS failure',providerMessage:String(d.message||d.error||d.status||d.code||'').slice(0,180)});
    }finally{clearTimeout(timer)}
   }else{
    if(!cfg.url)return res.status(400).json({error:'Configure NOTIFYBD_API_KEY in Render, or configure an SMS API endpoint in Settings'});
