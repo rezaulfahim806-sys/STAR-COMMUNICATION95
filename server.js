@@ -673,6 +673,28 @@ async function integrationSettings(owner){
 }
 async function callConfiguredApi(cfg,{transactionId,amount,customerId,phone,message}){
  const u=configuredHttpsUrl(cfg.url);
+ if(u.hostname.toLowerCase()==='portal.notifybd.com'){
+  const key=String(cfg.apiKey||process.env.NOTIFYBD_API_KEY||'').trim();
+  const sender=String(cfg.senderId||process.env.NOTIFYBD_SENDER_ID||'').trim();
+  if(!key)throw new Error('NOTIFYBD_API_KEY is missing in Render Environment Variables');
+  if(!sender)throw new Error('NOTIFYBD_SENDER_ID is missing in Render Environment Variables');
+  const text=String(message||''),digits=String(phone||'').replace(/[^0-9+]/g,'').replace(/^\\+/,'');
+  if(!digits)throw new Error('A valid customer phone number is required');
+  u.searchParams.set('api_key',key);
+  u.searchParams.set('type',/[\\u0980-\\u09FF]/.test(text)?'unicode':'text');
+  u.searchParams.set('contacts',digits);
+  u.searchParams.set('senderid',sender);
+  u.searchParams.set('msg',text);
+  u.searchParams.set('label','transactional');
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
+  try{
+   const response=await fetch(u,{method:'GET',headers:{Accept:'application/json'},signal:controller.signal,redirect:'error'});
+   const raw=await response.text();let data={};try{data=raw?JSON.parse(raw):{}}catch(e){data={message:raw.slice(0,300)}}
+   if(!response.ok)throw new Error('NotifyBD returned HTTP '+response.status);
+   if(data.success===false||data.ok===false||['error','failed','failure'].includes(String(data.status||'').toLowerCase())||data.code&&String(data.code)!=='1000')throw new Error(String(data.message||data.error||data.status||data.code||'NotifyBD SMS failed').slice(0,180));
+   return {data,status:response.status};
+  }finally{clearTimeout(timer)}
+ }
  const method=String(cfg.method||'POST').toUpperCase()==='GET'?'GET':'POST';
  const key=String(cfg.apiKey||'').trim();
  if(!key)throw new Error('API key/token is missing in Settings');
