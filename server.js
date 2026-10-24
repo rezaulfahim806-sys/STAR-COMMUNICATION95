@@ -344,8 +344,9 @@ app.post('/api/auth/login',async(req,res)=>{
   const ac=col(ACCOUNT_COLLECTION);  if(ac)account=await ac.findOne({username:u});  if(account){
    if(!bcrypt.compareSync(p,account.passwordHash))return res.status(401).json({error:'Invalid username or password'});
    if(account.accountStatus==='disabled')return res.status(403).json({error:String(account.disabledMessage||'এই কোম্পানির অ্যাকাউন্ট প্রশাসক সাময়িকভাবে বন্ধ রেখেছেন। অনুগ্রহ করে STAR COMMUNICATION Admin-এর সঙ্গে যোগাযোগ করুন।').slice(0,500)});
-   if(account.approvalStatus==='pending'||account.active===false){await ac.updateOne({username:u},{$set:{approvalStatus:'approved',active:true,approvedAt:new Date().toISOString()}});account.approvalStatus='approved';account.active=true;}
+   if(account.approvalStatus==='pending'){await ac.updateOne({username:u},{$set:{approvalStatus:'approved',active:true,approvedAt:new Date().toISOString()}});account.approvalStatus='approved';account.active=true;}
    if(account.approvalStatus==='rejected')return res.status(403).json({error:String(account.disabledMessage||'Your registration was not approved. Contact the administrator').slice(0,500)});
+   if(account.active===false)return res.status(403).json({error:String(account.disabledMessage||'এই কোম্পানির অ্যাকাউন্ট প্রশাসক বন্ধ রেখেছেন।').slice(0,500)});
    const claims={username:account.username,role:account.role||'worker',owner:account.owner||account.username,permissions:Array.isArray(account.permissions)?account.permissions:(account.role==='worker'?['dashboard','customers','billing']:['dashboard','customers','billing','accounts','reports','sms'])};
    const token=jwt.sign(claims,JWT_SECRET,{expiresIn:'30d'});
    return send(res,{token,expiresIn:30*24*60*60,role:claims.role,owner:claims.owner,username:claims.username,permissions:claims.permissions,features:Array.isArray(account.features)?account.features:['dashboard','customers','billing','collected','analytics','accounts','monitor','referrals','sms','packages','settings']});
