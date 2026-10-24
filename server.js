@@ -66,7 +66,7 @@ app.post('/api/public/complaints',async(req,res)=>{
  res.set('Cache-Control','no-store');
  const b=req.body||{},company=String(b.company||'').trim().toLowerCase(),customerCode=String(b.customerCode||'').trim();
  const type=String(b.type||'General').trim().slice(0,60),message=String(b.message||'').trim().slice(0,2000);
- if(!company||!/^[^\\s@]+@gmail\\.com$/i.test(company))return res.status(400).json({error:'Valid company account required'});
+ if(!company||!/^[^\s@]+@gmail\.com$/i.test(company))return res.status(400).json({error:'Valid company account required'});
  if(!customerCode||!message)return res.status(400).json({error:'Customer and complaint message are required'});
  if(message.length<3)return res.status(400).json({error:'Please enter a little more detail'});
  if(!['Payment Problem','Bill Problem','Internet Problem','Other'].includes(type))return res.status(400).json({error:'Invalid complaint type'});
