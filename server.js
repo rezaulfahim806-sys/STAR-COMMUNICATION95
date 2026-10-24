@@ -200,8 +200,15 @@ app.post('/api/auth/register',async(req,res)=>{
  if(company.length<2||company.length>100)return res.status(400).json({error:'Company name is required'});
  try{
   const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
-  if(await ac.findOne({username:u}))return res.status(409).json({error:'This Gmail account is already registered'});
-  const a={username:u,email:u,companyName:company,passwordHash:bcrypt.hashSync(p,12),role:'owner',owner:u,active:false,approvalStatus:'pending',createdAt:new Date().toISOString()};
+  const existing=await ac.findOne({username:u});
+  const now=new Date().toISOString();
+  if(existing){
+   if(existing.role==='worker')return res.status(409).json({error:'This Gmail is already used by a sub-panel account'});
+   if(existing.approvalStatus!=='rejected')return res.status(409).json({error:'This Gmail account is already registered'});
+   await ac.updateOne({_id:existing._id,approvalStatus:'rejected'},{$set:{email:u,companyName:company,passwordHash:bcrypt.hashSync(p,12),role:'owner',owner:u,active:false,accountStatus:'pending',approvalStatus:'pending',createdAt:now,updatedAt:now},$unset:{rejectedAt:'',rejectedBy:'',approvedAt:'',approvedBy:'',disabledMessage:''}});
+   return res.status(201).json({ok:true,pending:true,message:'আপনার নতুন কোম্পানি রেজিস্ট্রেশন Admin approval-এর জন্য পাঠানো হয়েছে।',username:u,companyName:company});
+  }
+  const a={username:u,email:u,companyName:company,passwordHash:bcrypt.hashSync(p,12),role:'owner',owner:u,active:false,approvalStatus:'pending',createdAt:now};
   await ac.insertOne(a);
   return res.status(201).json({ok:true,pending:true,message:'আপনার রেজিস্ট্রেশন Admin approval-এর জন্য পাঠানো হয়েছে। অনুমোদনের পর লগইন করতে পারবেন।',username:u,companyName:company});
  }catch(e){res.status(500).json({error:'Registration service error'})}
@@ -227,6 +234,19 @@ app.get('/api/admin/companies',auth,async(req,res)=>{
  const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
  const accounts=await ac.find({$or:[{role:'owner'},{approvalStatus:{$exists:true}}]}).sort({createdAt:-1}).project({passwordHash:0}).toArray();
  send(res,{ok:true,companies:accounts.filter(a=>String(a.username||'')!==String(ADMIN_USER)).map(a=>({username:a.username,email:a.email||a.username,companyName:a.companyName||'',role:a.role||'owner',status:a.accountStatus==='disabled'?'disabled':(a.approvalStatus||((a.active===false)?'disabled':'approved')),active:a.active!==false&&a.accountStatus!=='disabled'&&a.approvalStatus!=='pending'&&a.approvalStatus!=='rejected',online:!!a.lastSeenAt&&(Date.now()-new Date(a.lastSeenAt).getTime()<120000)&&a.active!==false&&a.accountStatus!=='disabled'&&a.approvalStatus!=='pending'&&a.approvalStatus!=='rejected',lastSeenAt:a.lastSeenAt||'',disabledMessage:a.disabledMessage||'',createdAt:a.createdAt||''}))});
+});
+app.delete('/api/admin/companies/:username',auth,async(req,res)=>{
+ if(!isSystemAdmin(req.user))return res.status(403).json({error:'System administrator access required'});
+ const u=String(req.params.username||'').trim().toLowerCase();
+ if(!u||u===String(ADMIN_USER).trim().toLowerCase())return res.status(400).json({error:'Cannot delete the system administrator account'});
+ const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
+ try{
+  const account=await ac.findOne({username:u});
+  if(!account||account.role==='worker')return res.status(404).json({error:'Company account not found'});
+  await ac.deleteOne({_id:account._id});
+  for(const name of ['app_state','company_integrations','sms_delivery_logs','complaints']){const c=col(name);if(c)await c.deleteMany({owner:u});}
+  return send(res,{ok:true,username:u,message:'Company deleted. This Gmail can register a new company again.'});
+ }catch(e){console.error('Admin company delete failed:',u,e.message);return res.status(500).json({error:'Could not delete company. Check server logs.'})}
 });
 app.post('/api/admin/companies/:username/status',auth,async(req,res)=>{
  if(!isSystemAdmin(req.user))return res.status(403).json({error:'System administrator access required'});
