@@ -61,6 +61,23 @@ async function bkashCheckoutRequest(path,token,body){
 function bkashCompleted(x){return String(x&&x.statusCode||'')==='0000'&&String(x&&x.transactionStatus||'').toLowerCase()==='completed'}
 
 app.get('/api/health',(req,res)=>send(res,{ok:true,app:'STAR COMMUNICATION',version:'1.5.3',deployment:'login-flow-update-2026-10-17',time:new Date().toISOString(),database:!!db}));
+// Public customer complaint submission: validates company and customer against cloud state.
+app.post('/api/public/complaints',async(req,res)=>{
+ res.set('Cache-Control','no-store');
+ const b=req.body||{},company=String(b.company||'').trim().toLowerCase(),customerCode=String(b.customerCode||'').trim();
+ const type=String(b.type||'General').trim().slice(0,60),message=String(b.message||'').trim().slice(0,2000);
+ if(!company||!/^[^\\s@]+@gmail\\.com$/i.test(company))return res.status(400).json({error:'Valid company account required'});
+ if(!customerCode||!message)return res.status(400).json({error:'Customer and complaint message are required'});
+ if(message.length<3)return res.status(400).json({error:'Please enter a little more detail'});
+ if(!['Payment Problem','Bill Problem','Internet Problem','Other'].includes(type))return res.status(400).json({error:'Invalid complaint type'});
+ const states=col('app_state'),complaints=col('complaints');if(!states||!complaints)return res.status(503).json({error:'Cloud database is not configured'});
+ try{const state=await states.findOne({owner:company});if(!state||!state.data)return res.status(404).json({error:'Company account not found'});
+ const customer=(Array.isArray(state.data.customers)?state.data.customers:[]).find(x=>String(x.id||'')===customerCode||String(x.clientCode||'').trim().toLowerCase()===customerCode.toLowerCase());
+ if(!customer)return res.status(404).json({error:'Customer code was not found for this company'});
+ const item={id:crypto.randomUUID?crypto.randomUUID():Date.now().toString(),owner:company,createdBy:'payment-link',customerId:String(customer.id||''),customerCode:String(customer.clientCode||customer.id||customerCode),customerName:String(customer.name||'Customer').slice(0,120),type,message,status:'OPEN',createdAt:new Date().toISOString(),source:'payment-link'};
+ await complaints.insertOne(item);return res.status(201).json({ok:true,complaintId:item.id,message:'Complaint submitted'});
+ }catch(e){console.error('Public complaint submission failed',e);return res.status(500).json({error:'Could not save complaint. Please try again.'})}
+});
 // Public read-only package lookup used by customer Payment Links.
 app.get('/api/public/packages',async(req,res)=>{
  res.set('Cache-Control','no-store, no-cache, must-revalidate, proxy-revalidate');
