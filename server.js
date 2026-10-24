@@ -201,9 +201,9 @@ app.post('/api/auth/register',async(req,res)=>{
  try{
   const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
   if(await ac.findOne({username:u}))return res.status(409).json({error:'This Gmail account is already registered'});
-  const a={username:u,email:u,companyName:company,passwordHash:bcrypt.hashSync(p,12),role:'owner',owner:u,active:true,approvalStatus:'approved',createdAt:new Date().toISOString(),approvedAt:new Date().toISOString()};
+  const a={username:u,email:u,companyName:company,passwordHash:bcrypt.hashSync(p,12),role:'owner',owner:u,active:false,approvalStatus:'pending',createdAt:new Date().toISOString()};
   await ac.insertOne(a);
-  return res.status(201).json({ok:true,pending:false,message:'আপনার অ্যাকাউন্ট খোলা হয়েছে। এখন আপনার অ্যাকাউন্টে লগইন করুন।',username:u,companyName:company});
+  return res.status(201).json({ok:true,pending:true,message:'আপনার রেজিস্ট্রেশন Admin approval-এর জন্য পাঠানো হয়েছে। অনুমোদনের পর লগইন করতে পারবেন।',username:u,companyName:company});
  }catch(e){res.status(500).json({error:'Registration service error'})}
 });
 
@@ -344,8 +344,8 @@ app.post('/api/auth/login',async(req,res)=>{
   const ac=col(ACCOUNT_COLLECTION);  if(ac)account=await ac.findOne({username:u});  if(account){
    if(!bcrypt.compareSync(p,account.passwordHash))return res.status(401).json({error:'Invalid username or password'});
    if(account.accountStatus==='disabled')return res.status(403).json({error:String(account.disabledMessage||'এই কোম্পানির অ্যাকাউন্ট প্রশাসক সাময়িকভাবে বন্ধ রেখেছেন। অনুগ্রহ করে STAR COMMUNICATION Admin-এর সঙ্গে যোগাযোগ করুন।').slice(0,500)});
-   if(account.approvalStatus==='pending'){await ac.updateOne({username:u},{$set:{approvalStatus:'approved',active:true,approvedAt:new Date().toISOString()}});account.approvalStatus='approved';account.active=true;}
-   if(account.approvalStatus==='rejected')return res.status(403).json({error:String(account.disabledMessage||'Your registration was not approved. Contact the administrator').slice(0,500)});
+   if(account.approvalStatus==='pending')return res.status(403).json({error:'Your registration is pending administrator approval. Please wait until the administrator approves your account.'});
+   if(account.approvalStatus==='rejected')return res.status(403).json({error:String(account.disabledMessage||'Your registration was rejected by the administrator. Contact the administrator.').slice(0,500)});
    if(account.active===false)return res.status(403).json({error:String(account.disabledMessage||'এই কোম্পানির অ্যাকাউন্ট প্রশাসক বন্ধ রেখেছেন।').slice(0,500)});
    const claims={username:account.username,role:account.role||'worker',owner:account.owner||account.username,permissions:Array.isArray(account.permissions)?account.permissions:(account.role==='worker'?['dashboard','customers','billing']:['dashboard','customers','billing','accounts','reports','sms'])};
    const token=jwt.sign(claims,JWT_SECRET,{expiresIn:'30d'});
