@@ -201,9 +201,9 @@ app.post('/api/auth/register',async(req,res)=>{
  try{
   const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
   if(await ac.findOne({username:u}))return res.status(409).json({error:'This Gmail account is already registered'});
-  const a={username:u,email:u,companyName:company,passwordHash:bcrypt.hashSync(p,12),role:'owner',owner:u,active:false,approvalStatus:'pending',createdAt:new Date().toISOString()};
+  const a={username:u,email:u,companyName:company,passwordHash:bcrypt.hashSync(p,12),role:'owner',owner:u,active:true,approvalStatus:'approved',createdAt:new Date().toISOString(),approvedAt:new Date().toISOString()};
   await ac.insertOne(a);
-  return res.status(202).json({ok:true,pending:true,message:'Registration submitted. Wait for administrator approval before logging in.',username:u,companyName:company});
+  return res.status(201).json({ok:true,pending:false,message:'আপনার অ্যাকাউন্ট খোলা হয়েছে। এখন আপনার অ্যাকাউন্টে লগইন করুন।',username:u,companyName:company});
  }catch(e){res.status(500).json({error:'Registration service error'})}
 });
 
@@ -298,6 +298,36 @@ app.post('/api/auth/password',auth,async(req,res)=>{
  await ac.updateOne({_id:account._id},{$set:{passwordHash:bcrypt.hashSync(next,12),passwordUpdatedAt:new Date().toISOString()}});
  return send(res,{ok:true,message:'Password updated'});
 });
+app.post('/api/auth/forgot-password/request',async(req,res)=>{
+ const email=String(req.body?.email||'').trim().toLowerCase();
+ if(!/^[^\s@]+@gmail\.com$/i.test(email))return res.status(400).json({error:'আপনার অ্যাকাউন্টের Gmail ঠিকানা দিন'});
+ try{
+  const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
+  const account=await ac.findOne({username:email});if(!account)return res.status(404).json({error:'এই Gmail দিয়ে কোনো অ্যাকাউন্ট পাওয়া যায়নি'});
+  if(account.resetOtpSentAt&&Date.now()-new Date(account.resetOtpSentAt).getTime()<60000)return res.status(429).json({error:'নতুন OTP পাঠানোর আগে ১ মিনিট অপেক্ষা করুন'});
+  const host=process.env.SMTP_HOST,user=process.env.SMTP_USER,pass=process.env.SMTP_PASS,from=process.env.SMTP_FROM||user;
+  if(!host||!user||!pass||!from)return res.status(503).json({error:'Email service সেটআপ করা নেই। Render-এ SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM সেট করুন।'});
+  const otp=String(crypto.randomInt(100000,1000000)),salt=crypto.randomBytes(16).toString('hex'),otpHash=crypto.createHash('sha256').update(salt+otp).digest('hex');
+  await ac.updateOne({username:email},{$set:{resetOtpHash:otpHash,resetOtpSalt:salt,resetOtpExpiresAt:new Date(Date.now()+600000).toISOString(),resetOtpSentAt:new Date().toISOString(),resetOtpAttempts:0}});
+  const transporter=nodemailer.createTransport({host,port:Number(process.env.SMTP_PORT||587),secure:String(process.env.SMTP_SECURE||'false')==='true',auth:{user,pass}});
+  await transporter.sendMail({from,to:email,subject:'STAR COMMUNICATION password reset OTP',text:'Your STAR COMMUNICATION password reset OTP is '+otp+'. It expires in 10 minutes. Do not share this code.',html:'<h2>STAR COMMUNICATION</h2><p>Your password reset OTP is:</p><p style="font-size:28px;font-weight:bold;letter-spacing:5px">'+otp+'</p><p>This code expires in 10 minutes. Do not share it.</p>'});
+  return send(res,{ok:true,message:'আপনার ইমেইলে OTP পাঠানো হয়েছে।'});
+ }catch(e){return res.status(500).json({error:'OTP ইমেইল পাঠানো যায়নি। SMTP সেটিংস যাচাই করুন।'})}
+});
+app.post('/api/auth/forgot-password/reset',async(req,res)=>{
+ const email=String(req.body?.email||'').trim().toLowerCase(),otp=String(req.body?.otp||'').trim(),password=String(req.body?.password||'');
+ if(!email||!/^[0-9]{6}$/.test(otp)||password.length<8)return res.status(400).json({error:'Gmail, ৬ সংখ্যার OTP এবং কমপক্ষে ৮ অক্ষরের নতুন পাসওয়ার্ড দিন'});
+ try{
+  const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
+  const account=await ac.findOne({username:email});if(!account||!account.resetOtpHash||!account.resetOtpExpiresAt)return res.status(400).json({error:'আগে OTP নিন'});
+  if(Date.now()>new Date(account.resetOtpExpiresAt).getTime()){await ac.updateOne({username:email},{$unset:{resetOtpHash:'',resetOtpSalt:'',resetOtpExpiresAt:''}});return res.status(400).json({error:'OTP-এর মেয়াদ শেষ। আবার OTP নিন'});}
+  if(Number(account.resetOtpAttempts||0)>=5)return res.status(429).json({error:'অনেকবার ভুল OTP দেওয়া হয়েছে। নতুন OTP নিন'});
+  const expected=crypto.createHash('sha256').update(String(account.resetOtpSalt||'')+otp).digest('hex');
+  if(expected!==account.resetOtpHash){await ac.updateOne({username:email},{$inc:{resetOtpAttempts:1}});return res.status(400).json({error:'OTP সঠিক নয়'});}
+  await ac.updateOne({username:email},{$set:{passwordHash:bcrypt.hashSync(password,12),passwordUpdatedAt:new Date().toISOString()},$unset:{resetOtpHash:'',resetOtpSalt:'',resetOtpExpiresAt:'',resetOtpSentAt:'',resetOtpAttempts:''}});
+  return send(res,{ok:true,message:'পাসওয়ার্ড পরিবর্তন হয়েছে। এখন নতুন পাসওয়ার্ড দিয়ে লগইন করুন।'});
+ }catch(e){return res.status(500).json({error:'পাসওয়ার্ড পরিবর্তন করা যায়নি'})}
+});
 app.post('/api/auth/login',async(req,res)=>{
  const {username,password}=req.body||{};
  const u=String(username||'').trim().toLowerCase(), p=String(password||'');
@@ -314,7 +344,7 @@ app.post('/api/auth/login',async(req,res)=>{
   const ac=col(ACCOUNT_COLLECTION);  if(ac)account=await ac.findOne({username:u});  if(account){
    if(!bcrypt.compareSync(p,account.passwordHash))return res.status(401).json({error:'Invalid username or password'});
    if(account.accountStatus==='disabled')return res.status(403).json({error:String(account.disabledMessage||'এই কোম্পানির অ্যাকাউন্ট প্রশাসক সাময়িকভাবে বন্ধ রেখেছেন। অনুগ্রহ করে STAR COMMUNICATION Admin-এর সঙ্গে যোগাযোগ করুন।').slice(0,500)});
-   if(account.approvalStatus==='pending'||account.active===false)return res.status(403).json({error:'Your registration is pending administrator approval'});
+   if(account.approvalStatus==='pending'||account.active===false){await ac.updateOne({username:u},{$set:{approvalStatus:'approved',active:true,approvedAt:new Date().toISOString()}});account.approvalStatus='approved';account.active=true;}
    if(account.approvalStatus==='rejected')return res.status(403).json({error:String(account.disabledMessage||'Your registration was not approved. Contact the administrator').slice(0,500)});
    const claims={username:account.username,role:account.role||'worker',owner:account.owner||account.username,permissions:Array.isArray(account.permissions)?account.permissions:(account.role==='worker'?['dashboard','customers','billing']:['dashboard','customers','billing','accounts','reports','sms'])};
    const token=jwt.sign(claims,JWT_SECRET,{expiresIn:'30d'});
