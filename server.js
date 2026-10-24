@@ -248,6 +248,20 @@ app.delete('/api/admin/companies/:username',auth,async(req,res)=>{
   return send(res,{ok:true,username:u,message:'Company deleted. This Gmail can register a new company again.'});
  }catch(e){console.error('Admin company delete failed:',u,e.message);return res.status(500).json({error:'Could not delete company. Check server logs.'})}
 });
+// POST fallback for Android WebViews or reverse proxies that block DELETE methods.
+app.post('/api/admin/companies/:username/delete',auth,async(req,res)=>{
+ if(!isSystemAdmin(req.user))return res.status(403).json({error:'System administrator access required'});
+ const u=String(req.params.username||'').trim().toLowerCase();
+ if(!u||u===String(ADMIN_USER).trim().toLowerCase())return res.status(400).json({error:'Cannot delete the system administrator account'});
+ const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
+ try{
+  const account=await ac.findOne({username:u});
+  if(!account||account.role==='worker')return res.status(404).json({error:'Company account not found'});
+  await ac.deleteOne({_id:account._id});
+  for(const name of ['app_state','company_integrations','sms_delivery_logs','complaints']){const c=col(name);if(c)await c.deleteMany({owner:u});}
+  return send(res,{ok:true,username:u,message:'Company deleted. This Gmail can register a new company again.'});
+ }catch(e){console.error('Admin company delete fallback failed:',u,e.message);return res.status(500).json({error:'Could not delete company. Check server logs.'})}
+});
 app.post('/api/admin/companies/:username/status',auth,async(req,res)=>{
  if(!isSystemAdmin(req.user))return res.status(403).json({error:'System administrator access required'});
  const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
