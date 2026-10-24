@@ -358,15 +358,31 @@ async function adminCompanyStatus(username,enabled,message=''){
 }
 async function adminRegistration(username,action){
  if(!['approve','reject'].includes(action)){toast('Invalid registration action');return}
- if(!confirm((action==='approve'?'Approve':'Reject')+' registration for '+username+'?'))return;
- const buttons=[...document.querySelectorAll('button[onclick*="adminRegistration("]')];buttons.forEach(b=>{if(b.getAttribute('onclick')&&b.getAttribute('onclick').includes(encodeURIComponent(username)))b.disabled=true});
+ const target=String(username||'').trim().toLowerCase();
+ if(!target){toast('Company Gmail/username missing');return}
+ const cards=[...document.querySelectorAll('#masterAdminBody button[onclick*="adminRegistration("]')];
+ const card=cards.find(b=>(b.getAttribute('onclick')||'').includes(encodeURIComponent(target)));
+ cards.forEach(b=>b.disabled=true);
+ const el=document.getElementById('masterAdminBody');
+ let status=document.getElementById('masterRegistrationActionStatus');
+ if(!status&&el){status=document.createElement('div');status.id='masterRegistrationActionStatus';status.style.cssText='position:sticky;top:6px;z-index:10;padding:12px;margin:8px 0;border-radius:10px;background:#dbeafe;color:#1e3a8a;font-weight:800';el.prepend(status)}
+ if(status)status.textContent=(action==='approve'?'Approving':'Rejecting')+' '+target+'…';
  try{
-  const url=masterApiBase()+'/api/admin/registrations/'+encodeURIComponent(String(username).trim().toLowerCase())+'/'+action;
-  const r=await fetch(url,{method:'POST',headers:{...cloudHeaders(),'Cache-Control':'no-cache'},body:JSON.stringify({}),cache:'no-store'});
-  const x=await r.json().catch(()=>({}));if(!r.ok)throw new Error(x.error||'Registration update failed (HTTP '+r.status+')');
-  toast(action==='approve'?(x.emailSent?'Company approved; Gmail notification sent':'Company approved and moved out of Pending'): 'Company rejected and removed from Pending');
+  const base=masterApiBase(),token=cloudConfig().token;
+  if(!token)throw new Error('Admin login session expired. Log out and sign in again.');
+  const url=base+'/api/admin/registrations/'+encodeURIComponent(target)+'/'+action;
+  const r=await fetch(url,{method:'POST',headers:{...cloudHeaders(),'Cache-Control':'no-cache'},body:'{}',cache:'no-store'});
+  const x=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(x.error||('Server request failed (HTTP '+r.status+'). Check Render deployment.'));
+  if(status){status.style.background='#dcfce7';status.style.color='#166534';status.textContent=action==='approve'?'✓ Approved — refreshing company list…':'✓ Rejected — refreshing company list…'}
+  toast(action==='approve'?(x.emailSent?'Company approved; Gmail notification sent':'Company approved successfully'): 'Company rejected successfully');
   await loadMasterAdmin();
- }catch(e){toast((e.message||'Registration update failed')+' — refresh and retry');await loadMasterAdmin()}
+ }catch(e){
+  const msg=e.message||'Registration action failed';
+  if(status){status.style.background='#fee2e2';status.style.color='#991b1b';status.textContent='Action failed: '+msg}
+  toast(msg);
+  cards.forEach(b=>b.disabled=false);
+ }
 }
 async function loadCompanyFeatures(username){
  const target=document.getElementById('features-'+encodeURIComponent(username));if(!target)return;target.textContent='Loading feature permissions…';
