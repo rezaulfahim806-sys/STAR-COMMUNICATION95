@@ -52,7 +52,45 @@
 #oltMonitorDashboard .btn{box-shadow:0 3px 8px #10213d18}
 #oltMonitorDashboard .btn.dark{background:linear-gradient(120deg,#10213d,#145da0)}
 #oltMonitorDashboard .btn.light{border:1px solid #d8e5f4;background:#edf5ff;color:#145da0}
-@media(max-width:360px){#oltMonitorDashboard>.section{padding:11px}}</style><!-- SMS composer + customer search fix -->
+@media(max-width:360px){#oltMonitorDashboard>.section{padding:11px}}/* Responsive full-screen layout: compact on phones, wide on laptop/desktop */
+@media (min-width: 768px){
+  html,body{width:100%;min-height:100%;font-size:15px}
+  body{background:#eef2f7}
+  .app{width:100%;max-width:none;margin:0;min-height:100vh;box-shadow:none}
+  .header{height:76px;padding:12px 28px}
+  .top{height:52px;gap:14px}
+  .logo{width:46px;height:46px}
+  .icon{width:46px;font-size:28px}
+  .brand{font-size:25px;line-height:1.15}
+  .content{width:100%;max-width:none;margin:0;padding:24px 28px 100px}
+  .title{font-size:28px;margin-bottom:8px}
+  .sub,.muted{font-size:13px}
+  .grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+  .stat{min-height:112px;padding:18px;border-radius:16px}
+  .stat .label{font-size:14px}
+  .bottom{left:0;right:0;transform:none;width:100%;height:74px}
+  .bottom button{font-size:14px}
+  .bottom button span{font-size:22px}
+  .drawer{width:320px;max-width:85vw}
+  .modal,.sheet,.modal-card{max-width:min(900px,94vw)}
+  .dashboardHero{padding:30px 28px!important;border-radius:0 0 22px 22px!important}
+  .dashboardHero .heroTitle{font-size:clamp(30px,2.4vw,42px)!important}
+  .dashboardHero .dashActions{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:14px!important}
+  .dashGrid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:14px!important}
+  .dashGrid .stat{min-height:112px!important;padding:18px!important}
+  .dashSectionTitle{font-size:19px!important;margin-top:24px!important}
+  table{font-size:14px}
+  input,select,textarea,button{font-size:inherit}
+}
+@media (min-width:1200px){
+  .content{padding:28px 36px 110px}
+  .header{padding-left:36px;padding-right:36px}
+  .dashGrid{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+}
+@media (max-width:767px){
+  .app{width:100%;max-width:520px;margin:0 auto}
+}
+</style><!-- SMS composer + customer search fix -->
 </head><body><div class="app"><header class="header"><div class="top"><button class="icon" onclick="openDrawer()">☰</button><img class="logo" src="logo.svg"><div class="brand">STAR COMMUNICATION</div><button class="icon" onclick="openCustomerSearch()">⌕</button></div></header><main id="content" class="content"></main><nav class="bottom"><button id="nav-dashboard" onclick="go('dashboard')"><span>🏠</span>Dashboard</button><button id="nav-customers" onclick="go('customers')"><span>👥</span>Customer</button><button id="nav-billing" onclick="go('billing')"><span>💳</span>Billing</button><button id="nav-accounts" onclick="go('accounts')"><span>💰</span>Accounts</button></nav></div><div id="shade" class="drawerShade" onclick="closeDrawer()"><aside class="drawer" onclick="event.stopPropagation()"><button class="close" onclick="closeDrawer()">×</button><div style="display:flex;gap:9px;align-items:center"><img class="logo" src="logo.svg"><div><b>STAR COMMUNICATION</b><div style="font-size:11px;color:#cbd7ea">ISP Manager</div></div></div><div class="menu"><button onclick="go('dashboard');closeDrawer()">🏠 Dashboard</button><button onclick="go('customers');closeDrawer()">👥 Customers</button><button onclick="go('billing');closeDrawer()">💳 Billing & Merchant</button><button onclick="go('analytics');closeDrawer()">📈 Growth & Analytics</button><button onclick="go('referrals');closeDrawer()">🎁 রেফারেল অফার</button><button onclick="go('accounts');closeDrawer()">💰 Accounts</button><button onclick="openIspAccount()">🏢 ISP Account</button><button onclick="openSettings()">⚙️ Settings</button><button onclick="backupData()">⬇️ Backup Data</button><button onclick="document.getElementById('restore').click()">⬆️ Restore Data</button></div></aside></div><input id="restore" type="file" accept="application/json" style="display:none" onchange="restoreData(event)"><div id="modal" class="modal"><div id="sheet" class="sheet"></div></div><div id="toast" class="toast"></div><div id="printArea" style="display:none"></div><script>'use strict';const KEY='star_communication_final_v2',LEGACY_KEY='star_communication_final_v1',DEF={customers:[],payments:[],expenses:[],pending:[],history:[],settings:{app:'STAR COMMUNICATION',password:'1234',merchantNumber:'',lastBillingMonth:'',cloud:{apiUrl:'https://star-communication-api.onrender.com',username:'',token:''},olt:{ip:'',user:'',password:'',vendor:'VSOL',protocol:'telnet',port:23}}};let d;try{d=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem(LEGACY_KEY)||'null')}catch(e){d=null}if(!d)d=JSON.parse(JSON.stringify(DEF));else if(!localStorage.getItem(KEY)){try{localStorage.setItem(KEY,JSON.stringify(d))}catch(e){}}['customers','payments','expenses','pending','history'].forEach(k=>{if(!Array.isArray(d[k]))d[k]=[]});d.settings=Object.assign({},DEF.settings,d.settings||{});d.settings.cloud=Object.assign({},DEF.settings.cloud,d.settings.cloud||{});if(!d.settings.cloud.apiUrl)d.settings.cloud.apiUrl='https://star-communication-api.onrender.com';d.settings.olt=Object.assign({},DEF.settings.olt,d.settings.olt||{});if(!d.settings.olt.protocol)d.settings.olt.protocol='ssh';if(!d.settings.olt.port)d.settings.olt.port=(d.settings.olt.protocol==='telnet'?23:22);if(d.settings.olt.protocol==='telnet'&&Number(d.settings.olt.port)===23){d.settings.olt.protocol='ssh';d.settings.olt.port=22;}let page='dashboard',opts={},stack=[],isAuthenticated=false,idleTimer=null;const IDLE_LIMIT=15*60*1000;const pad=n=>String(n).padStart(2,'0'),localDate=()=>{let x=new Date();return x.getFullYear()+'-'+pad(x.getMonth()+1)+'-'+pad(x.getDate())},today=()=>localDate(),dateKey=value=>{let s=String(value??'').trim();if(!s)return '';let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(m)return m[1]+'-'+pad(m[2])+'-'+pad(m[3]);m=s.match(/^(\d{1,2})[\/. -](\d{1,2})[\/. -](\d{4})$/);if(m)return m[3]+'-'+pad(m[2])+'-'+pad(m[1]);m=s.match(/^(\d{1,2})[- ]([A-Za-z]{3,})[- ](\d{4})$/);if(m){let ix=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(m[2].slice(0,3).toLowerCase());if(ix>=0)return m[3]+'-'+pad(ix+1)+'-'+pad(m[1])}return s.slice(0,10)},month=()=>today().slice(0,7),money=n=>'৳'+Number(n||0).toLocaleString('en-US'),esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));let cloudSyncTimer=0,cloudBusy=false;
 function cloudConfig(){return d.settings&&d.settings.cloud||{}}
 function cloudHeaders(){let h={'Content-Type':'application/json'};let tok=cloudConfig().token;if(tok)h.Authorization='Bearer '+tok;return h}
@@ -301,44 +339,6 @@ async function loadMasterAdmin(){
   const regCards=regs.map(a=>{const u=String(a.username||''),encoded=encodeURIComponent(u);return '<div style="background:#fff;border:1px solid #e1eaf5;border-radius:15px;padding:14px;margin:9px 0;color:#14233d;box-shadow:0 5px 14px #001a3510"><div style="display:flex;gap:10px;align-items:center"><div style="width:42px;height:42px;display:grid;place-items:center;background:#fff3d6;border-radius:12px;font-size:22px">⏳</div><div style="flex:1;min-width:0"><b>'+eh(a.companyName||u)+'</b><div style="font-size:11px;color:#64748b;overflow-wrap:anywhere">'+eh(u)+'</div><div style="font-size:11px;color:#a16207;margin-top:4px">Pending approval</div></div></div><div style="display:flex;gap:8px;margin-top:12px"><button type="button" class="btn green" style="flex:1" onclick="adminRegistration(decodeURIComponent(\''+encoded+'\'),\'approve\')">✓ Approve & Activate</button><button type="button" class="btn red" style="flex:1" onclick="adminRegistration(decodeURIComponent(\''+encoded+'\'),\'reject\')">Reject</button></div></div>'}).join('');
   const companyCards=shown.map((a,i)=>{const u=String(a.username||''),encoded=encodeURIComponent(u),msgId='masterDisableMsg'+i,featureId='features-'+encoded,isActive=!!a.active&&a.status==='approved';const onlineBadge=a.online?'<span style="background:#dcfce7;color:#166534;padding:5px 8px;border-radius:20px;font-size:10px;font-weight:900">● ONLINE</span>':'<span style="background:#e2e8f0;color:#475569;padding:5px 8px;border-radius:20px;font-size:10px;font-weight:900">● OFFLINE</span>';const lastSeen=a.lastSeenAt?new Date(a.lastSeenAt).toLocaleString():'No recent login';return '<div style="background:#fff;border:1px solid #dce7f5;border-radius:16px;padding:14px;margin:10px 0;color:#14233d;box-shadow:0 5px 16px #001a3510"><div style="display:flex;gap:10px;align-items:flex-start"><div style="width:44px;height:44px;flex-shrink:0;border-radius:13px;background:linear-gradient(145deg,#0b4c9b,#1686db);color:#fff;display:grid;place-items:center;font-size:22px;font-weight:900">★</div><div style="flex:1;min-width:0"><div style="display:flex;gap:7px;justify-content:space-between;align-items:center;flex-wrap:wrap"><b style="font-size:15px">'+eh(a.companyName||u)+'</b>'+onlineBadge+'</div><div style="font-size:11px;color:#64748b;overflow-wrap:anywhere;margin-top:4px">'+eh(u)+'</div><div style="font-size:11px;color:#64748b;margin-top:5px">Status: <b style="color:'+(isActive?'#15803d':a.status==='pending'?'#a16207':'#b91c1c')+'">'+eh(a.status||'unknown').toUpperCase()+'</b></div><div style="font-size:10px;color:#64748b;margin-top:3px">Last activity: '+eh(lastSeen)+'</div></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:13px"><button type="button" class="btn '+(isActive?'red':'green')+'" onclick="adminCompanyStatus(decodeURIComponent(\''+encoded+'\'),'+(!isActive)+',document.getElementById(\''+msgId+'\').value)">'+(isActive?'Disable Company':'Enable Company')+'</button><button type="button" class="btn dark" onclick="loadCompanyFeatures(decodeURIComponent(\''+encoded+'\'))">⚙ Feature Permissions</button></div><div style="margin-top:10px;background:#f4f8fd;border:1px solid #e2eaf5;border-radius:11px;padding:10px"><div style="font-size:11px;color:#425875;font-weight:800;margin-bottom:5px">Current feature access</div><div id="'+featureId+'" style="font-size:11px;color:#64748b">Tap Feature Permissions to view and edit selected features.</div></div><details style="margin-top:9px"><summary style="font-size:11px;color:#52647b;cursor:pointer">Disabled-account message</summary><textarea id="'+msgId+'" class="input" rows="2" placeholder="Message shown when disabled">'+eh(a.disabledMessage||'এই কোম্পানির অ্যাকাউন্ট STAR COMMUNICATION Admin বন্ধ রেখেছেন। অনুগ্রহ করে Admin-এর সঙ্গে যোগাযোগ করুন।')+'</textarea></details></div>'}).join('');
   el.innerHTML='<style>.masterKpi{border-radius:15px;padding:13px;color:#fff;min-width:0;box-shadow:0 7px 18px #0002}.masterKpi small{display:block;font-size:10px;opacity:.88;font-weight:800}.masterKpi b{display:block;font-size:27px;margin-top:7px}.masterSectionTitle{font-size:16px;font-weight:900;margin:22px 0 8px;color:#fff;display:flex;align-items:center;gap:8px}.masterCount{font-size:10px;background:#24496f;color:#dbeafe;border-radius:20px;padding:5px 8px}
-/* Responsive full-screen layout: compact on phones, wide on laptop/desktop */
-@media (min-width: 768px){
-  html,body{width:100%;min-height:100%;font-size:15px}
-  body{background:#eef2f7}
-  .app{width:100%;max-width:none;margin:0;min-height:100vh;box-shadow:none}
-  .header{height:76px;padding:12px 28px}
-  .top{height:52px;gap:14px}
-  .logo{width:46px;height:46px}
-  .icon{width:46px;font-size:28px}
-  .brand{font-size:25px;line-height:1.15}
-  .content{width:100%;max-width:none;margin:0;padding:24px 28px 100px}
-  .title{font-size:28px;margin-bottom:8px}
-  .sub,.muted{font-size:13px}
-  .grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
-  .stat{min-height:112px;padding:18px;border-radius:16px}
-  .stat .label{font-size:14px}
-  .bottom{left:0;right:0;transform:none;width:100%;height:74px}
-  .bottom button{font-size:14px}
-  .bottom button span{font-size:22px}
-  .drawer{width:320px;max-width:85vw}
-  .modal,.sheet,.modal-card{max-width:min(900px,94vw)}
-  .dashboardHero{padding:30px 28px!important;border-radius:0 0 22px 22px!important}
-  .dashboardHero .heroTitle{font-size:clamp(30px,2.4vw,42px)!important}
-  .dashboardHero .dashActions{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:14px!important}
-  .dashGrid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:14px!important}
-  .dashGrid .stat{min-height:112px!important;padding:18px!important}
-  .dashSectionTitle{font-size:19px!important;margin-top:24px!important}
-  table{font-size:14px}
-  input,select,textarea,button{font-size:inherit}
-}
-@media (min-width:1200px){
-  .content{padding:28px 36px 110px}
-  .header{padding-left:36px;padding-right:36px}
-  .dashGrid{grid-template-columns:repeat(4,minmax(0,1fr))!important}
-}
-@media (max-width:767px){
-  .app{width:100%;max-width:520px;margin:0 auto}
-}
 </style><div style="background:linear-gradient(145deg,#071a35,#0b3264 60%,#0759a7);padding:16px;border-radius:18px;margin-bottom:14px;border:1px solid #244d7a;box-shadow:0 10px 28px #0003"><div style="display:flex;align-items:center;gap:11px"><div style="width:50px;height:50px;border-radius:15px;background:#ffffff18;border:1px solid #ffffff30;display:grid;place-items:center;font-size:29px">🛡️</div><div><div style="font-size:19px;font-weight:900;letter-spacing:.2px">Master Admin</div><div style="font-size:11px;color:#bfdbfe;margin-top:3px">STAR COMMUNICATION · Control Center</div></div></div><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:17px"><div class="masterKpi" role="button" onclick="setMasterCompanyFilter(&quot;all&quot;)" style="cursor:pointer;background:linear-gradient(130deg,#1677d2,#0752a0)"><small>TOTAL COMPANIES · TAP ALL</small><b>'+all.length+'</b></div><div class="masterKpi" role="button" onclick="setMasterCompanyFilter(&quot;active&quot;)" style="cursor:pointer;background:linear-gradient(130deg,#0eb779,#047857)"><small>ACTIVE · TAP TO VIEW</small><b>'+active+'</b></div><div class="masterKpi" role="button" onclick="setMasterCompanyFilter(&quot;inactive&quot;)" style="cursor:pointer;background:linear-gradient(130deg,#64748b,#334155)"><small>INACTIVE · TAP TO VIEW</small><b>'+inactive+'</b></div><div class="masterKpi" style="background:linear-gradient(130deg,#22b8cf,#087e8b)"><small>ONLINE NOW</small><b>'+online+'</b></div><div class="masterKpi" style="background:linear-gradient(130deg,#f59e0b,#c2410c)"><small>PENDING APPROVAL</small><b>'+pending+'</b></div></div><div style="font-size:10px;color:#bfdbfe;margin-top:10px">Online = company app activity within the last 2 minutes. Refresh updates the status.</div></div><h3 class="masterSectionTitle">⏳ Pending Registrations <span class="masterCount">'+pending+'</span></h3>'+(regCards||'<div style="background:#10294b;padding:14px;border-radius:12px;color:#bfdbfe">No pending registrations.</div>')+'<h3 class="masterSectionTitle">🏢 Company Accounts · '+(filter==='active'?'Active':filter==='inactive'?'Inactive':'All Companies')+' <span class="masterCount">'+shown.length+'</span></h3>'+(companyCards||'<div style="background:#10294b;padding:14px;border-radius:12px;color:#bfdbfe">No company accounts found.</div>');
  }catch(e){el.innerHTML='<div class="section danger"><b>Master Admin could not load</b><div>'+esc(e.message||'Request failed')+'</div><button class="btn light full" style="margin-top:8px" onclick="loadMasterAdmin()">Try again</button></div>'}
 }
