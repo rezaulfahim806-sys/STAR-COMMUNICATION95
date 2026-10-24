@@ -263,29 +263,43 @@ app.put('/api/admin/companies/:username/features',auth,async(req,res)=>{
 
 // System-admin approval queue for newly registered ISP/company accounts.
 app.get('/api/admin/registrations',auth,async(req,res)=>{
- if(!isSystemAdmin(req.user))return res.status(403).json({error:'System administrator access required'});
+ if(!isSystemAdmin(req.user))return res.status(403).json({error:'System administrator access required. Verify ADMIN_USER in Render and sign in again.'});
  const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
- const accounts=await ac.find({approvalStatus:'pending'}).sort({createdAt:1}).project({passwordHash:0}).toArray();
- send(res,{ok:true,registrations:accounts.map(a=>({username:a.username,email:a.email||a.username,companyName:a.companyName||'',createdAt:a.createdAt,status:a.approvalStatus||'pending'}))});
+ try{
+  const accounts=await ac.find({approvalStatus:'pending'}).sort({createdAt:1}).project({passwordHash:0}).toArray();
+  return send(res,{ok:true,registrations:accounts.map(a=>({username:a.username,email:a.email||a.username,companyName:a.companyName||'',createdAt:a.createdAt||'',status:'pending'}))});
+ }catch(e){console.error('Admin registration queue failed:',e.message);return res.status(500).json({error:'Could not load registration queue. Check MongoDB connection.'})}
 });
-app.post('/api/admin/registrations/:username/approve',auth,async(req,res)=>{
- if(!isSystemAdmin(req.user))return res.status(403).json({error:'System administrator access required'});
- const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
- const u=String(req.params.username||'').trim().toLowerCase();
- const account=await ac.findOne({username:u,approvalStatus:'pending'});if(!account)return res.status(404).json({error:'Pending registration not found'});
- const result=await ac.updateOne({username:u,approvalStatus:'pending'},{$set:{active:true,approvalStatus:'approved',approvedAt:new Date().toISOString(),approvedBy:req.user.username}});
- if(!result.matchedCount)return res.status(404).json({error:'Pending registration not found'});
- let emailStatus={sent:false,reason:'No email address on registration'};try{emailStatus=await sendApprovalEmail(account.email||account.username,account.companyName||'Company')}catch(e){console.error('Approval email failed:',e.message);emailStatus={sent:false,reason:'Email send failed; check SMTP configuration'}}
- send(res,{ok:true,message:'Registration approved',username:u,emailSent:emailStatus.sent,emailMessage:emailStatus.sent?'Approval email sent':'Account approved; email notification not sent. '+emailStatus.reason});
-});
-app.post('/api/admin/registrations/:username/reject',auth,async(req,res)=>{
- if(!isSystemAdmin(req.user))return res.status(403).json({error:'System administrator access required'});
+async function updateRegistrationDecision(req,res,decision){
+ if(!isSystemAdmin(req.user))return res.status(403).json({error:'System administrator access required. Verify ADMIN_USER in Render and sign in again.'});
  const ac=col(ACCOUNT_COLLECTION);if(!ac)return res.status(503).json({error:'Cloud database is not configured'});
  const u=String(req.params.username||'').trim().toLowerCase();
- const result=await ac.updateOne({username:u,approvalStatus:'pending'},{$set:{active:false,approvalStatus:'rejected',rejectedAt:new Date().toISOString(),rejectedBy:req.user.username}});
- if(!result.matchedCount)return res.status(404).json({error:'Pending registration not found'});
- send(res,{ok:true,message:'Registration rejected',username:u});
-});
+ if(!u)return res.status(400).json({error:'Company Gmail/username is required'});
+ try{
+  const account=await ac.findOne({username:u});
+  if(!account||account.role==='worker')return res.status(404).json({error:'Registration account not found'});
+  if(account.approvalStatus===decision){
+   return send(res,{ok:true,message:decision==='approved'?'Company is already approved':'Company is already rejected',username:u,status:decision,alreadyApplied:true});
+  }
+  if(account.approvalStatus!=='pending')return res.status(409).json({error:'Registration is no longer pending (current status: '+String(account.approvalStatus||'not set')+'). Refresh the Admin dashboard.'});
+  const now=new Date().toISOString();
+  const fields=decision==='approved'?{active:true,approvalStatus:'approved',approvedAt:now,approvedBy:req.user.username}:{active:false,approvalStatus:'rejected',rejectedAt:now,rejectedBy:req.user.username};
+  const result=await ac.updateOne({_id:account._id,approvalStatus:'pending'},{$set:fields});
+  if(!result.matchedCount){
+   const latest=await ac.findOne({username:u});
+   if(latest&&latest.approvalStatus===decision)return send(res,{ok:true,message:'Registration '+decision,username:u,status:decision,alreadyApplied:true});
+   return res.status(409).json({error:'Registration status changed before this action completed. Refresh the Admin dashboard.'});
+  }
+  if(decision==='approved'){
+   let emailStatus={sent:false,reason:'No email address on registration'};
+   try{emailStatus=await sendApprovalEmail(account.email||account.username,account.companyName||'Company')}catch(e){console.error('Approval email failed:',e.message);emailStatus={sent:false,reason:'Email send failed; check SMTP configuration'}}
+   return send(res,{ok:true,message:'Registration approved',username:u,status:decision,emailSent:emailStatus.sent,emailMessage:emailStatus.sent?'Approval email sent':'Account approved; email notification not sent. '+emailStatus.reason});
+  }
+  return send(res,{ok:true,message:'Registration rejected',username:u,status:decision});
+ }catch(e){console.error('Registration decision failed:',decision,u,e.message);return res.status(500).json({error:'Could not '+decision+' registration. Check Render logs and MongoDB connection.'})}
+}
+app.post('/api/admin/registrations/:username/approve',auth,(req,res)=>updateRegistrationDecision(req,res,'approved'));
+app.post('/api/admin/registrations/:username/reject',auth,(req,res)=>updateRegistrationDecision(req,res,'rejected'));
 
 app.post('/api/auth/password',auth,async(req,res)=>{
  const current=String(req.body&&req.body.currentPassword||'');
