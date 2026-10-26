@@ -1016,7 +1016,7 @@ app.post('/api/integrations/sms/short-link',auth,async(req,res)=>{
   const links=col('payment_short_links');if(!links)return res.status(503).json({error:'Short link service unavailable'});
   const token=require('crypto').randomBytes(6).toString('base64url');
   await links.insertOne({token,url:target.toString(),owner:String(ownerOf(req.user)||'').trim().toLowerCase(),createdAt:new Date().toISOString()});
-  const base=String(PUBLIC_URL||'https://star-communication-api.onrender.com').replace(/\\/+$/,'');
+  const base=String(PUBLIC_URL||'https://star-communication-api.onrender.com').replace(/\/+$/,'');
   return res.json({ok:true,shortUrl:base+'/p/'+token});
  }catch(e){return res.status(500).json({error:'Could not create short payment link'})}
 });
