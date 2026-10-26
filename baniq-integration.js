@@ -198,11 +198,18 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
         // so harmless casing/spacing or numeric-string differences do not reject a valid choice.
         const normalizePackageName = value => String(value || '').trim().replace(/\s+/g, ' ').replace(/\s*mbps\s*$/i, '').trim().toLocaleLowerCase();
         const livePackage = packages.find(p =>
-          normalizePackageName(p && (p.speed || p.name)) === normalizePackageName(selectedPackage) &&
-          Math.abs(Number(p && (p.price ?? p.fee ?? 0)) - packagePrice) < 0.01
+          normalizePackageName(p && (p.speed || p.name)) === normalizePackageName(selectedPackage)
         );
         if (!livePackage) {
-          return res.status(409).json({ error: 'Selected package or price is no longer in the company package list. Sync package settings from the admin app to Render, then create a new payment link.' });
+          return res.status(409).json({ error: 'This package is not published in this company account. Open Admin > Settings > Manage Payment Packages, publish the package list, then create a new payment link.' });
+        }
+        // Use the current cloud package price as the source of truth. A stale payment link
+        // must not fail checkout solely because its embedded price is old, and clients
+        // must never be able to submit an arbitrary amount.
+        selectedPackage = String(livePackage.speed || livePackage.name).trim();
+        packagePrice = Number(livePackage.price ?? livePackage.fee ?? 0);
+        if (!selectedPackage || !Number.isFinite(packagePrice) || packagePrice <= 0) {
+          return res.status(409).json({ error: 'The selected company package has an invalid price. Update the package in Admin Settings.' });
         }
       } else {
         // OFF means the customer cannot choose a package: use the saved assignment as the
