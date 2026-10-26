@@ -1007,7 +1007,20 @@ app.post('/api/billing/verify-payment',auth,async(req,res)=>{
  }catch(e){res.status(502).json({ok:false,verified:false,error:'Payment verification failed: '+String(e.message||'Request failed').slice(0,180)})}
 });
 
-app.get('/p/:token',async(req,res)=>{try{const token=String(req.params.token||'').trim();if(!/^[A-Za-z0-9_-]{10,40}$/.test(token))return res.status(404).send('Payment link not found');const links=col('payment_short_links');if(!links)return res.status(503).send('Payment link service unavailable');const row=await links.findOne({token});if(!row||!/^https:\/\//i.test(String(row.url||'')))return res.status(404).send('Payment link expired or not found');return res.redirect(302,row.url)}catch(e){return res.status(500).send('Could not open payment link')}});
+app.post('/api/integrations/sms/short-link',auth,async(req,res)=>{
+ try{
+  const raw=String(req.body&&req.body.url||'').trim();
+  if(raw.length>12000)return res.status(400).json({error:'Payment URL is too long'});
+  let target;try{target=new URL(raw)}catch(e){return res.status(400).json({error:'Invalid payment URL'})}
+  if(target.protocol!=='https:'||target.hostname!=='rezaulfahim806-sys.github.io'||target.pathname!=='/STAR-COMMUNICATION95/pay.html'||target.username||target.password)return res.status(400).json({error:'Only the STAR COMMUNICATION payment page can be shortened'});
+  const links=col('payment_short_links');if(!links)return res.status(503).json({error:'Short link service unavailable'});
+  const token=require('crypto').randomBytes(6).toString('base64url');
+  await links.insertOne({token,url:target.toString(),owner:String(ownerOf(req.user)||'').trim().toLowerCase(),createdAt:new Date().toISOString()});
+  const base=String(PUBLIC_URL||'https://star-communication-api.onrender.com').replace(/\\/+$/,'');
+  return res.json({ok:true,shortUrl:base+'/p/'+token});
+ }catch(e){return res.status(500).json({error:'Could not create short payment link'})}
+});
+app.get('/p/:token',async(req,res)=>{try{const token=String(req.params.token||'').trim();if(!/^[A-Za-z0-9_-]{10,40}$/.test(token))return res.status(404).send('Payment link not found');const links=col('payment_short_links');if(!links)return res.status(503).send('Payment link service unavailable');const row=await links.findOne({token});let target;try{target=new URL(String(row&&row.url||''))}catch(e){return res.status(404).send('Payment link expired or not found')}if(target.protocol!=='https:'||target.hostname!=='rezaulfahim806-sys.github.io'||target.pathname!=='/STAR-COMMUNICATION95/pay.html')return res.status(404).send('Payment link expired or not found');return res.redirect(302,target.toString())}catch(e){return res.status(500).send('Could not open payment link')}});
 
 require('./baniq-integration')(app,{col,ownerOf,PUBLIC_URL, PAYMENT_PAGE_URL, integrationSettings, callConfiguredApi, getBaniqCredentials, auth});
 
