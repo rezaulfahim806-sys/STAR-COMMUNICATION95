@@ -840,7 +840,12 @@ async function getBaniqCredentials(owner){
  if(!c)throw new Error('Cloud database is not configured');
  const row=await c.findOne({owner:String(owner)});
  const baniq=row&&row.baniq||{};
- return {keyId:String(baniq.keyId||''),secret:decryptIntegrationSecret(baniq.secret)};
+ const companyKeyId=String(baniq.keyId||'').trim(),companySecret=decryptIntegrationSecret(baniq.secret);
+ // Allow a shared Render-configured Baniq merchant for newly registered companies;
+ // checkout sessions and all customer/payment records still remain scoped to company owner.
+ const sharedKeyId=String(process.env.BANIQ_API_KEY_ID||'').trim();
+ const sharedSecret=String(process.env.BANIQ_API_SECRET||'').trim();
+ return companyKeyId&&companySecret?{keyId:companyKeyId,secret:companySecret}:{keyId:sharedKeyId,secret:sharedSecret};
 }
 app.get('/api/integrations/baniq/settings',auth,async(req,res)=>{
  if(!isOwner(req.user))return res.status(403).json({error:'Company owner access required'});
@@ -848,7 +853,9 @@ app.get('/api/integrations/baniq/settings',auth,async(req,res)=>{
   const c=col('company_integrations');if(!c)return res.status(503).json({error:'Cloud database is not configured'});
   const row=await c.findOne({owner:ownerOf(req.user)});
   const cfg=row&&row.baniq||{};
-  return send(res,{ok:true,configured:!!(cfg.keyId&&cfg.secret&&cfg.secret.data),keyId:cfg.keyId||'',apiBase:(process.env.BANIQ_API_BASE||'https://api.baniq.app').replace(/\/$/,'')});
+  const companyConfigured=!!(cfg.keyId&&decryptIntegrationSecret(cfg.secret));
+  const sharedConfigured=!!(process.env.BANIQ_API_KEY_ID&&process.env.BANIQ_API_SECRET);
+  return send(res,{ok:true,configured:companyConfigured||sharedConfigured,keyId:cfg.keyId||(sharedConfigured?String(process.env.BANIQ_API_KEY_ID):''),sharedCredentials:!companyConfigured&&sharedConfigured,apiBase:(process.env.BANIQ_API_BASE||'https://api.baniq.app').replace(/\/$/,'')});
  }catch(e){return res.status(503).json({error:String(e.message||'Could not read Baniq settings').slice(0,160)})}
 });
 app.put('/api/integrations/baniq/settings',auth,async(req,res)=>{
