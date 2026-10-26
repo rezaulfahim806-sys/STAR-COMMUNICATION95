@@ -755,9 +755,10 @@ function readApiPath(obj,path){
  return String(path).split('.').reduce((v,k)=>v==null?undefined:v[k],obj);
 }
 function configuredHttpsUrl(raw){
- let u;try{u=new URL(String(raw||''))}catch(e){throw new Error('A valid HTTPS API URL is required')}
- if(u.protocol!=='https:'||!u.hostname||u.username||u.password)throw new Error('API endpoint must use HTTPS');
+ let u;try{u=new URL(String(raw||''))}catch(e){throw new Error('A valid API URL is required')}
  const h=u.hostname.toLowerCase();
+ const khudeBartaHost=['portal.khudebarta.com','161.248.247.60'].includes(h);
+ if((u.protocol!=='https:'&&!(u.protocol==='http:'&&khudeBartaHost))||!u.hostname||u.username||u.password)throw new Error('API endpoint must use HTTPS, except the approved Khude Barta hosts');
  if(h==='localhost'||h==='127.0.0.1'||h==='::1'||h.endsWith('.local'))throw new Error('Local API endpoints are not allowed');
  return u;
 }
@@ -792,12 +793,15 @@ async function callConfiguredApi(cfg,{transactionId,amount,customerId,phone,mess
   }finally{clearTimeout(timer)}
  }
  const method=String(cfg.method||'POST').toUpperCase()==='GET'?'GET':'POST';
- const key=String(cfg.apiKey||'').trim();
- if(!key)throw new Error('API key/token is missing in Settings');
- const payload={transactionId:transactionId||'',trxID:transactionId||'',amount:Number(amount||0),customerId:customerId||'',to:phone||'',phone:phone||'',message:message||'',senderid:cfg.senderId||'',senderId:cfg.senderId||''};
+ const khudeBarta = ['portal.khudebarta.com','161.248.247.60'].includes(u.hostname.toLowerCase()) || String(cfg.provider||'').toLowerCase()==='khudebarta';
+ const key=String(khudeBarta ? (process.env.KHUDEBARTA_API_KEY||cfg.apiKey||'') : (cfg.apiKey||'')).trim();
+ const secret=String(process.env.KHUDEBARTA_SECRET_KEY||cfg.secretKey||'').trim();
+ if(!key)throw new Error(khudeBarta?'KHUDEBARTA_API_KEY must be set in Render Environment Variables':'API key/token is missing in Settings');
+ const payload=khudeBarta ? {apikey:key,secretkey:secret,callerID:String(process.env.KHUDEBARTA_CALLER_ID||cfg.senderId||'STAR COMM'),toUser:String(phone||'').replace(/[^0-9,]/g,''),messageContent:String(message||'')} : {transactionId:transactionId||'',trxID:transactionId||'',amount:Number(amount||0),customerId:customerId||'',to:phone||'',phone:phone||'',message:message||'',senderid:cfg.senderId||'',senderId:cfg.senderId||''};
+ if(khudeBarta&&!secret)throw new Error('KHUDEBARTA_SECRET_KEY must be set in Render Environment Variables');
  const keyField=String(cfg.apiKeyField||'').trim();
- if(keyField)payload[keyField]=key;
- const headers={'Accept':'application/json','Authorization':'Bearer '+key,'x-api-key':key};
+ if(keyField&&!khudeBarta)payload[keyField]=key;
+ const headers={'Accept':'application/json'};
  let body;
  if(method==='GET'){
   Object.entries(payload).forEach(([k,v])=>{if(v!==''&&v!==undefined)u.searchParams.set(k,String(v))});
@@ -863,6 +867,8 @@ app.put('/api/integrations/baniq/settings',auth,async(req,res)=>{
 app.get('/api/integrations/sms/dashboard',auth,async(req,res)=>{
  try{
   const key=String(process.env.NOTIFYBD_API_KEY||'').trim();
+  const khudeKey=String(process.env.KHUDEBARTA_API_KEY||'').trim();
+  const khudeSecret=String(process.env.KHUDEBARTA_SECRET_KEY||'').trim();
   const logs=col('sms_delivery_logs');
   const now=new Date();
   const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dhaka',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
@@ -870,6 +876,17 @@ app.get('/api/integrations/sms/dashboard',auth,async(req,res)=>{
   const history=logs?await logs.find({owner}).sort({createdAt:-1}).limit(50).toArray():[];
   const todayCount=logs?await logs.countDocuments({owner,createdAt:{$regex:'^'+day}}):0;
   const monthCount=logs?await logs.countDocuments({owner,createdAt:{$regex:'^'+month}}):0;
+  if(khudeKey&&khudeSecret){
+   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
+   try{
+    const response=await fetch('http://161.248.247.60:3775/api/v3/balance',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({apikey:khudeKey,secretkey:khudeSecret,clienttransid:'SC-BAL-'+Date.now()}),signal:controller.signal,redirect:'error'});
+    const raw=await response.text();let data={};try{data=raw?JSON.parse(raw):{}}catch(e){data={message:raw.slice(0,200)}}
+    if(!response.ok)throw new Error('Khude Barta balance API HTTP '+response.status);
+    const payload=data.data&&typeof data.data==='object'?data.data:data;
+    const balance=payload.availablebalance??payload.availableBalance??payload.balance??payload.data?.availablebalance??null;
+    return send(res,{ok:true,providerConfigured:true,providerReachable:balance!==null,balance,sms_quantity:payload.sms_quantity??payload.smsQuantity??null,todayCount,monthCount,history:history.map(x=>({phone:x.phone,message:x.message,status:x.status,deliveryStatus:x.deliveryStatus||'Unknown',createdAt:x.createdAt}))});
+   }finally{clearTimeout(timer)}
+  }
   if(!key)return send(res,{ok:true,providerConfigured:false,providerReachable:false,balance:null,sms_quantity:null,todayCount,monthCount,history:history.map(x=>({phone:x.phone,message:x.message,status:x.status,deliveryStatus:x.deliveryStatus||'Unknown',createdAt:x.createdAt}))});
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
   let response,data={};
@@ -886,6 +903,7 @@ app.post('/api/integrations/sms/send',auth,async(req,res)=>{
   if(message.length>1200)return res.status(400).json({error:'Message is too long'});
   const settings=await integrationSettings(ownerOf(req.user)),cfg=settings.smsApi||{};
   const notifyKey=String(process.env.NOTIFYBD_API_KEY||'').trim();
+  const khudeKey=String(process.env.KHUDEBARTA_API_KEY||'').trim();
   const notifySender=String(process.env.NOTIFYBD_SENDER_ID||cfg.senderId||'').trim();
   let d={};
   if(notifyKey){
@@ -909,10 +927,16 @@ app.post('/api/integrations/sms/send',auth,async(req,res)=>{
     if(d.success===false||d.ok===false||['error','failed','failure'].includes(String(d.status||'').toLowerCase())||(d.code!==undefined&&!['0','200','202','1000','success','SUCCESS'].includes(String(d.code))))return res.status(502).json({error:'NotifyBD reported SMS failure',providerMessage:String(d.message||d.error||d.statusMessage||d.status_detail||d.statusDetail||d.code||JSON.stringify(d)||'Provider returned an empty/unknown failure response').slice(0,240)});
    }finally{clearTimeout(timer)}
   }else{
-   if(!cfg.url)return res.status(400).json({error:'Configure NOTIFYBD_API_KEY in Render, or configure an SMS API endpoint in Settings'});
+   if(khudeKey){
+    const result=await callConfiguredApi({url:'http://portal.khudebarta.com:3775/send',method:'POST',provider:'khudebarta',senderId:process.env.KHUDEBARTA_CALLER_ID||cfg.senderId},{phone,message});
+    d=result.data||{};
+    if(d.success===false||d.ok===false||['error','failed','failure'].includes(String(d.status||'').toLowerCase()))return res.status(502).json({error:'Khude Barta reported SMS failure',providerMessage:String(d.message||d.error||d.status||'').slice(0,180)});
+   }else{
+   if(!cfg.url)return res.status(400).json({error:'Configure SMS credentials in Render or configure an SMS API endpoint in Settings'});
    const result=await callConfiguredApi({...cfg,apiKeyField:cfg.apiKeyField,senderId:cfg.senderId},{phone,message});
    d=result.data||{};
    if(d.success===false||d.ok===false||String(d.status||'').toLowerCase()==='error')return res.status(502).json({error:'SMS provider reported failure',providerMessage:String(d.message||d.error||'').slice(0,180)});
+   }
   }
   const log=col('sms_delivery_logs');
   if(log)await log.insertOne({owner:ownerOf(req.user),phone,message:message.slice(0,1200),status:'accepted',deliveryStatus:'Unknown',providerMessageId:String(d.sms_shoot_id||d.smsShootId||d.shoot_id||d.id||''),providerResponse:JSON.stringify(d).slice(0,500),createdAt:new Date().toISOString()}).catch(e=>console.error('[sms-log] insert failed',e.message));
