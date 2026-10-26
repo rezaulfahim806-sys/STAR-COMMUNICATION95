@@ -840,16 +840,18 @@ async function getBaniqCredentials(owner){
  // Company-specific credentials are intentionally ignored; customer and payment
  // records remain owner-scoped in their existing routes and collections.
  return {
-  keyId:String(process.env.BANIQ_API_KEY_ID||'').trim(),
-  secret:String(process.env.BANIQ_API_SECRET||'').trim()
+  keyId:String(process.env.BANIQ_API_KEY_ID||process.env.BANIQ_KEY_ID||'').trim(),
+  secret:String(process.env.BANIQ_API_SECRET||process.env.BANIQ_SECRET||'').trim()
  };
 }
 app.get('/api/integrations/baniq/settings',auth,async(req,res)=>{
  if(!isOwner(req.user))return res.status(403).json({error:'Company owner access required'});
  try{
   const c=col('company_integrations');if(!c)return res.status(503).json({error:'Cloud database is not configured'});
-  const sharedConfigured=!!(String(process.env.BANIQ_API_KEY_ID||'').trim()&&String(process.env.BANIQ_API_SECRET||'').trim());
-  return send(res,{ok:true,configured:sharedConfigured,keyId:sharedConfigured?String(process.env.BANIQ_API_KEY_ID).trim():'',sharedCredentials:true,apiBase:(process.env.BANIQ_API_BASE||'https://api.baniq.app').replace(/\/$/,'')});
+  const sharedKeyId=String(process.env.BANIQ_API_KEY_ID||process.env.BANIQ_KEY_ID||'').trim();
+  const sharedSecret=String(process.env.BANIQ_API_SECRET||process.env.BANIQ_SECRET||'').trim();
+  const sharedConfigured=!!(sharedKeyId&&sharedSecret);
+  return send(res,{ok:true,configured:sharedConfigured,keyId:sharedConfigured?sharedKeyId:'',sharedCredentials:true,apiBase:(process.env.BANIQ_API_BASE||'https://api.baniq.app').replace(/\/$/,'')});
  }catch(e){return res.status(503).json({error:String(e.message||'Could not read Baniq settings').slice(0,160)})}
 });
 app.put('/api/integrations/baniq/settings',auth,async(req,res)=>{
