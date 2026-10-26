@@ -864,6 +864,36 @@ app.put('/api/integrations/baniq/settings',auth,async(req,res)=>{
  }catch(e){return res.status(503).json({error:String(e.message||'Could not save Baniq settings').slice(0,180)})}
 });
 
+async function refreshKhudeBartaDeliveryLogs(owner,logs){
+ const key=String(process.env.KHUDEBARTA_DELIVERY_API_KEY||'').trim();
+ const secret=String(process.env.KHUDEBARTA_DELIVERY_SECRET_KEY||'').trim();
+ if(!key||!secret||!logs)return;
+ const rows=await logs.find({owner,providerMessageId:{$exists:true,$nin:['']},deliveryStatus:{$nin:['Delivered','Failed','Rejected','Expired']}}).sort({createdAt:-1}).limit(50).toArray();
+ const now=Date.now();
+ for(const row of rows){
+  if(row.lastDeliveryCheckAt&&now-Date.parse(row.lastDeliveryCheckAt)<12000)continue;
+  const messageid=String(row.providerMessageId||'').trim();
+  if(!messageid)continue;
+  try{
+   await logs.updateOne({_id:row._id},{$set:{lastDeliveryCheckAt:new Date(now).toISOString()}});
+   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);
+   try{
+    const response=await fetch('http://161.248.247.60:3775/getstatus',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({apikey:key,secretkey:secret,messageid}),signal:controller.signal,redirect:'error'});
+    const raw=await response.text();let data={};try{data=raw?JSON.parse(raw):{}}catch(e){data={message:raw.slice(0,300)}}
+    if(!response.ok)throw new Error('Khude Barta delivery API HTTP '+response.status);
+    const p=data.data&&typeof data.data==='object'?data.data:data;
+    const rawStatus=String(p.deliveryStatus??p.delivery_status??p.deliverystatus??p.status??p.messageStatus??p.message_status??p.result??p.message??'').trim();
+    const norm=rawStatus.toLowerCase().replace(/[ _-]+/g,'');
+    let deliveryStatus='Pending';
+    if(['delivered','deliver','delivrd','success','successful','received','2','4'].includes(norm)||/delivered|delivrd/i.test(rawStatus))deliveryStatus='Delivered';
+    else if(['failed','failure','rejected','undelivered','expired','undeliv','5','6'].includes(norm)||/failed|undeliver|reject|expired/i.test(rawStatus))deliveryStatus='Failed';
+    else if(!rawStatus||['pending','queued','accepted','sent','processing','submitted','1','0'].includes(norm))deliveryStatus='Pending';
+    else deliveryStatus='Unknown';
+    await logs.updateOne({_id:row._id},{$set:{deliveryStatus,deliveryProviderResponse:JSON.stringify(data).slice(0,700),deliveryUpdatedAt:new Date().toISOString()}});
+   }finally{clearTimeout(timer)}
+  }catch(e){await logs.updateOne({_id:row._id},{$set:{deliveryCheckError:String(e.message||e).slice(0,180)}}).catch(()=>{});}
+ }
+}
 app.get('/api/integrations/sms/dashboard',auth,async(req,res)=>{
  try{
   const key=String(process.env.NOTIFYBD_API_KEY||'').trim();
@@ -873,6 +903,7 @@ app.get('/api/integrations/sms/dashboard',auth,async(req,res)=>{
   const now=new Date();
   const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dhaka',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
   const month=day.slice(0,7),owner=ownerOf(req.user);
+  if(logs)await refreshKhudeBartaDeliveryLogs(owner,logs);
   const history=logs?await logs.find({owner}).sort({createdAt:-1}).limit(50).toArray():[];
   const todayCount=logs?await logs.countDocuments({owner,createdAt:{$regex:'^'+day}}):0;
   const monthCount=logs?await logs.countDocuments({owner,createdAt:{$regex:'^'+month}}):0;
@@ -884,10 +915,10 @@ app.get('/api/integrations/sms/dashboard',auth,async(req,res)=>{
     if(!response.ok)throw new Error('Khude Barta balance API HTTP '+response.status);
     const payload=data.data&&typeof data.data==='object'?data.data:data;
     const balance=payload.availablebalance??payload.availableBalance??payload.balance??payload.data?.availablebalance??null;
-    return send(res,{ok:true,providerConfigured:true,providerReachable:balance!==null,balance,sms_quantity:payload.sms_quantity??payload.smsQuantity??null,todayCount,monthCount,history:history.map(x=>({phone:x.phone,message:x.message,status:x.status,deliveryStatus:x.deliveryStatus||'Unknown',createdAt:x.createdAt}))});
+    return send(res,{ok:true,providerConfigured:true,providerReachable:data.success!==false&&data.ok!==false&&String(data.status||'').toLowerCase()!=='error',balance,sms_quantity:payload.sms_quantity??payload.smsQuantity??payload.smsCount??payload.smscount??null,todayCount,monthCount,history:history.map(x=>({phone:x.phone,message:x.message,status:x.status,deliveryStatus:x.deliveryStatus||'Unknown',messageId:x.providerMessageId||'',createdAt:x.createdAt,deliveryUpdatedAt:x.deliveryUpdatedAt||null}))});
    }finally{clearTimeout(timer)}
   }
-  if(!key)return send(res,{ok:true,providerConfigured:false,providerReachable:false,balance:null,sms_quantity:null,todayCount,monthCount,history:history.map(x=>({phone:x.phone,message:x.message,status:x.status,deliveryStatus:x.deliveryStatus||'Unknown',createdAt:x.createdAt}))});
+  if(!key)return send(res,{ok:true,providerConfigured:false,providerReachable:false,balance:null,sms_quantity:null,todayCount,monthCount,history:history.map(x=>({phone:x.phone,message:x.message,status:x.status,deliveryStatus:x.deliveryStatus||'Unknown',messageId:x.providerMessageId||'',createdAt:x.createdAt,deliveryUpdatedAt:x.deliveryUpdatedAt||null}))});
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
   let response,data={};
   try{response=await fetch('https://portal.notifybd.com/api/v1/user/'+encodeURIComponent(key)+'/balance-summary',{headers:{Accept:'application/json'},signal:controller.signal,redirect:'error'});const raw=await response.text();try{data=raw?JSON.parse(raw):{}}catch(e){data={message:raw.slice(0,200)}}}finally{clearTimeout(timer)}
@@ -939,7 +970,7 @@ app.post('/api/integrations/sms/send',auth,async(req,res)=>{
    }
   }
   const log=col('sms_delivery_logs');
-  if(log)await log.insertOne({owner:ownerOf(req.user),phone,message:message.slice(0,1200),status:'accepted',deliveryStatus:'Unknown',providerMessageId:String(d.sms_shoot_id||d.smsShootId||d.shoot_id||d.id||''),providerResponse:JSON.stringify(d).slice(0,500),createdAt:new Date().toISOString()}).catch(e=>console.error('[sms-log] insert failed',e.message));
+  if(log)await log.insertOne({owner:ownerOf(req.user),phone,message:message.slice(0,1200),status:'accepted',deliveryStatus:'Unknown',providerMessageId:String(d.messageid||d.messageId||d.message_id||d.sms_shoot_id||d.smsShootId||d.shoot_id||d.id||d.data?.messageid||d.data?.messageId||d.data?.message_id||''),providerResponse:JSON.stringify(d).slice(0,500),createdAt:new Date().toISOString()}).catch(e=>console.error('[sms-log] insert failed',e.message));
   send(res,{ok:true,message:'SMS request accepted by provider',providerResponse:d});
  }catch(e){res.status(502).json({error:'SMS API failed: '+String(e.message||'Request failed').slice(0,180)})}
 });
