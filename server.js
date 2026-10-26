@@ -935,7 +935,7 @@ app.get('/api/integrations/sms/dashboard',auth,async(req,res)=>{
   try{response=await fetch('https://portal.notifybd.com/api/v1/user/'+encodeURIComponent(key)+'/balance-summary',{headers:{Accept:'application/json'},signal:controller.signal,redirect:'error'});const raw=await response.text();try{data=raw?JSON.parse(raw):{}}catch(e){data={message:raw.slice(0,200)}}}finally{clearTimeout(timer)}
   if(!response.ok)throw new Error('NotifyBD balance API HTTP '+response.status);
   const payload=data.data&&typeof data.data==='object'?data.data:data;
-  send(res,{ok:true,providerConfigured:true,providerReachable:!(data.success===false||data.ok===false||String(data.status||'').toLowerCase()==='error'),balance:payload.balance??payload.credit_balance??payload.wallet_balance??null,sms_quantity:payload.sms_quantity??payload.smsQuantity??null,todayCount,monthCount,history:history.map(x=>({phone:x.phone,message:x.message,status:x.status,deliveryStatus:x.deliveryStatus||'Unknown',createdAt:x.createdAt}))});
+  send(res,{ok:true,providerConfigured:true,providerReachable:!(data.success===false||data.ok===false||String(data.status||'').toLowerCase()==='error'),balance:payload.balance??payload.credit_balance??payload.wallet_balance??null,sms_quantity:payload.sms_quantity??payload.smsQuantity??null,todayCount,monthCount,history:history.map(x=>({phone:x.phone,message:x.message,status:x.status,deliveryStatus:x.deliveryStatus||'Unknown',providerMessageId:x.providerMessageId||'',createdAt:x.createdAt}))});
  }catch(e){res.status(502).json({ok:false,error:String(e.message||'NotifyBD balance check failed').slice(0,180)})}
 });
 app.post('/api/integrations/sms/send',auth,async(req,res)=>{
@@ -948,7 +948,11 @@ app.post('/api/integrations/sms/send',auth,async(req,res)=>{
   const khudeKey=String(process.env.KHUDEBARTA_API_KEY||'').trim();
   const notifySender=String(process.env.NOTIFYBD_SENDER_ID||cfg.senderId||'').trim();
   let d={};
-  if(notifyKey){
+  if(khudeKey){
+   const result=await callConfiguredApi({url:'http://portal.khudebarta.com:3775/send',method:'POST',provider:'khudebarta',senderId:process.env.KHUDEBARTA_CALLER_ID||cfg.senderId},{phone,message});
+   d=result.data||{};
+   if(d.success===false||d.ok===false||['error','failed','failure'].includes(String(d.status||'').toLowerCase()))return res.status(502).json({error:'Khude Barta reported SMS failure',providerMessage:String(d.message||d.error||d.status||'').slice(0,180)});
+  }else if(notifyKey){
    if(!notifySender)return res.status(400).json({error:'NOTIFYBD_SENDER_ID is missing in Render Environment Variables'});
    const digits=phone.replace(/[^0-9+]/g,'').replace(/^\+/,'');
    if(!digits)return res.status(400).json({error:'A valid customer phone number is required'});
@@ -969,16 +973,10 @@ app.post('/api/integrations/sms/send',auth,async(req,res)=>{
     if(d.success===false||d.ok===false||['error','failed','failure'].includes(String(d.status||'').toLowerCase())||(d.code!==undefined&&!['0','200','202','1000','success','SUCCESS'].includes(String(d.code))))return res.status(502).json({error:'NotifyBD reported SMS failure',providerMessage:String(d.message||d.error||d.statusMessage||d.status_detail||d.statusDetail||d.code||JSON.stringify(d)||'Provider returned an empty/unknown failure response').slice(0,240)});
    }finally{clearTimeout(timer)}
   }else{
-   if(khudeKey){
-    const result=await callConfiguredApi({url:'http://portal.khudebarta.com:3775/send',method:'POST',provider:'khudebarta',senderId:process.env.KHUDEBARTA_CALLER_ID||cfg.senderId},{phone,message});
-    d=result.data||{};
-    if(d.success===false||d.ok===false||['error','failed','failure'].includes(String(d.status||'').toLowerCase()))return res.status(502).json({error:'Khude Barta reported SMS failure',providerMessage:String(d.message||d.error||d.status||'').slice(0,180)});
-   }else{
    if(!cfg.url)return res.status(400).json({error:'Configure SMS credentials in Render or configure an SMS API endpoint in Settings'});
    const result=await callConfiguredApi({...cfg,apiKeyField:cfg.apiKeyField,senderId:cfg.senderId},{phone,message});
    d=result.data||{};
    if(d.success===false||d.ok===false||String(d.status||'').toLowerCase()==='error')return res.status(502).json({error:'SMS provider reported failure',providerMessage:String(d.message||d.error||'').slice(0,180)});
-   }
   }
   const log=col('sms_delivery_logs');
   if(log)await log.insertOne({owner:ownerOf(req.user),phone,message:message.slice(0,1200),status:'accepted',deliveryStatus:'Unknown',providerMessageId:String(d.messageid||d.messageId||d.message_id||d.sms_shoot_id||d.smsShootId||d.shoot_id||d.id||d.data?.messageid||d.data?.messageId||d.data?.message_id||''),providerResponse:JSON.stringify(d).slice(0,500),createdAt:new Date().toISOString()}).catch(e=>console.error('[sms-log] insert failed',e.message));
@@ -1008,6 +1006,8 @@ app.post('/api/billing/verify-payment',auth,async(req,res)=>{
   send(res,{ok:true,verified:true,transactionId,amount:Number(amountValue),providerStatus:String(statusValue),message:'Payment verified by configured provider API'});
  }catch(e){res.status(502).json({ok:false,verified:false,error:'Payment verification failed: '+String(e.message||'Request failed').slice(0,180)})}
 });
+
+app.get('/p/:token',async(req,res)=>{try{const token=String(req.params.token||'').trim();if(!/^[A-Za-z0-9_-]{10,40}$/.test(token))return res.status(404).send('Payment link not found');const links=col('payment_short_links');if(!links)return res.status(503).send('Payment link service unavailable');const row=await links.findOne({token});if(!row||!/^https:\/\//i.test(String(row.url||'')))return res.status(404).send('Payment link expired or not found');return res.redirect(302,row.url)}catch(e){return res.status(500).send('Could not open payment link')}});
 
 require('./baniq-integration')(app,{col,ownerOf,PUBLIC_URL, PAYMENT_PAGE_URL, integrationSettings, callConfiguredApi, getBaniqCredentials, auth});
 
