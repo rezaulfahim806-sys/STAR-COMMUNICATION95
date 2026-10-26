@@ -914,8 +914,16 @@ app.get('/api/integrations/sms/dashboard',auth,async(req,res)=>{
     const raw=await response.text();let data={};try{data=raw?JSON.parse(raw):{}}catch(e){data={message:raw.slice(0,200)}}
     if(!response.ok)throw new Error('Khude Barta balance API HTTP '+response.status);
     const payload=data.data&&typeof data.data==='object'?data.data:data;
-    const balance=payload.availablebalance??payload.availableBalance??payload.balance??payload.data?.availablebalance??null;
-    return send(res,{ok:true,providerConfigured:true,providerReachable:data.success!==false&&data.ok!==false&&String(data.status||'').toLowerCase()!=='error',balance,sms_quantity:payload.sms_quantity??payload.smsQuantity??payload.smsCount??payload.smscount??null,todayCount,monthCount,history:history.map(x=>({phone:x.phone,message:x.message,status:x.status,deliveryStatus:x.deliveryStatus||'Unknown',messageId:x.providerMessageId||'',createdAt:x.createdAt,deliveryUpdatedAt:x.deliveryUpdatedAt||null}))});
+    // Khude Barta may wrap balance fields at different nesting levels or use
+    // different casing/names. Search only known balance/quantity keys.
+    const flattenObjects=(root)=>{const out=[],seen=new Set();const walk=(v,depth)=>{if(!v||typeof v!=='object'||depth>5||seen.has(v))return;seen.add(v);out.push(v);Object.values(v).forEach(x=>walk(x,depth+1));};walk(root,0);return out;};
+    const objects=flattenObjects(data);
+    const pick=(keys)=>{for(const obj of objects){for(const [k,v] of Object.entries(obj)){if(keys.includes(String(k).toLowerCase().replace(/[^a-z0-9]/g,''))&&v!==null&&v!==undefined&&v!=='')return v;}}return null;};
+    const balance=pick(['availablebalance','balance','currentbalance','walletbalance','creditbalance','accountbalance','remainingbalance','smsbalance','availablecredit','credit']);
+    const smsQuantity=pick(['smsquantity','quantity','remainingsms','remainingsmscount','smscount','smsremaining','availablesms','remainingcount','smscredit']);
+    const statusText=String(data.status??data.message??data.result??'').toLowerCase();
+    const providerReachable=data.success!==false&&data.ok!==false&&!['error','failed','failure','invalid','unauthorized'].includes(statusText);
+    return send(res,{ok:true,providerConfigured:true,providerReachable,balance,sms_quantity:smsQuantity,balanceDiagnostic:balance===null?'Balance API responded but no recognized balance field was found. Check the provider response field names.':null,balanceResponseKeys:Object.keys(payload||{}).slice(0,30),todayCount,monthCount,history:history.map(x=>({phone:x.phone,message:x.message,status:x.status,deliveryStatus:x.deliveryStatus||'Unknown',messageId:x.providerMessageId||'',createdAt:x.createdAt,deliveryUpdatedAt:x.deliveryUpdatedAt||null}))});
    }finally{clearTimeout(timer)}
   }
   if(!key)return send(res,{ok:true,providerConfigured:false,providerReachable:false,balance:null,sms_quantity:null,todayCount,monthCount,history:history.map(x=>({phone:x.phone,message:x.message,status:x.status,deliveryStatus:x.deliveryStatus||'Unknown',messageId:x.providerMessageId||'',createdAt:x.createdAt,deliveryUpdatedAt:x.deliveryUpdatedAt||null}))});
