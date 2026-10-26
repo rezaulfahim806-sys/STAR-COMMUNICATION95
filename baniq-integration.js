@@ -30,7 +30,7 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
   async function baniqFetch(owner, path, options = {}) {
     if (typeof getBaniqCredentials !== 'function') throw new Error('Company-specific Baniq settings are unavailable');
     const credentials = await getBaniqCredentials(owner);
-    if (!credentials.keyId || !credentials.secret) throw new Error('This company must configure its own Baniq API Key ID and Secret in Settings');
+    if (!credentials.keyId || !credentials.secret) throw new Error('Shared Baniq API credentials are missing in Render. Set BANIQ_API_KEY_ID and BANIQ_API_SECRET (or BANIQ_KEY_ID and BANIQ_SECRET)');
     const response = await fetch(API_BASE + path, {
       ...options,
       headers: {
