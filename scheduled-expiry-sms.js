@@ -79,8 +79,14 @@ module.exports = function startScheduledExpirySms({ col, integrationSettings, ca
         const settings = data.settings || {};
         const notifyKey = String(process.env.NOTIFYBD_API_KEY || '').trim();
         const notifySender = String(process.env.NOTIFYBD_SENDER_ID || '').trim();
-        const sms = notifyKey ? { url: 'https://portal.notifybd.com/api/v1/sms/send', apiKey: notifyKey, senderId: notifySender, apiKeyField: 'api_key', method: 'GET' } : (settings.smsApi || {});
-        if (!owner || !sms.url || !sms.apiKey || !sms.senderId) continue;
+        const khudeKey = String(process.env.KHUDEBARTA_API_KEY || '').trim();
+        const khudeSender = String(process.env.KHUDEBARTA_CALLER_ID || '').trim();
+        const sms = notifyKey
+          ? { url: 'https://portal.notifybd.com/api/v1/sms/send', apiKey: notifyKey, senderId: notifySender, apiKeyField: 'api_key', method: 'GET' }
+          : khudeKey
+            ? { url: 'http://portal.khudebarta.com:3775/send', apiKey: khudeKey, senderId: khudeSender || 'STAR COMM', provider: 'khudebarta', method: 'POST' }
+            : (settings.smsApi || {});
+        if (!owner || !sms.url || (!sms.apiKey && !khudeKey) || !sms.senderId) continue;
         const customers = Array.isArray(data.customers) ? data.customers : [];
         for (const customer of customers) {
           const phone = String(customer.phone || customer.mobile || '').trim();
