@@ -1,5 +1,6 @@
 // Server-side daily expiry SMS scheduler for STAR COMMUNICATION.
 // Runs independently of the APK/browser; credentials remain in company cloud settings.
+const crypto = require('crypto');
 module.exports = function startScheduledExpirySms({ col, integrationSettings, callConfiguredApi, paymentPageUrl, publicUrl }) {
   let running = false;
   const timezone = 'Asia/Dhaka';
@@ -32,7 +33,7 @@ module.exports = function startScheduledExpirySms({ col, integrationSettings, ca
     ).reduce((sum, p) => sum + Number(p.amount || 0), 0);
     return Math.max(0, Number(customer.prevDue || 0) + Math.max(0, Number(customer.fee || 0) - paid));
   }
-  function paymentLink(owner, customer, data, due, day) {
+  async function paymentLink(owner, customer, data, due, day) {
     const base = String(paymentPageUrl || 'https://rezaulfahim806-sys.github.io/STAR-COMMUNICATION95/pay.html');
     const settings = data.settings || {};
     const packages = Array.isArray(settings.packages) ? settings.packages : [];
@@ -57,7 +58,18 @@ module.exports = function startScheduledExpirySms({ col, integrationSettings, ca
       api: String(publicUrl || 'https://star-communication-api.onrender.com'),
       v: 'daily-expiry-sms'
     });
-    return base + '?' + q.toString();
+    const fullUrl = base + '?' + q.toString();
+    const token = crypto.randomBytes(9).toString('base64url');
+    const links = col('payment_short_links');
+    if (!links) return fullUrl;
+    try {
+      await links.insertOne({ token, url: fullUrl, owner: String(owner || '').trim().toLowerCase(), customerId: String(customer.id || ''), createdAt: new Date().toISOString() });
+      const apiBase = String(publicUrl || 'https://star-communication-api.onrender.com').replace(/\\/+$/, '');
+      return apiBase + '/p/' + token;
+    } catch (e) {
+      console.error('[expiry-sms] short link creation failed:', String(e.message || e));
+      return fullUrl;
+    }
   }
   async function run() {
     if (running) return;
@@ -81,10 +93,10 @@ module.exports = function startScheduledExpirySms({ col, integrationSettings, ca
         const notifySender = String(process.env.NOTIFYBD_SENDER_ID || '').trim();
         const khudeKey = String(process.env.KHUDEBARTA_API_KEY || '').trim();
         const khudeSender = String(process.env.KHUDEBARTA_CALLER_ID || '').trim();
-        const sms = notifyKey
-          ? { url: 'https://portal.notifybd.com/api/v1/sms/send', apiKey: notifyKey, senderId: notifySender, apiKeyField: 'api_key', method: 'GET' }
-          : khudeKey
-            ? { url: 'http://portal.khudebarta.com:3775/send', apiKey: khudeKey, senderId: khudeSender || 'STAR COMM', provider: 'khudebarta', method: 'POST' }
+        const sms = khudeKey
+          ? { url: 'http://portal.khudebarta.com:3775/send', apiKey: khudeKey, senderId: khudeSender || 'STAR COMM', provider: 'khudebarta', method: 'POST' }
+          : notifyKey
+            ? { url: 'https://portal.notifybd.com/api/v1/sms/send', apiKey: notifyKey, senderId: notifySender, apiKeyField: 'api_key', method: 'GET' }
             : (settings.smsApi || {});
         if (!owner || !sms.url || (!sms.apiKey && !khudeKey) || !sms.senderId) continue;
         const customers = Array.isArray(data.customers) ? data.customers : [];
@@ -106,7 +118,7 @@ module.exports = function startScheduledExpirySms({ col, integrationSettings, ca
           }
 
           try {
-            const link = paymentLink(owner, customer, data, due, day);
+            const link = await paymentLink(owner, customer, data, due, day);
             const template = String(settings.expirySmsTemplate || settings.smsTemplate ||
               'STAR COMMUNICATION: Dear {name}, your internet bill expires today. Due: Tk {due}. Expiry: {expiry}. Pay here: {paymentLink}');
             let message = template
