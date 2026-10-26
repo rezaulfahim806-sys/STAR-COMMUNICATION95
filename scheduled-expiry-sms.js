@@ -64,7 +64,8 @@ module.exports = function startScheduledExpirySms({ col, integrationSettings, ca
     if (!links) return fullUrl;
     try {
       await links.insertOne({ token, url: fullUrl, owner: String(owner || '').trim().toLowerCase(), customerId: String(customer.id || ''), createdAt: new Date().toISOString() });
-      const apiBase = String(publicUrl || 'https://star-communication-api.onrender.com').replace(/\\/+$/, '');
+      let apiBase = String(publicUrl || 'https://star-communication-api.onrender.com');
+      while (apiBase.endsWith('/')) apiBase = apiBase.slice(0, -1);
       return apiBase + '/p/' + token;
     } catch (e) {
       console.error('[expiry-sms] short link creation failed:', String(e.message || e));
