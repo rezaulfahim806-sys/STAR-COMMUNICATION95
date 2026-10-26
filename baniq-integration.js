@@ -132,14 +132,25 @@ module.exports = function registerBaniqRoutes(app, { col, ownerOf, PUBLIC_URL, P
       const latestSession = await sessions.findOne({ orderId: session.orderId });
       if (latestSession && !latestSession.receiptSmsSentAt && typeof integrationSettings === 'function' && typeof callConfiguredApi === 'function') {
         const settings = await integrationSettings(session.owner);
-        const sms = settings.smsApi || {};
+        const configuredSms = settings.smsApi || {};
+        const khudeKey = String(process.env.KHUDEBARTA_API_KEY || '').trim();
+        const notifyKey = String(process.env.NOTIFYBD_API_KEY || '').trim();
+        const sms = khudeKey
+          ? { url: 'http://portal.khudebarta.com:3775/send', apiKey: khudeKey, senderId: process.env.KHUDEBARTA_CALLER_ID || configuredSms.senderId || 'STAR COMM', provider: 'khudebarta', method: 'POST' }
+          : notifyKey
+            ? { url: 'https://portal.notifybd.com/api/v1/sms/send', apiKey: notifyKey, senderId: process.env.NOTIFYBD_SENDER_ID || configuredSms.senderId, apiKeyField: 'api_key', method: 'GET' }
+            : configuredSms;
         const phone = String(session.customerMobile || customer.mobile || customer.phone || '').trim();
-        if (sms.url && sms.apiKey && phone) {
+        if (sms.url && (sms.apiKey || khudeKey || notifyKey) && phone) {
           const message = 'STAR COMMUNICATION: Dear ' + String(customer.name || session.customerName || 'Customer') +
             ', your payment of Tk ' + amountTaka.toFixed(2) + ' has been verified successfully. Client Code: ' +
             String(customer.clientCode || session.clientCode || '') + '. Your bill is PAID. Thank you.';
-          await callConfiguredApi({ ...sms, apiKeyField: sms.apiKeyField, senderId: sms.senderId }, { phone, message, amount: amountTaka, customerId: canonicalCustomerId, transactionId: String(providerData.reference || session.reference || session.orderId) });
-          await sessions.updateOne({ orderId: session.orderId, receiptSmsSentAt: { $exists: false } }, { $set: { receiptSmsSentAt: new Date().toISOString(), receiptSmsStatus: 'accepted' } });
+          const smsResult = await callConfiguredApi({ ...sms, apiKeyField: sms.apiKeyField, senderId: sms.senderId }, { phone, message, amount: amountTaka, customerId: canonicalCustomerId, transactionId: String(providerData.reference || session.reference || session.orderId) });
+          const smsData = smsResult && smsResult.data || {};
+          const providerMessageId = String(smsData.messageid || smsData.messageId || smsData.message_id || smsData.sms_shoot_id || smsData.smsShootId || smsData.shoot_id || smsData.id || smsData.data?.messageid || smsData.data?.messageId || smsData.data?.message_id || '');
+          const deliveryLogs = col('sms_delivery_logs');
+          if (deliveryLogs) await deliveryLogs.insertOne({ owner: String(session.owner || '').trim().toLowerCase(), phone, message, status: 'accepted', deliveryStatus: 'Unknown', providerMessageId, providerResponse: JSON.stringify(smsData).slice(0, 500), source: 'baniq-payment-receipt', customerId: canonicalCustomerId, createdAt: new Date().toISOString() }).catch(() => {});
+          await sessions.updateOne({ orderId: session.orderId, receiptSmsSentAt: { $exists: false } }, { $set: { receiptSmsSentAt: new Date().toISOString(), receiptSmsStatus: 'accepted', receiptSmsProviderMessageId: providerMessageId } });
         } else {
           await sessions.updateOne({ orderId: session.orderId, receiptSmsStatus: { $exists: false } }, { $set: { receiptSmsStatus: 'not_configured_or_no_phone' } });
         }
