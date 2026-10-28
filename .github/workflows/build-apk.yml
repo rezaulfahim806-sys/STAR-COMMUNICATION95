@@ -81,6 +81,12 @@ jobs:
           test -f app/src/main/assets/index.html
           gradle projects --no-daemon
 
+      - name: Stamp APK build number and commit
+        shell: bash
+        run: |
+          set -e
+          sed -i "s/__STAR_BUILD_NUMBER__/${GITHUB_RUN_NUMBER}/g; s/__STAR_COMMIT_SHA__/${GITHUB_SHA}/g" app/src/main/assets/index.html
+
       - name: Build APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace --warning-mode all
 
