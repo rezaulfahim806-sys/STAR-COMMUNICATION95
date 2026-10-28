@@ -103,15 +103,16 @@ module.exports = function startScheduledExpirySms({ col, integrationSettings, ca
         const customers = Array.isArray(data.customers) ? data.customers : [];
         for (const customer of customers) {
           const phone = String(customer.phone || customer.mobile || '').trim();
-          if (!phone || customer.free || ['left', 'inactive', 'disconnected', 'off'].includes(String(customer.status || '').toLowerCase()) || dateKey(customer.expiry) !== day) continue;
+          const expiryDate = dateKey(customer.expiry);
+          if (!phone || customer.free || ['left', 'inactive', 'disconnected', 'off'].includes(String(customer.status || '').toLowerCase()) || !expiryDate || expiryDate > day) continue;
           const due = dueFor(customer, data, month);
           if (!(due > 0)) continue;
 
-          const key = owner + '|' + String(customer.id || customer.clientCode || phone) + '|' + day;
+          const key = owner + '|' + String(customer.id || customer.clientCode || phone) + '|expiry:' + expiryDate;
           try {
             await logCollection.insertOne({
               _id: key, owner, customerId: String(customer.id || ''),
-              phone, expiryDate: day, status: 'sending', createdAt: new Date().toISOString()
+              phone, expiryDate, status: 'sending', createdAt: new Date().toISOString()
             });
           } catch (e) {
             if (e && e.code === 11000) continue;
