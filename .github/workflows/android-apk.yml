@@ -46,6 +46,15 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Stamp APK build number and commit SHA
+        shell: bash
+        run: |
+          set -e
+          FILE=app/src/main/assets/index.html
+          test -f "$FILE"
+          sed -i "s/__STAR_BUILD_NUMBER__/${GITHUB_RUN_NUMBER}/g; s/__STAR_COMMIT_SHA__/${GITHUB_SHA}/g" "$FILE"
+          ! grep -q '__STAR_BUILD_NUMBER__\|__STAR_COMMIT_SHA__' "$FILE"
+          echo "Stamped build #${GITHUB_RUN_NUMBER}, commit ${GITHUB_SHA:0:7}"
       - name: Build debug APK with Gradle 8.7
         uses: gradle/gradle-build-action@v3
         with:
