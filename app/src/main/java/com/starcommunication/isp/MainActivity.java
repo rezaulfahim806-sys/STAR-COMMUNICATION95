@@ -2,6 +2,10 @@ package com.starcommunication.isp;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.DownloadManager;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.IntentFilter;
 import android.content.Intent;
 import android.content.ContentValues;
 import android.content.pm.PackageManager;
@@ -291,6 +295,42 @@ public class MainActivity extends Activity {
                 runOnUiThread(()->Toast.makeText(MainActivity.this,"Payment link copied",Toast.LENGTH_SHORT).show());
                 return true;
             }catch(Exception e){return false;}
+        }
+        @JavascriptInterface public boolean downloadAndInstallApk(String url){
+            if(url==null||!url.startsWith("https://")){runOnUiThread(()->Toast.makeText(MainActivity.this,"Invalid APK download link",Toast.LENGTH_LONG).show());return false;}
+            runOnUiThread(()->{
+                try{
+                    if(Build.VERSION.SDK_INT>=26&&!getPackageManager().canRequestPackageInstalls()){
+                        Intent settings=new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,Uri.parse("package:"+getPackageName()));
+                        startActivity(settings);
+                        Toast.makeText(MainActivity.this,"Allow install unknown apps, then tap Update Now again",Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    DownloadManager dm=(DownloadManager)getSystemService(DOWNLOAD_SERVICE);
+                    DownloadManager.Request req=new DownloadManager.Request(Uri.parse(url));
+                    req.setTitle("STAR COMMUNICATION APK update");
+                    req.setDescription("Downloading update for installation");
+                    req.setMimeType("application/vnd.android.package-archive");
+                    req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+                    req.setDestinationInExternalFilesDir(MainActivity.this,Environment.DIRECTORY_DOWNLOADS,"star-communication-update.apk");
+                    long id=dm.enqueue(req);
+                    BroadcastReceiver receiver=new BroadcastReceiver(){
+                        @Override public void onReceive(Context context,Intent intent){
+                            if(intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID,-1)!=id)return;
+                            try{unregisterReceiver(this);}catch(Exception ignored){}
+                            Uri apk=dm.getUriForDownloadedFile(id);
+                            if(apk==null){Toast.makeText(MainActivity.this,"APK download failed. Please retry.",Toast.LENGTH_LONG).show();return;}
+                            Intent install=new Intent(Intent.ACTION_VIEW);
+                            install.setDataAndType(apk,"application/vnd.android.package-archive");
+                            install.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                            startActivity(install);
+                        }
+                    };
+                    if(Build.VERSION.SDK_INT>=33)registerReceiver(receiver,new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),Context.RECEIVER_NOT_EXPORTED);else registerReceiver(receiver,new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
+                    Toast.makeText(MainActivity.this,"APK downloading. Install prompt will open when complete.",Toast.LENGTH_LONG).show();
+                }catch(Exception e){Toast.makeText(MainActivity.this,"Update download failed: "+e.getMessage(),Toast.LENGTH_LONG).show();}
+            });
+            return true;
         }
         @JavascriptInterface public boolean openExternalUrl(String url){
             try{if(url==null||url.trim().isEmpty())return false;startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));return true;}catch(Exception e){return false;}
