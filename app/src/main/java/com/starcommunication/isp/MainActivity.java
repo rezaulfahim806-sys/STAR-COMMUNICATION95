@@ -351,6 +351,37 @@ public class MainActivity extends Activity {
                 createCustomerPdf(packet.toString());
             }catch(Exception e){ Toast.makeText(MainActivity.this,"PDF data error: "+e.getMessage(),Toast.LENGTH_LONG).show(); }
         }
+        @JavascriptInterface public boolean saveTextFile(String filename,String content,String mimeType){
+            try {
+                String safe=(filename==null?"STAR-COMMUNICATION-export.csv":filename).replaceAll("[^A-Za-z0-9._-]","_");
+                String type=(mimeType==null||mimeType.trim().isEmpty())?"text/csv":mimeType;
+                byte[] bytes=(content==null?"":content).getBytes("UTF-8");
+                if(Build.VERSION.SDK_INT>=29){
+                    ContentValues values=new ContentValues();
+                    values.put(MediaStore.Downloads.DISPLAY_NAME,safe);
+                    values.put(MediaStore.Downloads.MIME_TYPE,type);
+                    values.put(MediaStore.Downloads.RELATIVE_PATH,Environment.DIRECTORY_DOWNLOADS);
+                    values.put(MediaStore.Downloads.IS_PENDING,1);
+                    Uri uri=getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,values);
+                    if(uri==null)return false;
+                    try(OutputStream out=getContentResolver().openOutputStream(uri)){
+                        if(out==null)throw new java.io.IOException("Cannot open Downloads file");
+                        out.write(bytes);out.flush();
+                    }
+                    values.clear();values.put(MediaStore.Downloads.IS_PENDING,0);
+                    getContentResolver().update(uri,values,null,null);
+                }else{
+                    File dir=Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                    if(!dir.exists()&&!dir.mkdirs())return false;
+                    try(FileOutputStream out=new FileOutputStream(new File(dir,safe))){out.write(bytes);out.flush();}
+                }
+                runOnUiThread(()->Toast.makeText(MainActivity.this,"Saved to Downloads: "+safe,Toast.LENGTH_LONG).show());
+                return true;
+            }catch(Exception e){
+                runOnUiThread(()->Toast.makeText(MainActivity.this,"Download failed: "+e.getMessage(),Toast.LENGTH_LONG).show());
+                return false;
+            }
+        }
         @JavascriptInterface public void createCustomerPdf(String payload){
             runOnUiThread(() -> {
                 if (Build.VERSION.SDK_INT < 29) { printPage("STAR COMMUNICATION"); return; }
