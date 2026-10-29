@@ -12,7 +12,7 @@ on:
       - '.github/workflows/android-apk.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -67,3 +67,15 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
+      - name: Publish signed APK release for in-app updates
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: star-build-${{ github.run_number }}
+          name: STAR COMMUNICATION v1.16 (build ${{ github.run_number }})
+          body: |
+            STAR COMMUNICATION Android update.
+            - Customer list visual improvements
+            - Add Customer back button
+            - Settings sync and in-app update fixes
+          files: app/build/outputs/apk/debug/app-debug.apk
+          make_latest: true
