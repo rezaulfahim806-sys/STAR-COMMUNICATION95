@@ -1,5 +1,5 @@
 {
-  "version": "1.15",
-  "url": "https://github.com/rezaulfahim806-sys/STAR-COMMUNICATION95/releases/download/star-build-944/app-debug.apk",
-  "releaseNotes": "STAR COMMUNICATION app update"
+  "version": "1.16",
+  "url": "https://github.com/rezaulfahim806-sys/STAR-COMMUNICATION95/releases/latest/download/app-debug.apk",
+  "releaseNotes": "Customer list UI, Add Customer back button, settings sync and APK update fixes"
 }
