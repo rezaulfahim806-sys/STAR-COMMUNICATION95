@@ -127,23 +127,9 @@ public class MainActivity extends Activity {
                     Toast.makeText(MainActivity.this, "Latest app features loaded", Toast.LENGTH_SHORT).show();
                     return;
                 }
-                if (cacheFile.isFile()) {
-                    try (FileInputStream cacheIn = new FileInputStream(cacheFile);
-                         ByteArrayOutputStream cacheOut = new ByteArrayOutputStream()) {
-                        byte[] cacheBuffer = new byte[8192];
-                        int cacheCount;
-                        while ((cacheCount = cacheIn.read(cacheBuffer)) != -1
-                                && cacheOut.size() < 2 * 1024 * 1024) {
-                            cacheOut.write(cacheBuffer, 0, cacheCount);
-                        }
-                        String cached = cacheOut.toString("UTF-8");
-                        if (cached.contains("<html") && cached.contains("STAR COMMUNICATION")) {
-                            webView.loadDataWithBaseURL("file:///android_asset/", cached, "text/html", "UTF-8", null);
-                            return;
-                        }
-                    } catch (Exception ignored) {
-                    }
-                }
+                // Never load a stale remote HTML cache after an update.
+                // Fall back to the freshly packaged APK asset instead.
+                try { if (cacheFile.exists()) cacheFile.delete(); } catch (Exception ignored) {}
                 webView.loadUrl("file:///android_asset/index.html");
             });
         }).start();
