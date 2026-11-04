@@ -131,7 +131,7 @@ async function loadPortal(){
  $('loginView').style.display='none';$('portal').style.display='block';$('bottomNav').style.display='grid';renderPortal();
 }
 function pkgName(c){return String(c.packageName||'—').trim()}
-function dateOnly(v){if(!v)return null;const raw=String(v).trim();const m=raw.match(/^(\\d{4})-(\\d{2})-(\\d{2})/);if(m)return new Date(Number(m[1]),Number(m[2])-1,Number(m[3]));const d=new Date(raw);return isNaN(d.getTime())?null:new Date(d.getFullYear(),d.getMonth(),d.getDate())}
+function dateOnly(v){if(!v)return null;const raw=String(v).trim();const m=raw.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return new Date(Number(m[1]),Number(m[2])-1,Number(m[3]));const d=new Date(raw);return isNaN(d.getTime())?null:new Date(d.getFullYear(),d.getMonth(),d.getDate())}
 function fmtDate(v){const d=dateOnly(v);if(!d)return v?'Admin-এর তথ্য অনুযায়ী':'Admin-এর তথ্য অনুযায়ী';return d.toLocaleDateString('bn-BD',{day:'numeric',month:'long',year:'numeric'})}
 function fmtExpiryCountdown(v){const d=dateOnly(v);if(!d)return 'মেয়াদ শেষের তারিখ পাওয়া যায়নি';const now=new Date(),today=new Date(now.getFullYear(),now.getMonth(),now.getDate()),days=Math.round((d-today)/86400000);if(days<0)return 'মেয়াদ শেষ হয়েছে '+Math.abs(days).toLocaleString('bn-BD')+' দিন আগে';if(days===0)return 'আজই মেয়াদ শেষ';return 'আর '+days.toLocaleString('bn-BD')+' দিন মেয়াদ বাকি'}
 function renderPortal(){
