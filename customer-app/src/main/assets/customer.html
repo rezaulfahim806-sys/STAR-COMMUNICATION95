@@ -59,7 +59,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 
 
 <section id="portal">
 <div class="dashhead"><div><h1>আপনার ইন্টারনেট<br>অ্যাকাউন্ট</h1><div id="customerCode" class="smallmuted">গ্রাহক নম্বর: —</div></div><span id="statusPill" class="pill">● সক্রিয়</span></div>
-<div id="homeSection" class="section active">
+<div id="homeSection" class="section active"><div id="internetStatusCard" class="card" style="border:1px solid #dce5ef"><div class="itemrow"><h3 style="margin:0">📡 ইন্টারনেট সংযোগ</h3><span id="internetStatusBadge" class="pill">● চালু</span></div><div id="internetStatusMessage" class="muted" style="margin-top:8px">আপনার সংযোগের অবস্থা Admin-এর তথ্য অনুযায়ী দেখানো হচ্ছে।</div></div>
 <div class="hero"><small>আপনার বর্তমান প্যাকেজ</small><h2 id="pkgSpeed">—</h2><div class="fee" id="pkgPrice">৳— / মাস</div><button class="btn" onclick="goTab('package')">প্যাকেজ দেখুন</button></div>
 <div class="grid"><div class="metric"><small>এই মাসের বিল</small><strong id="billNow">৳—</strong></div><div class="metric"><small>আগের বকেয়া</small><strong id="billDue">৳—</strong></div></div>
 <div class="card"><div class="itemrow"><h3>পরবর্তী বিলের তারিখ</h3><span id="paidStatus" class="pill">—</span></div><div class="datebox"><span>পরবর্তী বিল গণনা / Bill due date</span><strong id="dueDate">—</strong><strong id="expiryCountdown" style="display:block;margin-top:8px;font-size:1.08em">মেয়াদ গণনা হচ্ছে…</strong><span>বিলের আগে আপনাকে Reminder দেওয়া হবে।</span></div></div>
@@ -137,7 +137,7 @@ function fmtExpiryCountdown(v){const d=dateOnly(v);if(!d)return 'মেয়া
 function renderPortal(){
  const c=portalData.customer||{},company=portalData.company||{},status=String(c.status||'ACTIVE').toLowerCase(),active=!['inactive','expired','left','disconnected','disabled'].includes(status);
  $('customerCode').textContent='গ্রাহক নম্বর: '+(c.clientCode||c.id||'—');
- $('statusPill').textContent=active?'● সক্রিয়':'● '+(c.status||'Inactive');$('statusPill').className='pill'+(active?'':' bad');
+ $('statusPill').textContent=active?'● সক্রিয়':'● '+(c.status||'Inactive');$('statusPill').className='pill'+(active?'':' bad');\n const internetOff=String(c.internetStatus||'on').toLowerCase()==='off';$('internetStatusBadge').textContent=internetOff?'● Internet OFF':'● Internet চালু';$('internetStatusBadge').className='pill'+(internetOff?' bad':'');$('internetStatusCard').style.borderColor=internetOff?'#f1c5c5':'#dce5ef';$('internetStatusMessage').innerHTML=internetOff?'<b style="color:#a52b2b">আপনার ইন্টারনেট সংযোগ বর্তমানে বন্ধ।</b><div style="margin-top:6px">'+esc(c.internetOffReason||'Admin সাময়িকভাবে সংযোগ বন্ধ দেখিয়েছেন। বিস্তারিত জানতে STAR COMMUNICATION Admin-এর সঙ্গে যোগাযোগ করুন।')+'</div>':'<span style="color:#16834a;font-weight:700">আপনার ইন্টারনেট সংযোগ চালু আছে।</span>';
  let pkg=pkgName(c);if(!/mbps/i.test(pkg)&&pkg!=='—')pkg+=' Mbps';$('pkgSpeed').textContent=pkg;
  $('pkgPrice').textContent=money(c.monthlyFee)+' / মাস';$('billNow').textContent=money(c.monthlyFee);$('billDue').textContent=money(c.previousDue);$('billNow2').textContent=money(c.monthlyFee);$('billDue2').textContent=money(c.previousDue);
  $('dueDate').textContent=fmtDate(c.expiryDate);$('expiryCountdown').textContent=fmtExpiryCountdown(c.expiryDate);$('paidStatus').textContent=String(c.lastPaymentStatus||'UNPAID').toUpperCase();
