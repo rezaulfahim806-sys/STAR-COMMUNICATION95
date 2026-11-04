@@ -123,7 +123,7 @@ public class MainActivity extends Activity {
             runOnUiThread(() -> {
                 if (isFinishing() || webView == null) return;
                 if (page != null) {
-                    webView.loadDataWithBaseURL("file:///android_asset/", page, "text/html", "UTF-8", null);
+                    webView.loadDataWithBaseURL("file:///android_asset/index.html", page, "text/html", "UTF-8", null);
                     Toast.makeText(MainActivity.this, "Latest app features loaded", Toast.LENGTH_SHORT).show();
                     return;
                 }
