@@ -1,0 +1,1 @@
+Separate STAR COMMUNICATION Customer APK module. Build with gradle :customer-app:assembleDebug. Customer portal UI is a preview and backend auth/payment integration is not complete yet.
