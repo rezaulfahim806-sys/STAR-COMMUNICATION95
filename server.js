@@ -84,7 +84,7 @@ app.post('/api/public/complaints',async(req,res)=>{
 const customerLoginAttempts=new Map();
 function normalizeCustomerPhone(value){
  let digits=String(value||'').replace(/\\D/g,'');
- if(digits.startsWith('0088'))digits=digits.slice(2);
+ if(digits.startsWith('0088'))digits=digits.slice(4);
  else if(digits.startsWith('88')&&digits.length===13)digits=digits.slice(2);
  if(digits.length===10&&digits.startsWith('1'))digits='0'+digits;
  return digits;
@@ -106,7 +106,7 @@ async function findCustomerInCompany(owner,code,phoneDigits){
  const customer=customers.find(c=>{
   const id=String(c.clientCode||c.code||'').trim().toUpperCase();
   const phone=normalizeCustomerPhone(c.phone||c.mobile||c.number||'');
-  return id===code&&phone&&phone===phoneDigits;
+  return id===code&&(!phoneDigits||(phone&&phone===phoneDigits));
  });
  return customer?{state,customer}:null;
 }
