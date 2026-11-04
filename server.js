@@ -521,6 +521,7 @@ app.get('/api/sync/backups',auth,async(req,res)=>{
    previousDue:Number(c.prevDue??c.previousDue??0),expiryDate:String(c.expiry||c.expiryDate||c.dueDate||''),status:String(c.status||'ACTIVE'),
    lastPaymentStatus:String(c.lastPaymentStatus||''),allowPackageChoice:packageChoiceEnabled(c),free:!!c.free,left:!!c.left};
  }
+ // Customer Portal login endpoint (must be included in the Render API deployment).
  app.post('/api/customer/login',async(req,res)=>{
   const code=customerCodeKey(req.body&&req.body.customerId),phone=customerPhoneKey(req.body&&req.body.mobile);
   if(!code||!phone)return res.status(400).json({error:'Customer ID ও Admin-এর কাছে নিবন্ধিত মোবাইল নম্বর দিন'});
