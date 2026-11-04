@@ -62,7 +62,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 
 <div id="homeSection" class="section active">
 <div class="hero"><small>আপনার বর্তমান প্যাকেজ</small><h2 id="pkgSpeed">—</h2><div class="fee" id="pkgPrice">৳— / মাস</div><button class="btn" onclick="goTab('package')">প্যাকেজ দেখুন</button></div>
 <div class="grid"><div class="metric"><small>এই মাসের বিল</small><strong id="billNow">৳—</strong></div><div class="metric"><small>আগের বকেয়া</small><strong id="billDue">৳—</strong></div></div>
-<div class="card"><div class="itemrow"><h3>পরবর্তী বিলের তারিখ</h3><span id="paidStatus" class="pill">—</span></div><div class="datebox"><span>পরবর্তী বিল গণনা / Bill due date</span><strong id="dueDate">—</strong><span>বিলের আগে আপনাকে Reminder দেওয়া হবে।</span></div></div>
+<div class="card"><div class="itemrow"><h3>পরবর্তী বিলের তারিখ</h3><span id="paidStatus" class="pill">—</span></div><div class="datebox"><span>পরবর্তী বিল গণনা / Bill due date</span><strong id="dueDate">—</strong><strong id="expiryCountdown" style="display:block;margin-top:8px;font-size:1.08em">মেয়াদ গণনা হচ্ছে…</strong><span>বিলের আগে আপনাকে Reminder দেওয়া হবে।</span></div></div>
 <div id="offerCard" class="card" style="display:none"><h3>🎁 Admin-এর Offer</h3><div id="offerText"></div></div>
 <div class="card"><h3>💳 দ্রুত বিল পরিশোধ</h3><div class="muted">Admin-এর Baniq Pay API দিয়ে নিরাপদ পেমেন্ট করুন।</div><button class="btn" id="homePayBtn" onclick="showPaymentMethods()">bKash / Nagad দিয়ে বিল পরিশোধ</button><div id="baniqNote" class="muted" style="margin-top:7px"></div></div>
 </div>
@@ -107,7 +107,7 @@ const PAYMENT_PAGE='https://rezaulfahim806-sys.github.io/STAR-COMMUNICATION95/pa
 let portalData=null,chosenPackage=null;
 const $=id=>document.getElementById(id),money=n=>'৳'+Number(n||0).toLocaleString('bn-BD');
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-function token(){return sessionStorage.getItem('starCustomerToken')||''}
+function token(){const t=sessionStorage.getItem('starCustomerToken')||localStorage.getItem('starCustomerToken')||'';if(t&&!sessionStorage.getItem('starCustomerToken'))sessionStorage.setItem('starCustomerToken',t);return t}
 function showError(msg){$('loginError').textContent=msg;$('loginError').style.display='block'}
 $('loginForm').addEventListener('submit',async e=>{
  e.preventDefault();$('loginError').style.display='none';
@@ -119,7 +119,7 @@ $('loginForm').addEventListener('submit',async e=>{
   const r=await fetch(API_BASE+'/api/customer/login',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({customerId,mobile}),signal:controller.signal,cache:'no-store'});
   const j=await r.json().catch(()=>({}));
   if(!r.ok||!j.token)throw new Error(j.error||('Login ব্যর্থ (HTTP '+r.status+')'));
-  sessionStorage.setItem('starCustomerToken',j.token);await loadPortal();
+  sessionStorage.setItem('starCustomerToken',j.token);localStorage.setItem('starCustomerToken',j.token);await loadPortal();
  }catch(err){
   if(err&&err.name==='AbortError')showError('সার্ভার চালু হতে সময় নিচ্ছে। ১ মিনিট অপেক্ষা করে আবার Login করুন।');
   else showError(err.message||'Login service এখন পাওয়া যাচ্ছে না। Render সার্ভার চালু আছে কি না Admin-কে যাচাই করতে বলুন।');
@@ -131,14 +131,16 @@ async function loadPortal(){
  $('loginView').style.display='none';$('portal').style.display='block';$('bottomNav').style.display='grid';renderPortal();
 }
 function pkgName(c){return String(c.packageName||'—').trim()}
-function fmtDate(v){if(!v)return 'Admin-এর তথ্য অনুযায়ী';const d=new Date(v+'T00:00:00');if(isNaN(d.getTime()))return String(v);return d.toLocaleDateString('bn-BD',{day:'numeric',month:'long',year:'numeric'})}
+function dateOnly(v){if(!v)return null;const raw=String(v).trim();const m=raw.match(/^(\\d{4})-(\\d{2})-(\\d{2})/);if(m)return new Date(Number(m[1]),Number(m[2])-1,Number(m[3]));const d=new Date(raw);return isNaN(d.getTime())?null:new Date(d.getFullYear(),d.getMonth(),d.getDate())}
+function fmtDate(v){const d=dateOnly(v);if(!d)return v?'Admin-এর তথ্য অনুযায়ী':'Admin-এর তথ্য অনুযায়ী';return d.toLocaleDateString('bn-BD',{day:'numeric',month:'long',year:'numeric'})}
+function fmtExpiryCountdown(v){const d=dateOnly(v);if(!d)return 'মেয়াদ শেষের তারিখ পাওয়া যায়নি';const now=new Date(),today=new Date(now.getFullYear(),now.getMonth(),now.getDate()),days=Math.round((d-today)/86400000);if(days<0)return 'মেয়াদ শেষ হয়েছে '+Math.abs(days).toLocaleString('bn-BD')+' দিন আগে';if(days===0)return 'আজই মেয়াদ শেষ';return 'আর '+days.toLocaleString('bn-BD')+' দিন মেয়াদ বাকি'}
 function renderPortal(){
  const c=portalData.customer||{},company=portalData.company||{},status=String(c.status||'ACTIVE').toLowerCase(),active=!['inactive','expired','left','disconnected','disabled'].includes(status);
  $('customerCode').textContent='গ্রাহক নম্বর: '+(c.clientCode||c.id||'—');
  $('statusPill').textContent=active?'● সক্রিয়':'● '+(c.status||'Inactive');$('statusPill').className='pill'+(active?'':' bad');
  let pkg=pkgName(c);if(!/mbps/i.test(pkg)&&pkg!=='—')pkg+=' Mbps';$('pkgSpeed').textContent=pkg;
  $('pkgPrice').textContent=money(c.monthlyFee)+' / মাস';$('billNow').textContent=money(c.monthlyFee);$('billDue').textContent=money(c.previousDue);$('billNow2').textContent=money(c.monthlyFee);$('billDue2').textContent=money(c.previousDue);
- $('dueDate').textContent=fmtDate(c.expiryDate);$('paidStatus').textContent=String(c.lastPaymentStatus||'UNPAID').toUpperCase();
+ $('dueDate').textContent=fmtDate(c.expiryDate);$('expiryCountdown').textContent=fmtExpiryCountdown(c.expiryDate);$('paidStatus').textContent=String(c.lastPaymentStatus||'UNPAID').toUpperCase();
  $('currentPackage').innerHTML='<div class="itemrow"><b>'+esc(pkgName(c))+'</b><span class="price">'+money(c.monthlyFee)+'/মাস</span></div><div class="muted">Customer ID: '+esc(c.clientCode||c.id||'')+'</div>';
  $('packageChoiceNote').textContent=c.allowPackageChoice?'Admin প্যাকেজ পরিবর্তনের অনুমতি দিয়েছেন। পেমেন্টের আগে প্যাকেজ নির্বাচন করতে পারবেন।':'Admin আপনার বর্তমান প্যাকেজ নির্ধারণ করেছেন। প্যাকেজ পরিবর্তনের জন্য Admin-এর সঙ্গে যোগাযোগ করুন।';
  renderPackages();renderPayments();
@@ -179,7 +181,8 @@ async function openBaniqPayment(provider){
   const r=await fetch(API_BASE+'/api/baniq/create',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({company:String(portalData.company&&portalData.company.slug||''),customerCode:String(c.id||''),clientCode:String(c.clientCode||c.id||''),customerName:String(c.name||'Customer'),customerMobile:String(c.mobile||''),selectedPackage:String(pkg.speed),packagePrice:Number(pkg.price),previousDue:prev,amount:total,provider,merchantInvoiceNumber:'SC-'+String(c.clientCode||c.id||'')+'-'+Date.now()})});
   const data=await r.json().catch(()=>({}));
   if(!r.ok||!(data.checkoutUrl||data.bkashURL))throw new Error(data.error||('Baniq checkout চালু হয়নি (HTTP '+r.status+')'));
-  location.href=data.checkoutUrl||data.bkashURL;
+  // Keep the customer portal in browser history so Android Back returns here.
+  window.location.href=data.checkoutUrl||data.bkashURL;
  }catch(e){status.textContent=e.message||'Payment service unavailable.';bk.disabled=false;ng.disabled=false}
 }
 async function sendComplaint(){
@@ -190,6 +193,15 @@ async function sendComplaint(){
  finally{btn.disabled=false;btn.textContent='অভিযোগ পাঠান'}
 }
 function goTab(tab){const map={home:'homeSection',package:'packageSection',bill:'billSection',profile:'profileSection'};Object.values(map).forEach(id=>$(id).classList.remove('active'));$(map[tab]||map.home).classList.add('active');document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));window.scrollTo({top:0,behavior:'smooth'})}
-function logout(){sessionStorage.removeItem('starCustomerToken');portalData=null;chosenPackage=null;$('portal').style.display='none';$('bottomNav').style.display='none';$('loginView').style.display='block';$('mobile').value='';$('loginError').style.display='none'}
+function logout(){sessionStorage.removeItem('starCustomerToken');localStorage.removeItem('starCustomerToken');portalData=null;chosenPackage=null;$('portal').style.display='none';$('bottomNav').style.display='none';$('loginView').style.display='block';$('mobile').value='';$('loginError').style.display='none'}
+function restoreCustomerSession(){
+ if(!token())return;
+ loadPortal().catch(err=>{sessionStorage.removeItem('starCustomerToken');localStorage.removeItem('starCustomerToken');$('portal').style.display='none';$('bottomNav').style.display='none';$('loginView').style.display='block';showError(err.message||'Session শেষ হয়েছে। আবার Login করুন।')});
+}
+window.addEventListener('pageshow',()=>{
+ hidePaymentMethods();
+ if(portalData&&token())api('/api/customer/portal').then(j=>{portalData=j;renderPortal()}).catch(()=>{});
+});
+restoreCustomerSession();
 </script>
 </body></html>
