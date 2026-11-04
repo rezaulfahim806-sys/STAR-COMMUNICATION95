@@ -9,15 +9,15 @@
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,"Noto Sans Bengali",sans-serif;color:var(--navy);background:var(--bg);-webkit-text-size-adjust:100%}
 body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
 button,input,select,textarea{font:inherit}button{cursor:pointer}
-.top{background:#fff;border-bottom:1px solid var(--line);padding:8px 12px;display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:5;min-height:60px;width:100%;overflow:visible}
-.logo{width:clamp(38px,11vw,48px);height:clamp(38px,11vw,48px);flex:none}.brandWrap{flex:1;min-width:0}.brand{font-size:clamp(12px,4.1vw,18px);font-weight:850;letter-spacing:0;line-height:1.15;white-space:nowrap;overflow:visible}.subtitle{font-size:clamp(10px,3.2vw,12px);color:var(--muted);margin-top:3px;white-space:nowrap}
-@media(max-width:360px){.top{padding:8px 10px;gap:7px}.logo{width:38px;height:38px}.brand{font-size:12.5px}.subtitle{font-size:10px}}
-main{width:100%;max-width:520px;margin:0 auto;padding:14px 12px 22px}
-.panel{background:#fff;border:1px solid var(--line);border-radius:20px;padding:18px 16px;box-shadow:0 7px 24px #153b7008}
-.welcome{font-size:13px;color:var(--muted)}h1{font-size:clamp(22px,6.3vw,28px);line-height:1.32;margin:5px 0 8px;color:var(--navy);overflow-wrap:anywhere}
+.top{background:#fff;border-bottom:1px solid var(--line);padding:10px max(12px,env(safe-area-inset-left));display:flex;align-items:center;gap:9px;position:sticky;top:0;z-index:5;min-height:66px;width:100%;overflow:hidden}
+.logo{width:clamp(40px,12vw,52px);height:clamp(40px,12vw,52px);flex:none}.brandWrap{flex:1;min-width:0;max-width:calc(100vw - 78px)}.brand{font-size:clamp(14px,4.4vw,19px);font-weight:850;letter-spacing:0;line-height:1.12;white-space:normal;overflow-wrap:anywhere;word-break:normal}.subtitle{font-size:clamp(10px,3.2vw,13px);color:var(--muted);margin-top:4px;white-space:normal;line-height:1.25}
+@media(max-width:360px){.top{padding:8px 10px;gap:8px;min-height:60px}.logo{width:39px;height:39px}.brand{font-size:14px}.subtitle{font-size:10px}}
+main{width:100%;max-width:480px;margin:0 auto;padding:clamp(10px,3vw,16px) clamp(10px,3.2vw,16px) 22px}
+.panel{background:#fff;border:1px solid var(--line);border-radius:20px;padding:clamp(15px,4.5vw,22px) clamp(13px,4vw,20px);box-shadow:0 7px 24px #153b7008}
+.welcome{font-size:13px;color:var(--muted)}h1{font-size:clamp(21px,6vw,28px);line-height:1.25;margin:6px 0 9px;color:var(--navy);overflow-wrap:anywhere}
 .intro{font-size:13px;color:var(--muted);line-height:1.6;margin:0 0 17px}
 label{display:block;font-size:13px;font-weight:750;margin:12px 0 6px}
-input,select,textarea{width:100%;border:1px solid #d8e3f2;border-radius:12px;padding:12px;background:#fbfdff;color:var(--navy);outline:none;min-width:0;font-size:15px}
+input,select,textarea{width:100%;max-width:100%;border:1px solid #d8e3f2;border-radius:12px;padding:clamp(11px,3.2vw,14px);background:#fbfdff;color:var(--navy);outline:none;min-width:0;font-size:16px}
 input:focus,select:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px #1769e018}
 .btn{border:0;border-radius:13px;padding:13px 15px;background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;font-size:15px;font-weight:800;box-shadow:0 5px 14px #1769e022;width:100%;margin-top:12px}
 .btn:disabled{opacity:.55;cursor:default}.btn.light{background:#edf4ff;color:#1769d0;box-shadow:none}.btn.green{background:#e7f7ed;color:#167b43;box-shadow:none}.btn.outline{background:#fff;color:var(--blue);border:1px solid #cbdcf6;box-shadow:none}
@@ -101,7 +101,7 @@ function token(){return sessionStorage.getItem('starCustomerToken')||''}
 function showError(msg){$('loginError').textContent=msg;$('loginError').style.display='block'}
 $('loginForm').addEventListener('submit',async e=>{
  e.preventDefault();$('loginError').style.display='none';
- const customerId=$('customerId').value.trim().toUpperCase().replace(/[\\s-]/g,''),mobile=$('mobile').value.trim().replace(/\\s+/g,'');
+ const customerId=$('customerId').value.trim().toUpperCase().replace(/[\s-]/g,''),mobile=$('mobile').value.trim().replace(/\s+/g,'');
  if(!customerId||!mobile){showError('Customer ID ও Admin-এ নিবন্ধিত মোবাইল নম্বর দুটোই লিখুন।');return}
  const btn=$('loginButton');btn.disabled=true;btn.textContent='Login হচ্ছে…';
  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),75000);
