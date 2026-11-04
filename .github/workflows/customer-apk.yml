@@ -49,6 +49,17 @@ jobs:
           APK=customer-app/build/outputs/apk/debug/customer-app-debug.apk
           test -s "$APK"
           jarsigner -verify "$APK"
+      - name: Publish signed Customer APK release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: customer-apk-${{ github.run_number }}
+          name: STAR COMMUNICATION Customer APK build ${{ github.run_number }}
+          body: |
+            Customer Portal APK for STAR COMMUNICATION.
+            Signed with the configured stable STAR release key for update installs.
+          files: customer-app/build/outputs/apk/debug/customer-app-debug.apk
+          make_latest: false
       - uses: actions/upload-artifact@v4
         with:
           name: STAR-COMMUNICATION-CUSTOMER-APK-SIGNED
