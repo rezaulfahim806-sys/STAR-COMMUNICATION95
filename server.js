@@ -561,7 +561,7 @@ app.get('/api/sync/backups',auth,async(req,res)=>{
    const settings=data.settings||{},company=settings.company||{},packages=Array.isArray(settings.packages)?settings.packages:[],offers=Array.isArray(settings.offers)?settings.offers:[];
    const creds=await getBaniqCredentials(owner).catch(()=>({keyId:'',secret:''}));
    return send(res,{ok:true,customer:safePortalCustomer(customer),payments,packages,offers,
-    company:{name:String(settings.companyName||company.name||owner),supportPhone:String(settings.supportPhone||settings.complaintNumber||company.supportPhone||company.phone||settings.phone||'')},
+    company:{slug:owner,name:String(settings.companyName||company.name||owner),supportPhone:String(settings.supportPhone||settings.complaintNumber||company.supportPhone||company.phone||settings.phone||'')},
     baniq:{configured:!!(creds.keyId&&creds.secret)}});
   }catch(e){return res.status(503).json({error:'Customer Portal data load failed'});}
  });
