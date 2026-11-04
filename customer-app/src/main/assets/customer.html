@@ -1,152 +1,164 @@
 <!doctype html>
 <html lang="bn">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#1769e0">
-<title>STAR COMMUNICATION • Customer Portal</title>
+<title>STAR COMMUNICATION | Customer Portal</title>
 <style>
-:root{--blue:#1769e0;--blue2:#4596f5;--navy:#172d4e;--bg:#f3f7ff;--muted:#718096;--line:#e1e9f5;--green:#168447;--red:#c93434}
-*{box-sizing:border-box}html{font-size:14px;-webkit-text-size-adjust:100%}body{margin:0;min-height:100vh;background:var(--bg);font-family:system-ui,-apple-system,"Noto Sans Bengali",sans-serif;color:var(--navy);padding-bottom:calc(70px + env(safe-area-inset-bottom))}
-.top{background:#fff;border-bottom:1px solid var(--line);padding:10px 14px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:3;min-height:70px}
-.brandmark{width:44px;height:44px;flex:none}.brand{font-size:clamp(14px,4vw,18px);font-weight:850;line-height:1.15;letter-spacing:.1px}.subtitle{font-size:11px;color:var(--muted);margin-top:3px}
-main{width:100%;max-width:430px;margin:0 auto;padding:14px 12px 24px}.login-card,.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:0 5px 18px #153b7008}
-.welcome{font-size:12px;color:var(--muted)}h1{font-size:clamp(21px,6vw,26px);line-height:1.25;margin:5px 0 7px;color:var(--navy);overflow-wrap:anywhere}.intro{font-size:13px;color:var(--muted);line-height:1.55;margin:0 0 16px}
-label{display:block;font-size:13px;font-weight:750;margin:12px 0 6px}input,select,textarea{width:100%;min-width:0;border:1px solid #d8e3f2;border-radius:12px;padding:12px 13px;font:inherit;font-size:15px;background:#fbfdff;color:var(--navy);outline:none}input{height:46px}input:focus,select:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px #1769e018}
-button{font:inherit;cursor:pointer}.btn{width:100%;border:0;border-radius:12px;margin-top:14px;padding:13px 14px;background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;font-size:15px;font-weight:800;box-shadow:0 5px 14px #1769e025}.btn:disabled{opacity:.65}.btn.secondary{background:#edf4ff;color:var(--blue);box-shadow:none;border:1px solid #dce8f8}.error{display:none;margin-top:11px;padding:11px;border-radius:11px;background:#fff0f0;color:#a32323;font-size:12px;line-height:1.5}.help{font-size:11px;color:var(--muted);line-height:1.55;margin-top:12px}.support{background:#eaf3ff;border-radius:12px;padding:11px;margin-top:13px;font-size:12px;line-height:1.55;color:#31547e}
-.footer{text-align:center;color:#8a98aa;font-size:10px;margin:16px 0 4px}
-#portal{display:none}.helloRow{display:flex;justify-content:space-between;align-items:center;gap:8px}.helloRow h1{margin:4px 0;font-size:clamp(20px,5.5vw,24px)}.pill{border-radius:30px;padding:6px 10px;background:#e8f8ef;color:var(--green);font-size:11px;font-weight:800;white-space:nowrap}
-.hero{background:linear-gradient(135deg,#1769e0,#4b9cff);color:white;border-radius:19px;padding:18px;margin:13px 0;box-shadow:0 8px 18px #1769e01b}.hero small{color:#e4efff;font-size:12px}.hero h2{font-size:clamp(28px,8vw,36px);margin:5px 0 8px;line-height:1.1}.hero .price{font-size:16px}.hero .btn{display:inline-block;width:auto;min-width:130px;background:white;color:#1769e0;box-shadow:none;padding:11px 16px;margin-top:12px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.metric{background:#f1f6ff;border:1px solid var(--line);border-radius:15px;padding:12px;min-width:0}.metric small{display:block;color:var(--muted);font-size:12px}.metric strong{display:block;font-size:clamp(19px,6vw,24px);color:var(--blue);margin-top:4px;overflow-wrap:anywhere}
-.card{padding:14px;margin:11px 0;border-radius:17px}.card h3{font-size:16px;margin:0 0 10px}.datebox{background:#eaf8ef;border-radius:12px;padding:12px;color:#176b3c;font-size:13px}.datebox strong{display:block;font-size:18px;margin:4px 0}.muted{font-size:12px;color:var(--muted);line-height:1.5}.rowLine{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid #edf1f7;font-size:13px}.rowLine:last-child{border-bottom:0}.rowLine span:first-child{color:var(--muted)}.rowLine b{text-align:right;overflow-wrap:anywhere}
-.tabContent{display:none}.tabContent.active{display:block}.nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:7px 2px calc(7px + env(safe-area-inset-bottom));z-index:4}.nav button{border:0;background:transparent;color:#778392;font-size:11px;min-width:0;flex:1;padding:4px 1px}.nav button .ico{display:block;font-size:17px;line-height:1.3}.nav button.active{color:var(--blue);font-weight:800}
-@media(max-width:340px){.top{padding:8px 10px}.brandmark{width:38px;height:38px}main{padding:10px 9px}.login-card,.card{padding:12px}.hero{padding:15px}.metric{padding:10px}.nav button{font-size:10px}}
-@media(min-width:600px){main{max-width:440px;padding-top:20px}.top{padding-left:max(14px,calc((100vw - 440px)/2));padding-right:max(14px,calc((100vw - 440px)/2))}}
+:root{--blue:#1769df;--blue2:#4b98f7;--navy:#172d4e;--bg:#f3f7ff;--muted:#718096;--line:#e1e9f5;--green:#168447;--red:#b83232}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,"Noto Sans Bengali",sans-serif;color:var(--navy);background:var(--bg);-webkit-text-size-adjust:100%}
+body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
+button,input,select,textarea{font:inherit}button{cursor:pointer}
+.top{background:#fff;border-bottom:1px solid var(--line);padding:10px 14px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:5;min-height:68px}
+.logo{width:46px;height:46px;flex:none}.brand{font-size:clamp(14px,4.2vw,18px);font-weight:850;letter-spacing:.1px;line-height:1.2}.subtitle{font-size:12px;color:var(--muted);margin-top:3px}
+main{width:100%;max-width:520px;margin:0 auto;padding:14px 12px 22px}
+.panel{background:#fff;border:1px solid var(--line);border-radius:20px;padding:18px 16px;box-shadow:0 7px 24px #153b7008}
+.welcome{font-size:13px;color:var(--muted)}h1{font-size:clamp(22px,6.3vw,28px);line-height:1.32;margin:5px 0 8px;color:var(--navy);overflow-wrap:anywhere}
+.intro{font-size:13px;color:var(--muted);line-height:1.6;margin:0 0 17px}
+label{display:block;font-size:13px;font-weight:750;margin:12px 0 6px}
+input,select,textarea{width:100%;border:1px solid #d8e3f2;border-radius:12px;padding:12px;background:#fbfdff;color:var(--navy);outline:none;min-width:0;font-size:15px}
+input:focus,select:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px #1769e018}
+.btn{border:0;border-radius:13px;padding:13px 15px;background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;font-size:15px;font-weight:800;box-shadow:0 5px 14px #1769e022;width:100%;margin-top:12px}
+.btn:disabled{opacity:.55;cursor:default}.btn.light{background:#edf4ff;color:#1769d0;box-shadow:none}.btn.green{background:#e7f7ed;color:#167b43;box-shadow:none}.btn.outline{background:#fff;color:var(--blue);border:1px solid #cbdcf6;box-shadow:none}
+.error{display:none;margin-top:12px;padding:11px 12px;border-radius:12px;background:#fff0f0;color:#9d2828;font-size:13px;line-height:1.5}
+.help{font-size:12px;color:var(--muted);line-height:1.55;margin-top:13px}.support{background:#eaf3ff;border-radius:13px;padding:12px;margin-top:14px;font-size:12px;line-height:1.6;color:#31547e}
+#portal{display:none}.dashhead{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin:4px 2px 12px}.dashhead h1{font-size:clamp(21px,6vw,27px);margin:0}.smallmuted{font-size:12px;color:var(--muted);margin-top:5px;overflow-wrap:anywhere}
+.pill{border-radius:30px;padding:6px 10px;background:#e8f8ef;color:var(--green);font-size:12px;font-weight:800;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}.pill.bad{background:#fff0f0;color:#b83232}.hero{background:linear-gradient(135deg,#1769e0,#4b98f7);color:white;border-radius:20px;padding:18px;margin:12px 0;box-shadow:0 8px 18px #1769e018}.hero small{font-size:13px;color:#e4efff}.hero h2{font-size:clamp(30px,8vw,38px);line-height:1.2;margin:7px 0 9px;overflow-wrap:anywhere}.hero .fee{font-size:18px;font-weight:700}.hero .btn{background:#fff;color:#1769d0;box-shadow:none;width:auto;min-width:145px;margin-top:14px;padding:11px 15px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:10px 0}.metric{background:#fff;border:1px solid var(--line);border-radius:16px;padding:13px;min-width:0}.metric small{display:block;color:var(--muted);font-size:12px;line-height:1.4}.metric strong{display:block;font-size:clamp(21px,6vw,27px);color:var(--blue);margin-top:5px;overflow-wrap:anywhere}
+.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:15px;margin:10px 0;box-shadow:0 5px 18px #183c7006}.card h3{font-size:16px;margin:0 0 10px}.datebox{background:#eaf8ef;border-radius:13px;padding:12px;color:#176b3c;font-size:13px;line-height:1.5}.datebox strong{display:block;font-size:19px;margin:4px 0}
+.section{display:none}.section.active{display:block}.item{border:1px solid var(--line);border-radius:13px;padding:12px;margin:8px 0;background:#fbfdff}.itemrow{display:flex;justify-content:space-between;align-items:center;gap:8px}.item b{overflow-wrap:anywhere}.muted{color:var(--muted);font-size:12px;line-height:1.5}.price{font-size:19px;color:var(--blue);font-weight:850}.nav{position:fixed;bottom:0;left:0;right:0;z-index:6;background:#fff;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,1fr);padding:7px 3px max(7px,env(safe-area-inset-bottom));box-shadow:0 -4px 16px #0b2b4b08}.nav button{border:0;background:transparent;color:#7b8797;font-size:11px;padding:3px 0;display:flex;flex-direction:column;align-items:center;gap:2px}.nav button .ico{font-size:18px;line-height:1.2}.nav button.active{color:var(--blue);font-weight:800}
+.footer{text-align:center;color:#8a98aa;font-size:10px;margin:18px 0 2px}
+@media(min-width:430px){main{padding:18px 16px 25px}.panel{padding:22px}.top{padding:12px 18px}.logo{width:50px;height:50px}}
 </style>
 </head>
 <body>
 <header class="top">
-<svg class="brandmark" viewBox="0 0 120 120" role="img" aria-label="STAR COMMUNICATION Logo">
-<defs><linearGradient id="red" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff1717"/><stop offset="1" stop-color="#b90000"/></linearGradient></defs>
-<path fill="url(#red)" d="M60 3 76 38 116 40 86 64 97 105 60 82 23 105 34 64 4 40 44 38Z"/>
+<svg class="logo" viewBox="0 0 120 120" role="img" aria-label="STAR COMMUNICATION Logo">
+<defs><linearGradient id="starRed" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff1717"/><stop offset="1" stop-color="#b90000"/></linearGradient></defs>
+<path fill="url(#starRed)" d="M60 3 76 38 116 40 86 64 97 105 60 82 23 105 34 64 4 40 44 38Z"/>
 <path d="M38 61 Q60 38 82 61 M44 70 Q60 54 76 70 M51 79 Q60 70 69 79" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/><circle cx="60" cy="88" r="5" fill="#fff"/>
 </svg>
 <div><div class="brand">STAR COMMUNICATION</div><div class="subtitle">গ্রাহক সেবা • Customer Portal</div></div>
 </header>
 <main>
-<section id="loginView" class="login-card">
+<section id="loginView" class="panel">
 <div class="welcome">স্বাগতম</div><h1>আপনার ইন্টারনেট অ্যাকাউন্টে Login করুন</h1>
-<p class="intro">Admin Dashboard-এ সংরক্ষিত Customer ID ও মোবাইল নম্বর ব্যবহার করুন।</p>
+<p class="intro">Admin Dashboard-এ আপনার Customer ID ও নিবন্ধিত মোবাইল নম্বর ব্যবহার করুন।</p>
 <form id="loginForm" autocomplete="on">
 <label for="customerId">গ্রাহক নম্বর / Customer ID</label>
-<input id="customerId" name="customerId" placeholder="যেমন: SC001" autocomplete="username" autocapitalize="characters" maxlength="24" required>
-<label for="mobileNumber">Admin-এর কাছে থাকা মোবাইল নম্বর</label>
-<input id="mobileNumber" name="mobileNumber" type="tel" inputmode="tel" placeholder="01XXXXXXXXX" autocomplete="tel" maxlength="18" required>
+<input id="customerId" name="customerId" placeholder="যেমন: SC001" autocomplete="username" autocapitalize="characters" maxlength="40" required>
+<label for="mobile">Admin-এ নিবন্ধিত মোবাইল নম্বর</label>
+<input id="mobile" name="mobile" type="tel" inputmode="tel" placeholder="01XXXXXXXXX" autocomplete="tel" maxlength="20" required>
 <div id="loginError" class="error" role="alert"></div>
 <button id="loginButton" class="btn" type="submit">Login করুন</button>
 </form>
-<div class="support"><b>Login করতে সমস্যা হচ্ছে?</b><br>Customer ID বা Admin Dashboard-এ থাকা মোবাইল নম্বর মিলিয়ে দেখুন।</div>
-<div class="help">আপনার Customer ID ও মোবাইল নম্বর অন্য কারও সঙ্গে শেয়ার করবেন না।</div>
+<div class="support"><b>Login করতে সমস্যা হচ্ছে?</b><br>আপনার Customer ID ও মোবাইল নম্বর Admin Dashboard-এ যেভাবে আছে, ঠিক সেভাবে লিখুন।</div>
+<div class="help">আপনার মোবাইল নম্বর অন্য কারও সঙ্গে শেয়ার করবেন না।</div>
 </section>
 
 <section id="portal">
-<div class="tabContent active" id="tab-home">
-<div class="welcome">স্বাগতম</div><div class="helloRow"><h1>আপনার ইন্টারনেট অ্যাকাউন্ট</h1><span class="pill" id="statusPill">● সক্রিয়</span></div>
-<div class="subtitle" id="customerCode">গ্রাহক নম্বর: —</div>
-<section class="hero"><small>আপনার বর্তমান প্যাকেজ</small><h2 id="pkgSpeed">—</h2><div class="price" id="pkgPrice">৳— / মাস</div><button class="btn" onclick="goTab('packages')">প্যাকেজ দেখুন</button></section>
-<div class="grid"><div class="metric"><small>এই মাসের বাকি বিল</small><strong id="billNow">৳—</strong></div><div class="metric"><small>আগের বকেয়া</small><strong id="billDue">৳—</strong></div></div>
-<section class="card"><div class="helloRow"><h3>পরবর্তী বিলের তারিখ</h3><span class="pill" id="paidStatus">—</span></div><div class="datebox"><small>Bill due date / মেয়াদ</small><strong id="dueDate">—</strong><span id="reminderText">বিলের আগে Reminder দেওয়া হবে।</span></div></section>
-<section class="card"><h3>দ্রুত কাজ</h3><button class="btn" onclick="payBill()">Baniq Pay দিয়ে বিল পরিশোধ</button><button class="btn secondary" onclick="goTab('complaint')">অভিযোগ / Support</button></section>
+<div class="dashhead"><div><h1>আপনার ইন্টারনেট<br>অ্যাকাউন্ট</h1><div id="customerCode" class="smallmuted">গ্রাহক নম্বর: —</div></div><span id="statusPill" class="pill">● সক্রিয়</span></div>
+<div id="homeSection" class="section active">
+<div class="hero"><small>আপনার বর্তমান প্যাকেজ</small><h2 id="pkgSpeed">—</h2><div class="fee" id="pkgPrice">৳— / মাস</div><button class="btn" onclick="goTab('package')">প্যাকেজ দেখুন</button></div>
+<div class="grid"><div class="metric"><small>এই মাসের বিল</small><strong id="billNow">৳—</strong></div><div class="metric"><small>আগের বকেয়া</small><strong id="billDue">৳—</strong></div></div>
+<div class="card"><div class="itemrow"><h3>পরবর্তী বিলের তারিখ</h3><span id="paidStatus" class="pill">—</span></div><div class="datebox"><span>পরবর্তী বিল গণনা / Bill due date</span><strong id="dueDate">—</strong><span>বিলের আগে আপনাকে Reminder দেওয়া হবে।</span></div></div>
+<div id="offerCard" class="card" style="display:none"><h3>🎁 Admin-এর Offer</h3><div id="offerText"></div></div>
+<div class="card"><h3>💳 দ্রুত বিল পরিশোধ</h3><div class="muted">Admin-এর Baniq Pay API দিয়ে নিরাপদ পেমেন্ট করুন।</div><button class="btn" id="homePayBtn" onclick="openPayment()">Baniq Pay দিয়ে বিল পরিশোধ</button><div id="baniqNote" class="muted" style="margin-top:7px"></div></div>
 </div>
 
-<div class="tabContent" id="tab-packages">
-<section class="card"><h3>আপনার প্যাকেজ</h3><div class="rowLine"><span>বর্তমান প্যাকেজ</span><b id="packageName">—</b></div><div class="rowLine"><span>মাসিক মূল্য</span><b id="packageFee">—</b></div><div class="rowLine"><span>প্যাকেজ পরিবর্তন</span><b id="packagePermission">Admin অনুমতি অনুযায়ী</b></div><p class="muted" id="packageHint">প্যাকেজ পরিবর্তনের অনুমতি Admin Dashboard থেকে নিয়ন্ত্রণ করা হয়।</p><button class="btn" onclick="payBill()">প্যাকেজ / বিল Payment</button></section>
+<div id="packageSection" class="section">
+<div class="card"><h3>📶 আপনার প্যাকেজ</h3><div id="currentPackage" class="item"></div><div id="packageChoiceNote" class="muted"></div></div>
+<div class="card"><h3>প্যাকেজ তালিকা</h3><div id="packageList"></div><button class="btn" onclick="openPayment()">নির্বাচিত প্যাকেজের বিল পরিশোধ</button></div>
 </div>
 
-<div class="tabContent" id="tab-bill">
-<section class="card"><h3>বিলের বিস্তারিত</h3><div class="rowLine"><span>এই মাসের বিল</span><b id="billMonthly">—</b></div><div class="rowLine"><span>এই মাসে পরিশোধ</span><b id="billPaid">—</b></div><div class="rowLine"><span>আগের বকেয়া</span><b id="billPrevious">—</b></div><div class="rowLine"><span>মোট বাকি</span><b id="billTotal">—</b></div><button class="btn" onclick="payBill()">Baniq Pay দিয়ে বিল পরিশোধ</button></section>
-<section class="card"><h3>Payment History</h3><div id="paymentHistory" class="muted">Payment history লোড হচ্ছে…</div></section>
+<div id="billSection" class="section">
+<div class="grid"><div class="metric"><small>এই মাসের বিল</small><strong id="billNow2">৳—</strong></div><div class="metric"><small>আগের বকেয়া</small><strong id="billDue2">৳—</strong></div></div>
+<div class="card"><h3>পেমেন্ট হিস্টোরি</h3><div id="paymentHistory" class="muted">লোড হচ্ছে…</div></div>
+<button class="btn" onclick="openPayment()">Baniq Pay দিয়ে বিল পরিশোধ</button>
 </div>
 
-<div class="tabContent" id="tab-profile">
-<section class="card"><h3>আমার Profile</h3><div class="rowLine"><span>Customer ID</span><b id="profileCode">—</b></div><div class="rowLine"><span>নাম</span><b id="profileName">—</b></div><div class="rowLine"><span>মোবাইল</span><b id="profileMobile">—</b></div><div class="rowLine"><span>ঠিকানা</span><b id="profileAddress">—</b></div><div class="rowLine"><span>এলাকা</span><b id="profileArea">—</b></div><div class="rowLine"><span>Support Number</span><b id="profileSupport">Admin-এর সঙ্গে যোগাযোগ করুন</b></div><button class="btn secondary" onclick="logout()">Logout</button></section>
+<div id="profileSection" class="section">
+<div class="card"><h3>👤 গ্রাহক প্রোফাইল</h3><div id="profileDetails"></div></div>
+<div class="card"><h3>☎️ অভিযোগ ও সহায়তা</h3><div id="supportDetails" class="muted">Admin-এর Support নম্বর লোড হচ্ছে…</div><label for="complaintType">অভিযোগের ধরন</label><select id="complaintType"><option>Internet Problem / ইন্টারনেট সমস্যা</option><option>Bill Problem / বিলের সমস্যা</option><option>Payment Problem / পেমেন্ট সমস্যা</option><option>Other / অন্যান্য</option></select><label for="complaintMessage">অভিযোগ লিখুন</label><textarea id="complaintMessage" rows="3" maxlength="2000" placeholder="আপনার সমস্যা লিখুন…"></textarea><button class="btn" id="complaintBtn" onclick="sendComplaint()">অভিযোগ পাঠান</button><button class="btn light" onclick="logout()">Logout</button></div>
 </div>
-
-<div class="tabContent" id="tab-complaint">
-<section class="card"><h3>অভিযোগ / Customer Support</h3><p class="muted">আপনার অভিযোগ Admin Dashboard-এ পাঠানো হবে।</p><label for="complaintType">অভিযোগের ধরন</label><select id="complaintType"><option>Internet Problem</option><option>Bill Problem</option><option>Payment Problem</option><option>Other</option></select><label for="complaintMessage">অভিযোগ লিখুন</label><textarea id="complaintMessage" rows="4" maxlength="2000" placeholder="আপনার সমস্যাটি লিখুন…"></textarea><div id="complaintError" class="error"></div><button class="btn" id="complaintButton" onclick="sendComplaint()">অভিযোগ পাঠান</button></section>
-</div>
-<div class="footer">STAR COMMUNICATION • নিরাপদ গ্রাহক সেবা</div>
+<div class="footer">STAR COMMUNICATION • Customer Portal</div>
 </section>
 </main>
 <nav class="nav" id="bottomNav" style="display:none">
 <button class="active" data-tab="home" onclick="goTab('home')"><span class="ico">⌂</span>হোম</button>
-<button data-tab="packages" onclick="goTab('packages')"><span class="ico">◇</span>প্যাকেজ</button>
+<button data-tab="package" onclick="goTab('package')"><span class="ico">◇</span>প্যাকেজ</button>
 <button data-tab="bill" onclick="goTab('bill')"><span class="ico">▤</span>বিল</button>
 <button data-tab="profile" onclick="goTab('profile')"><span class="ico">♙</span>প্রোফাইল</button>
 </nav>
 <script>
 const API_BASE='https://star-communication-api.onrender.com';
 const PAYMENT_PAGE='https://rezaulfahim806-sys.github.io/STAR-COMMUNICATION95/pay.html';
-let customerData=null;
-const form=document.getElementById('loginForm'),button=document.getElementById('loginButton'),errorBox=document.getElementById('loginError');
-const money=n=>'৳'+Number(n||0).toLocaleString('en-BD');
-function showError(msg){errorBox.textContent=msg;errorBox.style.display='block'}
+let portalData=null,chosenPackage=null;
+const $=id=>document.getElementById(id),money=n=>'৳'+Number(n||0).toLocaleString('bn-BD');
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function token(){return sessionStorage.getItem('starCustomerToken')||''}
-function logout(){sessionStorage.removeItem('starCustomerToken');customerData=null;document.getElementById('portal').style.display='none';document.getElementById('bottomNav').style.display='none';document.getElementById('loginView').style.display='block';document.getElementById('mobileNumber').value='';document.getElementById('loginError').style.display='none'}
-function goTab(name){document.querySelectorAll('.tabContent').forEach(x=>x.classList.remove('active'));const target=document.getElementById('tab-'+name);if(target)target.classList.add('active');document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.tab===name));window.scrollTo({top:0,behavior:'smooth'})}
-function setText(id,value){const el=document.getElementById(id);if(el)el.textContent=value??'—'}
-async function loadCustomer(){
- const r=await fetch(API_BASE+'/api/customer/me',{headers:{Authorization:'Bearer '+token(),'Accept':'application/json'},cache:'no-store'});
- const data=await r.json().catch(()=>({}));
- if(!r.ok||!data.customer)throw new Error(data.error||'Customer তথ্য লোড করা যায়নি। আবার Login করুন।');
- customerData=data.customer;renderCustomer(customerData);
+function showError(msg){$('loginError').textContent=msg;$('loginError').style.display='block'}
+$('loginForm').addEventListener('submit',async e=>{
+ e.preventDefault();$('loginError').style.display='none';const customerId=$('customerId').value.trim().toUpperCase(),mobile=$('mobile').value.trim();
+ if(!customerId||!mobile){showError('Customer ID ও মোবাইল নম্বর দুটোই লিখুন।');return}
+ const btn=$('loginButton');btn.disabled=true;btn.textContent='Login হচ্ছে…';
+ try{
+  const r=await fetch(API_BASE+'/api/customer/login',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({customerId,mobile})});
+  const j=await r.json().catch(()=>({}));if(!r.ok||!j.token)throw new Error(j.error||'Login করা যায়নি।');
+  sessionStorage.setItem('starCustomerToken',j.token);await loadPortal();
+ }catch(err){showError(err.message||'Login service এখন পাওয়া যাচ্ছে না।')}
+ finally{btn.disabled=false;btn.textContent='Login করুন'}
+});
+async function api(path,options={}){const r=await fetch(API_BASE+path,{...options,headers:{'Content-Type':'application/json','Authorization':'Bearer '+token(),...(options.headers||{})},cache:'no-store'});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'সার্ভার থেকে তথ্য আনা যায়নি');return j}
+async function loadPortal(){
+ const j=await api('/api/customer/portal');portalData=j;chosenPackage=null;
+ $('loginView').style.display='none';$('portal').style.display='block';$('bottomNav').style.display='grid';renderPortal();
 }
-function renderCustomer(c){
- const active=String(c.status||'active').toLowerCase()==='active';
- setText('customerCode','গ্রাহক নম্বর: '+(c.clientCode||'—'));
- setText('statusPill',active?'● সক্রিয়':String(c.status||'').toUpperCase());
- setText('pkgSpeed',(c.packageName||'—')+' Mbps');setText('pkgPrice',money(c.monthlyFee)+' / মাস');
- setText('billNow',money(c.billDue));setText('billDue',money(c.previousDue));
- setText('paidStatus',Number(c.totalDue||0)<=0?'PAID':'UNPAID');
- setText('dueDate',c.expiryDate||'Admin-এর তথ্য অনুযায়ী');
- setText('reminderText',Number(c.totalDue||0)<=0?'আপনার বিল পরিশোধ সম্পন্ন।':'বিলের আগে Reminder দেওয়া হবে।');
- setText('packageName',c.packageName||'—');setText('packageFee',money(c.monthlyFee));
- setText('packagePermission',c.allowPackageChoice?'প্যাকেজ নির্বাচন অনুমোদিত':'Admin-এর অনুমতি প্রয়োজন');
- setText('packageHint',c.allowPackageChoice?'Admin প্যাকেজ পরিবর্তনের অনুমতি দিয়েছেন। Payment page-এ অনুমোদিত package নির্বাচন করতে পারবেন।':'আপনার প্যাকেজ পরিবর্তন করতে STAR COMMUNICATION Admin-এর সঙ্গে যোগাযোগ করুন।');
- setText('billMonthly',money(c.monthlyFee));setText('billPaid',money(c.paidThisMonth));setText('billPrevious',money(c.previousDue));setText('billTotal',money(c.totalDue));
- setText('profileCode',c.clientCode||'—');setText('profileName',c.name||'—');setText('profileMobile',c.mobile||'—');setText('profileAddress',c.address||'—');setText('profileArea',c.area||'—');setText('profileSupport',c.supportNumber||'Admin-এর সঙ্গে যোগাযোগ করুন');
- const hist=document.getElementById('paymentHistory');const list=Array.isArray(c.payments)?c.payments:[];
- hist.innerHTML=list.length?list.map(p=>'<div class="rowLine"><span>'+escapeHtml(p.month||p.createdAt||'Payment')+' • '+escapeHtml(p.method||'')+'</span><b>'+money(p.amount)+' PAID</b></div>').join(''):'এখনো কোনো Payment History নেই।';
+function pkgName(c){return String(c.packageName||'—').trim()}
+function fmtDate(v){if(!v)return 'Admin-এর তথ্য অনুযায়ী';const d=new Date(v+'T00:00:00');if(isNaN(d.getTime()))return String(v);return d.toLocaleDateString('bn-BD',{day:'numeric',month:'long',year:'numeric'})}
+function renderPortal(){
+ const c=portalData.customer||{},company=portalData.company||{},status=String(c.status||'ACTIVE').toLowerCase(),active=!['inactive','expired','left','disconnected','disabled'].includes(status);
+ $('customerCode').textContent='গ্রাহক নম্বর: '+(c.clientCode||c.id||'—');
+ $('statusPill').textContent=active?'● সক্রিয়':'● '+(c.status||'Inactive');$('statusPill').className='pill'+(active?'':' bad');
+ let pkg=pkgName(c);if(!/mbps/i.test(pkg)&&pkg!=='—')pkg+=' Mbps';$('pkgSpeed').textContent=pkg;
+ $('pkgPrice').textContent=money(c.monthlyFee)+' / মাস';$('billNow').textContent=money(c.monthlyFee);$('billDue').textContent=money(c.previousDue);$('billNow2').textContent=money(c.monthlyFee);$('billDue2').textContent=money(c.previousDue);
+ $('dueDate').textContent=fmtDate(c.expiryDate);$('paidStatus').textContent=String(c.lastPaymentStatus||'UNPAID').toUpperCase();
+ $('currentPackage').innerHTML='<div class="itemrow"><b>'+esc(pkgName(c))+'</b><span class="price">'+money(c.monthlyFee)+'/মাস</span></div><div class="muted">Customer ID: '+esc(c.clientCode||c.id||'')+'</div>';
+ $('packageChoiceNote').textContent=c.allowPackageChoice?'Admin প্যাকেজ পরিবর্তনের অনুমতি দিয়েছেন। পেমেন্টের আগে প্যাকেজ নির্বাচন করতে পারবেন।':'Admin আপনার বর্তমান প্যাকেজ নির্ধারণ করেছেন। প্যাকেজ পরিবর্তনের জন্য Admin-এর সঙ্গে যোগাযোগ করুন।';
+ renderPackages();renderPayments();
+ $('profileDetails').innerHTML='<div class="itemrow"><span>নাম</span><b>'+esc(c.name||'—')+'</b></div><div class="itemrow"><span>Customer ID</span><b>'+esc(c.clientCode||c.id||'—')+'</b></div><div class="itemrow"><span>মোবাইল</span><b>'+esc(c.mobile||'—')+'</b></div><div class="itemrow"><span>প্যাকেজ</span><b>'+esc(pkgName(c))+'</b></div>';
+ const phone=String(company.supportPhone||'').trim();$('supportDetails').innerHTML=phone?('Support নম্বর: <b>'+esc(phone)+'</b><br><a href="tel:'+esc(phone)+'">কল করুন</a>'):'Admin Dashboard-এ Support নম্বর সেট করা নেই।';
+ const offers=Array.isArray(portalData.offers)?portalData.offers:[];const activeOffers=offers.filter(x=>x&&x.active!==false&&String(x.text||x.message||x.title||'').trim());
+ if(activeOffers.length){$('offerCard').style.display='block';$('offerText').innerHTML=activeOffers.map(x=>'<div class="item">'+esc(x.title||x.text||x.message||'Offer')+(x.text&&x.title?'<div class="muted">'+esc(x.text)+'</div>':'')+'</div>').join('')}else $('offerCard').style.display='none';
+ $('baniqNote').textContent=portalData.baniq&&portalData.baniq.configured?'Admin-এর Baniq API সংযুক্ত আছে।':'Baniq API Admin Settings-এ সেট করা নেই।';
+ if(!(portalData.baniq&&portalData.baniq.configured)){$('homePayBtn').disabled=true;$('homePayBtn').textContent='Baniq API সংযুক্ত নয়'}else{$('homePayBtn').disabled=false;$('homePayBtn').textContent='Baniq Pay দিয়ে বিল পরিশোধ'}
 }
-function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
-function payBill(){
- if(!customerData){alert('আগে Login করুন');return}
- const c=customerData,q=new URLSearchParams({code:String(c.id||''),clientCode:String(c.clientCode||''),company:String(c.company||''),mobile:String(c.mobile||''),name:String(c.name||''),location:String(c.address||''),package:String(c.packageName||''),bill:String(c.monthlyFee||0),prev:String(c.previousDue||0),total:String(c.totalDue||0),api:API_BASE,v:'customer-portal'});
+function renderPackages(){
+ const c=portalData.customer||{},list=Array.isArray(portalData.packages)?portalData.packages:[];
+ if(!c.allowPackageChoice){$('packageList').innerHTML='<div class="item">বর্তমান প্যাকেজ: <b>'+esc(pkgName(c))+'</b><div class="muted">Package choice Admin বন্ধ রেখেছেন।</div></div>';chosenPackage={speed:pkgName(c),price:Number(c.monthlyFee||0)};return}
+ const valid=list.filter(p=>p&&Number(p.price??p.fee)>0&&String(p.speed||p.name||'').trim());
+ if(!valid.length){$('packageList').innerHTML='<div class="muted">Admin Dashboard-এ কোনো package list পাওয়া যায়নি।</div>';return}
+ $('packageList').innerHTML=valid.map((p,i)=>{const speed=String(p.speed||p.name),price=Number(p.price??p.fee);return '<div class="item"><div class="itemrow"><b>'+esc(speed)+'</b><span class="price">'+money(price)+'</span></div><button class="btn outline" onclick="selectPackage('+i+')">'+(chosenPackage&&chosenPackage.speed===speed?'✓ নির্বাচিত':'এই প্যাকেজ নির্বাচন')+'</button></div>'}).join('');
+}
+function selectPackage(i){const list=portalData.packages||[],p=list.filter(x=>x&&Number(x.price??x.fee)>0)[i];if(!p)return;chosenPackage={speed:String(p.speed||p.name),price:Number(p.price??p.fee)};renderPackages()}
+function renderPayments(){const xs=Array.isArray(portalData.payments)?portalData.payments:[];if(!xs.length){$('paymentHistory').textContent='এখনো কোনো পেমেন্ট রেকর্ড নেই।';return}
+ $('paymentHistory').innerHTML=xs.map(p=>'<div class="item"><div class="itemrow"><b>'+esc(p.method||'Payment')+'</b><span class="price">'+money(p.amount)+'</span></div><div class="muted">'+esc(fmtDate(String(p.date||'').slice(0,10)))+' • '+esc(String(p.status||'').toUpperCase())+'</div></div>').join('');
+}
+function openPayment(){
+ const c=portalData&&portalData.customer||{},pkg=chosenPackage||{speed:pkgName(c),price:Number(c.monthlyFee||0)},prev=Math.max(0,Number(c.previousDue||0)),total=Number(pkg.price)+prev;
+ if(!(portalData.baniq&&portalData.baniq.configured)){alert('Admin Dashboard-এ Baniq API Key ID ও Secret সেট করুন।');return}
+ if(!pkg.speed||!Number.isFinite(total)||total<=0){alert('বিলের তথ্য সঠিক নয়। Admin-এর সঙ্গে যোগাযোগ করুন।');return}
+ const q=new URLSearchParams({code:String(c.id||''),clientCode:String(c.clientCode||c.id||''),company:String(portalData.company&&portalData.company.slug||''),mobile:String(c.mobile||''),name:String(c.name||'Customer'),package:String(pkg.speed),bill:String(pkg.price),prev:String(prev),total:String(total),api:API_BASE,allowPackageChoice:String(!!c.allowPackageChoice),packages:JSON.stringify(portalData.packages||[])});
  window.location.href=PAYMENT_PAGE+'?'+q.toString();
 }
-form.addEventListener('submit',async e=>{
- e.preventDefault();errorBox.style.display='none';
- const customerId=document.getElementById('customerId').value.trim().toUpperCase();
- const mobileNumber=document.getElementById('mobileNumber').value.trim();
- if(!customerId||!mobileNumber){showError('Customer ID এবং Admin Dashboard-এ থাকা মোবাইল নম্বর লিখুন।');return}
- button.disabled=true;button.textContent='Login হচ্ছে…';
- try{
-  const response=await fetch(API_BASE+'/api/customer/login',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({customerId,mobileNumber})});
-  const data=await response.json().catch(()=>({}));
-  if(!response.ok||!data.token)throw new Error(data.error||'Login করা যায়নি। তথ্য মিলিয়ে দেখুন।');
-  sessionStorage.setItem('starCustomerToken',data.token);
-  await loadCustomer();
-  document.getElementById('loginView').style.display='none';document.getElementById('portal').style.display='block';document.getElementById('bottomNav').style.display='flex';goTab('home');
- }catch(err){sessionStorage.removeItem('starCustomerToken');showError(err.message||'Login service-এ সংযোগ করা যায়নি।')}
- finally{button.disabled=false;button.textContent='Login করুন'}
-});
 async function sendComplaint(){
- const message=document.getElementById('complaintMessage').value.trim(),box=document.getElementById('complaintError'),btn=document.getElementById('complaintButton');
- box.style.display='none';if(!customerData||!message){box.textContent='অভিযোগ লিখুন।';box.style.display='block';return}
- btn.disabled=true;btn.textContent='পাঠানো হচ্ছে…';
- try{const r=await fetch(API_BASE+'/api/public/complaints',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({company:customerData.company,customerCode:customerData.clientCode,type:document.getElementById('complaintType').value,message})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'অভিযোগ পাঠানো যায়নি');box.style.display='block';box.style.background='#eaf8ef';box.style.color='#176b3c';box.textContent='অভিযোগ সফলভাবে Admin Dashboard-এ পাঠানো হয়েছে।';document.getElementById('complaintMessage').value='';}
- catch(e){box.textContent=e.message;box.style.display='block'}
+ const message=$('complaintMessage').value.trim();if(!message){alert('অভিযোগ লিখুন');return}
+ const btn=$('complaintBtn');btn.disabled=true;btn.textContent='পাঠানো হচ্ছে…';
+ try{await api('/api/customer/complaints',{method:'POST',body:JSON.stringify({type:$('complaintType').value,message})});$('complaintMessage').value='';alert('অভিযোগ Admin Dashboard-এ পাঠানো হয়েছে।')}
+ catch(e){alert(e.message||'অভিযোগ পাঠানো যায়নি')}
  finally{btn.disabled=false;btn.textContent='অভিযোগ পাঠান'}
 }
-if(token()){loadCustomer().then(()=>{document.getElementById('loginView').style.display='none';document.getElementById('portal').style.display='block';document.getElementById('bottomNav').style.display='flex'}).catch(()=>sessionStorage.removeItem('starCustomerToken'))}
+function goTab(tab){const map={home:'homeSection',package:'packageSection',bill:'billSection',profile:'profileSection'};Object.values(map).forEach(id=>$(id).classList.remove('active'));$(map[tab]||map.home).classList.add('active');document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));window.scrollTo({top:0,behavior:'smooth'})}
+function logout(){sessionStorage.removeItem('starCustomerToken');portalData=null;chosenPackage=null;$('portal').style.display='none';$('bottomNav').style.display='none';$('loginView').style.display='block';$('mobile').value='';$('loginError').style.display='none'}
 </script>
 </body></html>
