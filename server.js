@@ -1032,11 +1032,11 @@ async function getBaniqCredentials(owner){
 app.get('/api/integrations/baniq/settings',auth,async(req,res)=>{
  if(!isOwner(req.user))return res.status(403).json({error:'Company owner access required'});
  try{
-  const c=col('company_integrations');if(!c)return res.status(503).json({error:'Cloud database is not configured'});
-  const sharedKeyId=String(process.env.BANIQ_API_KEY_ID||process.env.BANIQ_KEY_ID||'').trim();
-  const sharedSecret=String(process.env.BANIQ_API_SECRET||process.env.BANIQ_SECRET||'').trim();
-  const sharedConfigured=!!(sharedKeyId&&sharedSecret);
-  return send(res,{ok:true,configured:sharedConfigured,keyId:sharedConfigured?sharedKeyId:'',sharedCredentials:true,apiBase:(process.env.BANIQ_API_BASE||'https://api.baniq.app').replace(/\/$/,'')});
+  const credentials=await getBaniqCredentials(ownerOf(req.user));
+  const configured=!!(credentials.keyId&&credentials.secret);
+  const c=col('company_integrations'),row=c?await c.findOne({owner:ownerOf(req.user)}):null;
+  const companySaved=!!(row&&row.baniq&&row.baniq.keyId&&row.baniq.secret);
+  return send(res,{ok:true,configured,keyId:configured?credentials.keyId:'',sharedCredentials:!companySaved,apiBase:(process.env.BANIQ_API_BASE||'https://api.baniq.app').replace(/\\/$/,'')});
  }catch(e){return res.status(503).json({error:String(e.message||'Could not read Baniq settings').slice(0,160)})}
 });
 app.put('/api/integrations/baniq/settings',auth,async(req,res)=>{
