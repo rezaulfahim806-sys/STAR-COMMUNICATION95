@@ -1,39 +1,87 @@
 <!doctype html>
 <html lang="bn">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>STAR COMMUNICATION — Customer Portal</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1769e0">
+<title>STAR COMMUNICATION | Customer Login</title>
 <style>
-:root{--blue:#1769e0;--navy:#123b75;--bg:#f4f8ff;--text:#172b4d;--muted:#64748b;--line:#e3ebf7;--green:#168447}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,"Noto Sans Bengali",sans-serif;color:var(--text)}
-header{background:#fff;padding:18px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;position:sticky;top:0}
-.logo{width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg,#1769e0,#4aa3ff);color:#fff;display:grid;place-items:center;font-weight:800}
-.brand{font-weight:800}.sub{font-size:12px;color:var(--muted)}main{max-width:760px;margin:0 auto;padding:18px 14px 90px}.welcome{display:flex;justify-content:space-between;align-items:center;margin:8px 2px 18px}.pill{border-radius:30px;padding:6px 12px;background:#e8f8ef;color:var(--green);font-size:12px;font-weight:700}
-.card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:18px;margin:12px 0;box-shadow:0 5px 20px #183c7010}
-.hero{background:linear-gradient(135deg,#1769e0,#4b9cff);color:#fff;border:0}.hero .muted{color:#e0edff}.hero h1{font-size:32px;margin:8px 0}.muted{color:var(--muted);font-size:13px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.metric{background:#f1f6ff;border-radius:14px;padding:14px}.metric small{display:block;color:var(--muted)}.metric strong{font-size:22px;color:var(--blue)}
-button{border:0;border-radius:13px;padding:13px 16px;font-size:15px;font-weight:700;cursor:pointer}.primary{background:var(--blue);color:#fff;width:100%}.outline{background:#fff;color:var(--blue);border:1px solid #b8d2ff}.row{display:flex;justify-content:space-between;align-items:center;gap:10px}.section-title{font-size:18px;margin:0 0 12px}.datebox{background:#eaf8ef;border-radius:14px;padding:14px;color:#176b3c}.datebox strong{font-size:20px;display:block;margin:4px 0}.package{border:1px solid var(--line);border-radius:15px;padding:14px;margin:10px 0}.package.selected{border:2px solid var(--blue);background:#f5f9ff}.price{font-size:22px;color:var(--blue);font-weight:800}.label{display:block;font-size:13px;color:var(--muted);margin:10px 0 5px}input,textarea{width:100%;padding:12px;border:1px solid #d6e2f2;border-radius:12px;font:inherit;background:#fbfdff}textarea{min-height:90px;resize:vertical}.nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:10px 4px max(10px,env(safe-area-inset-bottom));}.nav a{color:var(--muted);font-size:12px;text-decoration:none;text-align:center}.nav a:first-child{color:var(--blue);font-weight:700}.notice{font-size:12px;color:var(--muted);line-height:1.5}
+:root{--blue:#1769e0;--blue2:#4596f5;--navy:#172d4e;--bg:#f3f7ff;--muted:#718096;--line:#e1e9f5;--green:#168447;--red:#d93636}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,"Noto Sans Bengali",sans-serif;color:var(--navy);background:var(--bg)}
+body{padding-bottom:env(safe-area-inset-bottom)}.top{background:#fff;border-bottom:1px solid var(--line);padding:14px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:2}
+.brandmark{width:54px;height:54px;flex:none}.brand{font-size:17px;font-weight:850;letter-spacing:.2px}.subtitle{font-size:12px;color:var(--muted);margin-top:2px}
+main{max-width:520px;margin:0 auto;padding:22px 16px 34px}.login-card{background:#fff;border:1px solid var(--line);border-radius:24px;padding:24px 20px;box-shadow:0 12px 32px #153b7010}
+.welcome{font-size:13px;color:var(--muted)}h1{font-size:28px;line-height:1.35;margin:6px 0 8px;color:#172d4e}.intro{font-size:14px;color:var(--muted);line-height:1.65;margin:0 0 22px}
+label{display:block;font-size:14px;font-weight:700;margin:14px 0 7px}input{width:100%;height:52px;border:1px solid #d8e3f2;border-radius:13px;padding:0 14px;font:inherit;background:#fbfdff;color:var(--navy);outline:none}input:focus{border-color:var(--blue);box-shadow:0 0 0 3px #1769e018}
+.password-wrap{display:flex;gap:8px}.password-wrap input{flex:1;min-width:0}.showpass{border:1px solid var(--line);background:#f6f9ff;border-radius:12px;padding:0 12px;color:var(--blue);font-weight:700}
+button{font:inherit;cursor:pointer}.login-btn{width:100%;border:0;border-radius:14px;margin-top:20px;padding:15px;background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;font-size:16px;font-weight:800;box-shadow:0 6px 16px #1769e02b}.login-btn:disabled{opacity:.65}
+.error{display:none;margin-top:14px;padding:12px;border-radius:12px;background:#fff0f0;color:#a32323;font-size:13px;line-height:1.5}.help{font-size:12px;color:var(--muted);line-height:1.6;margin-top:16px}.support{background:#eaf3ff;border-radius:14px;padding:13px;margin-top:18px;font-size:13px;line-height:1.6;color:#31547e}
+.footer{text-align:center;color:#8a98aa;font-size:11px;margin:20px 0 4px}
+#portal{display:none}.hero{background:linear-gradient(135deg,#1769e0,#4b9cff);color:white;border-radius:22px;padding:22px;margin:16px 0}.hero small{color:#e4efff}.hero h2{font-size:34px;margin:8px 0}.pill{border-radius:30px;padding:7px 12px;background:#e8f8ef;color:var(--green);font-size:12px;font-weight:800}.card{background:white;border:1px solid var(--line);border-radius:18px;padding:17px;margin:12px 0;box-shadow:0 5px 20px #183c7008}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.metric{background:#f1f6ff;border-radius:14px;padding:14px}.metric small{display:block;color:var(--muted)}.metric strong{font-size:23px;color:var(--blue)}.datebox{background:#eaf8ef;border-radius:14px;padding:14px;color:#176b3c}.datebox strong{display:block;font-size:20px;margin:5px 0}.nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:10px 4px max(10px,env(safe-area-inset-bottom));font-size:12px;color:var(--muted)}.nav span{display:block;text-align:center}.nav b{color:var(--blue)}
 </style>
 </head>
 <body>
-<header><div class="logo">SC</div><div><div class="brand">STAR COMMUNICATION</div><div class="sub">গ্রাহক সেবা • Customer Portal</div></div></header>
+<header class="top">
+<svg class="brandmark" viewBox="0 0 120 120" role="img" aria-label="STAR COMMUNICATION Logo">
+<defs><linearGradient id="red" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff1717"/><stop offset="1" stop-color="#b90000"/></linearGradient></defs>
+<path fill="url(#red)" d="M60 3 76 38 116 40 86 64 97 105 60 82 23 105 34 64 4 40 44 38Z"/>
+<path d="M38 61 Q60 38 82 61 M44 70 Q60 54 76 70 M51 79 Q60 70 69 79" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+<circle cx="60" cy="88" r="5" fill="#fff"/>
+</svg>
+<div><div class="brand">STAR COMMUNICATION</div><div class="subtitle">গ্রাহক সেবা • Customer Portal</div></div>
+</header>
 <main>
-<div class="welcome"><div><div class="sub">স্বাগতম</div><h2 style="margin:4px 0">আপনার ইন্টারনেট অ্যাকাউন্ট</h2><div class="sub">গ্রাহক নম্বর: SC001</div></div><span class="pill">● সক্রিয়</span></div>
-<section class="card hero"><div class="muted">আপনার বর্তমান প্যাকেজ</div><h1>৫০ Mbps</h1><div>৳৮৫০ <span class="muted">/ মাস</span></div><div style="margin-top:16px"><button style="background:#fff;color:#1769e0" onclick="document.getElementById('packages').scrollIntoView({behavior:'smooth'})">প্যাকেজ পরিবর্তন</button></div></section>
-<div class="grid"><div class="card metric"><small>এই মাসের বিল</small><strong>৳৮৫০</strong></div><div class="card metric"><small>আগের বকেয়া</small><strong>৳০</strong></div></div>
-<section class="card"><div class="row"><h3 class="section-title">পরবর্তী বিলের তারিখ</h3><span class="pill">PAID</span></div><div class="datebox"><div class="muted">পরবর্তী মাসের বিল গণনা / Bill due date</div><strong>১ ডিসেম্বর ২০২৬</strong><div>বিলের আগে আপনাকে Reminder দেওয়া হবে।</div></div><p class="notice">তারিখ ও Reminder Admin-এর billing cycle অনুযায়ী Backend থেকে আসবে।</p></section>
-<section class="card" id="packages"><h3 class="section-title">আপনার প্যাকেজ নির্বাচন</h3><p class="muted">Admin অনুমতি দিলে আপনি নিজেই প্যাকেজ পরিবর্তন করতে পারবেন। Admin approval লাগবে না।</p>
-<div class="package"><div class="row"><b>৩০ Mbps</b><span class="price">৳৫২০/মাস</span></div><div class="muted">বর্তমান প্যাকেজের উদাহরণ</div></div>
-<div class="package selected"><div class="row"><b>৫০ Mbps</b><span class="price">৳৮৫০/মাস</span></div><div class="muted">জনপ্রিয় প্যাকেজ</div><button class="outline" onclick="selectPlan('৫০ Mbps','৳৮৫০')">এই প্যাকেজ নির্বাচন</button></div>
-<div class="package"><div class="row"><b>১০০ Mbps</b><span class="price">৳১৫০০/মাস</span></div><button class="outline" onclick="selectPlan('১০০ Mbps','৳১৫০০')">এই প্যাকেজ নির্বাচন</button></div>
-<p class="notice">এখানে দেখানো Package/Price নমুনা। বাস্তবে Admin-এর Package List API থেকে লোড করতে হবে। Package পরিবর্তনের পর পুরো নতুন মাসিক মূল্য প্রযোজ্য হবে। MikroTik speed provisioning পরে যুক্ত হবে।</p></section>
-<section class="card"><h3 class="section-title">বিল পরিশোধ</h3><div class="row"><span>নতুন প্যাকেজের মাসিক বিল</span><b id="payAmount">৳৮৫০</b></div><div class="row" style="margin:10px 0"><span>আগের বকেয়া</span><b>৳০</b></div><hr style="border:0;border-top:1px solid var(--line)"><div class="row"><b>মোট পরিশোধযোগ্য</b><strong id="total" class="price">৳৮৫০</strong></div><button class="primary" style="margin-top:14px" onclick="alert('বাস্তব Baniq Checkout Backend API যুক্ত হলে এখানে Payment শুরু হবে।')">Baniq Pay দিয়ে বিল পরিশোধ</button><p class="notice">Payment সফল দেখানোর আগে Backend Baniq থেকে Payment verify করবে। Verified হলে Customer ও Admin Dashboard—দুই জায়গায় Paid হবে।</p></section>
-<section class="card"><h3 class="section-title">আমার প্রোফাইল</h3><div class="muted">গ্রাহকের নাম</div><b>গ্রাহক</b><div class="muted" style="margin-top:10px">PPPoE Username</div><b>customer001</b><label class="label">মোবাইল নম্বর</label><input id="phone" value="017XXXXXXXX" inputmode="tel"><button class="outline" style="margin-top:10px" onclick="alert('বাস্তবে OTP যাচাই করে Backend-এ নম্বর আপডেট করতে হবে।')">নম্বর পরিবর্তন ও যাচাই</button><p class="notice">OTP যাচাই সফল হলে Customer List ও Admin Dashboard-এ নতুন নম্বর আপডেট হবে।</p></section>
-<section class="card"><h3 class="section-title">অভিযোগ ও সহায়তা</h3><div class="datebox"><div>গ্রাহক অভিযোগ / Support Number</div><strong>017XXXXXXXX</strong><div>এই নম্বর Admin Dashboard থেকে নির্ধারিত হবে।</div></div><label class="label">আপনার অভিযোগ লিখুন</label><textarea placeholder="ইন্টারনেট বা বিল সংক্রান্ত সমস্যার বিবরণ লিখুন..."></textarea><button class="primary" style="margin-top:10px" onclick="alert('অভিযোগ Backend-এ পাঠানোর API যুক্ত করতে হবে।')">অভিযোগ পাঠান</button></section>
-<section class="card"><h3 class="section-title">বিল ও পেমেন্ট ইতিহাস</h3><div class="row"><div><b>নভেম্বর ২০২৬</b><div class="muted">Baniq Pay • ০৪ নভেম্বর</div></div><span class="pill">পরিশোধিত</span></div></section>
+<section id="loginView" class="login-card">
+<div class="welcome">স্বাগতম</div><h1>আপনার ইন্টারনেট<br>অ্যাকাউন্টে Login করুন</h1>
+<p class="intro">আপনার Customer ID ও Admin-এর দেওয়া Password ব্যবহার করে লগইন করুন।</p>
+<form id="loginForm" autocomplete="on">
+<label for="customerId">গ্রাহক নম্বর / Customer ID</label>
+<input id="customerId" name="username" placeholder="যেমন: SC001" autocomplete="username" autocapitalize="characters" required>
+<label for="password">পাসওয়ার্ড / Password</label>
+<div class="password-wrap"><input id="password" name="password" type="password" placeholder="আপনার পাসওয়ার্ড" autocomplete="current-password" required><button type="button" class="showpass" id="togglePass">দেখুন</button></div>
+<div id="loginError" class="error" role="alert"></div>
+<button id="loginButton" class="login-btn" type="submit">Login করুন</button>
+</form>
+<div class="support"><b>Login করতে সমস্যা হচ্ছে?</b><br>আপনার Customer ID বা Password না জানলে STAR COMMUNICATION Admin-এর সঙ্গে যোগাযোগ করুন।</div>
+<div class="help">আপনার পাসওয়ার্ড কারও সঙ্গে শেয়ার করবেন না।</div>
+</section>
+<section id="portal">
+<div class="welcome">স্বাগতম</div><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h1 style="margin:5px 0">আপনার ইন্টারনেট<br>অ্যাকাউন্ট</h1><span class="pill">● সক্রিয়</span></div>
+<div id="customerCode" class="subtitle">গ্রাহক নম্বর: —</div>
+<section class="hero"><small>আপনার বর্তমান প্যাকেজ</small><h2 id="pkgSpeed">— Mbps</h2><div id="pkgPrice">৳— / মাস</div><p style="font-size:12px;color:#e4efff">প্যাকেজ পরিবর্তন Admin অনুমতি অনুযায়ী হবে।</p></section>
+<div class="grid"><div class="card metric"><small>এই মাসের বিল</small><strong id="billNow">৳—</strong></div><div class="card metric"><small>আগের বকেয়া</small><strong id="billDue">৳—</strong></div></div>
+<section class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0 0 12px">পরবর্তী বিলের তারিখ</h3><span class="pill" id="paidStatus">—</span></div><div class="datebox"><small>Bill due date</small><strong id="dueDate">Admin-এর তথ্য অনুযায়ী</strong><div>বিলের আগে আপনাকে Reminder দেওয়া হবে।</div></div></section>
+<section class="card"><h3>প্যাকেজ • বিল • পেমেন্ট</h3><p class="subtitle">আপনার প্যাকেজ, Baniq Pay Checkout এবং Payment History এখানে দেখানো হবে।</p><button class="login-btn" type="button" onclick="alert('Baniq Pay checkout সংযোগের জন্য Backend API প্রয়োজন।')">Baniq Pay দিয়ে বিল পরিশোধ</button></section>
+<section class="card"><h3>অভিযোগ ও সহায়তা</h3><p class="subtitle">Admin নির্ধারিত Support Number দিয়ে যোগাযোগ করুন।</p></section>
+<button class="login-btn" id="logoutButton" type="button" style="background:#eaf1fb;color:#1769e0;box-shadow:none">Logout</button>
+</section>
+<div class="footer">STAR COMMUNICATION • নিরাপদ গ্রাহক সেবা</div>
 </main>
-<nav class="nav"><a href="#">⌂<br>হোম</a><a href="#packages">◈<br>প্যাকেজ</a><a href="#">▤<br>বিল</a><a href="#">♙<br>প্রোফাইল</a></nav>
 <script>
-function selectPlan(name,price){document.getElementById('payAmount').textContent=price;document.getElementById('total').textContent=price;alert(name+' নির্বাচন করা হয়েছে। বাস্তবে Package Change API যুক্ত করে সঙ্গে সঙ্গে Backend-এ সংরক্ষণ করতে হবে।');}
+const API_BASE='https://star-communication-api.onrender.com';
+const form=document.getElementById('loginForm'),button=document.getElementById('loginButton'),errorBox=document.getElementById('loginError');
+document.getElementById('togglePass').addEventListener('click',()=>{const p=document.getElementById('password');const show=p.type==='password';p.type=show?'text':'password';document.getElementById('togglePass').textContent=show?'লুকান':'দেখুন';});
+function showError(message){errorBox.textContent=message;errorBox.style.display='block';}
+form.addEventListener('submit',async e=>{
+ e.preventDefault();errorBox.style.display='none';
+ const customerId=document.getElementById('customerId').value.trim(),password=document.getElementById('password').value;
+ if(!customerId||!password){showError('Customer ID ও Password দুটোই লিখুন।');return;}
+ button.disabled=true;button.textContent='Login হচ্ছে…';
+ try{
+  const response=await fetch(API_BASE+'/api/customer/login',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({customerId,password})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||!data.token)throw new Error(data.error||'Customer Login এখনো সার্ভারে চালু হয়নি। Admin-এর সঙ্গে যোগাযোগ করুন।');
+  sessionStorage.setItem('starCustomerToken',data.token);
+  document.getElementById('customerCode').textContent='গ্রাহক নম্বর: '+(data.customer?.clientCode||customerId);
+  const c=data.customer||{};document.getElementById('pkgSpeed').textContent=(c.packageName||c.pkg||'—')+' Mbps';
+  document.getElementById('pkgPrice').textContent='৳'+(c.monthlyFee||c.fee||'—')+' / মাস';
+  document.getElementById('billNow').textContent='৳'+(c.monthlyFee||c.fee||'—');
+  document.getElementById('billDue').textContent='৳'+(c.previousDue||c.prevDue||0);
+  document.getElementById('dueDate').textContent=c.expiryDate||'Admin-এর তথ্য অনুযায়ী';
+  document.getElementById('paidStatus').textContent=c.status||'—';
+  document.getElementById('loginView').style.display='none';document.getElementById('portal').style.display='block';
+ }catch(err){showError(err.message||'Login করা যায়নি। ইন্টারনেট সংযোগ পরীক্ষা করুন।');}
+ finally{button.disabled=false;button.textContent='Login করুন';}
+});
+document.getElementById('logoutButton').addEventListener('click',()=>{sessionStorage.removeItem('starCustomerToken');document.getElementById('portal').style.display='none';document.getElementById('loginView').style.display='block';document.getElementById('password').value='';});
 </script>
 </body></html>
