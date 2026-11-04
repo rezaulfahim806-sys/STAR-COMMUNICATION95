@@ -60,7 +60,9 @@ async function bkashCheckoutRequest(path,token,body){
 }
 function bkashCompleted(x){return String(x&&x.statusCode||'')==='0000'&&String(x&&x.transactionStatus||'').toLowerCase()==='completed'}
 
-app.get('/api/health',(req,res)=>send(res,{ok:true,app:'STAR COMMUNICATION',version:'1.5.3',deployment:'login-flow-update-2026-10-17',time:new Date().toISOString(),database:!!db}));
+app.get('/api/health',(req,res)=>send(res,{ok:true,app:'STAR COMMUNICATION',version:'1.5.4',deployment:'customer-login-route-fix-2026-11-04',time:new Date().toISOString(),database:!!db}));
+// Public route probe: opening this URL in a browser should confirm the customer login endpoint is deployed.
+app.get('/api/customer/login',(req,res)=>send(res,{ok:true,endpoint:'/api/customer/login',method:'POST',message:'Customer login API is deployed'}));
 // Public customer complaint submission: validates company and customer against cloud state.
 app.post('/api/public/complaints',async(req,res)=>{
  res.set('Cache-Control','no-store');
