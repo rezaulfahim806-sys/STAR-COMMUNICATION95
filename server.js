@@ -650,7 +650,8 @@ app.post('/api/bkash/create',async(req,res)=>{
   try{
    const body=req.body||{},owner=String(body.company||'').trim().toLowerCase(),customerId=String(body.customerCode||body.code||'').trim();
    const clientCode=String(body.clientCode||'').trim(),mobile=customerPhoneKey(body.customerMobile||body.mobile||'');
-   const selectedPackage=String(body.selectedPackage||body.package||'').trim(),packagePrice=Number(body.packagePrice??body.bill??0),requestedAmount=Number(body.amount||0);
+   const selectedPackage=String(body.selectedPackage||body.package||'').trim(),packagePrice=Number(body.packagePrice??body.bill??0),requestedAmount=Number(body.amount||0),provider=String(body.provider||'').trim().toLowerCase();
+   if(provider&&!['bkash','nagad','rocket','upay'].includes(provider))return res.status(400).json({error:'Unsupported Baniq payment provider'});
    if(!owner||!customerId||!selectedPackage||!Number.isFinite(packagePrice)||packagePrice<=0)return res.status(400).json({error:'Company, customer and package are required'});
    const states=col('app_state');if(!states)return res.status(503).json({error:'Cloud database is not configured'});
    const state=await states.findOne({owner});if(!state||!state.data)return res.status(404).json({error:'Company cloud data not found'});
@@ -670,11 +671,11 @@ app.post('/api/bkash/create',async(req,res)=>{
    const reference=('STAR-'+String(clientCode||customer.id)+'-'+Date.now()).replace(/[^A-Za-z0-9_-]/g,'').slice(0,64);
    const successUrl=PUBLIC_URL+'/api/baniq/callback?reference='+encodeURIComponent(reference);
    const cancelUrl=baniqPaymentPageUrl({customerId,clientCode},'cancelled');
-   const order=await baniqRequest('POST','/api/v1/orders',credentials,{amount:Math.round(amount*100),productName:'STAR COMMUNICATION Internet Bill '+String(clientCode||customer.id)+' - '+speed,reference,successUrl,cancelUrl,customerName:String(customer.name||'Customer'),customerPhone:String(customer.phone||customer.mobile||''),metadata:{company:owner,customerId,clientCode:String(clientCode||customer.clientCode||''),packageName:speed,packagePrice:price,previousDue,amount}});
+   const order=await baniqRequest('POST','/api/v1/orders',credentials,{amount:Math.round(amount*100),productName:'STAR COMMUNICATION Internet Bill '+String(clientCode||customer.id)+' - '+speed, ...(provider?{provider}:{}),reference,successUrl,cancelUrl,customerName:String(customer.name||'Customer'),customerPhone:String(customer.phone||customer.mobile||''),metadata:{company:owner,customerId,clientCode:String(clientCode||customer.clientCode||''),packageName:speed,packagePrice:price,previousDue,amount,provider:provider||'auto'}});
    const orderId=String(order.orderId||order.id||''),checkoutUrl=String(order.checkoutUrl||'');
    if(!orderId||!checkoutUrl)return res.status(502).json({error:'Baniq did not return orderId and checkoutUrl'});
    const sessions=col('baniq_checkout_sessions');if(!sessions)return res.status(503).json({error:'Payment database is not configured'});
-   const session={orderId,reference,owner,customerId,clientCode:String(clientCode||customer.clientCode||''),customerName:String(customer.name||'Customer'),customerMobile:String(customer.phone||customer.mobile||''),selectedPackage:speed,packagePrice:price,previousDue,amount,amountPaisa:Math.round(amount*100),status:'PENDING',createdAt:new Date().toISOString()};
+   const session={orderId,reference,owner,customerId,clientCode:String(clientCode||customer.clientCode||''),customerName:String(customer.name||'Customer'),customerMobile:String(customer.phone||customer.mobile||''),selectedPackage:speed,packagePrice:price,previousDue,amount,amountPaisa:Math.round(amount*100),provider:provider||'auto',status:'PENDING',createdAt:new Date().toISOString()};
    await sessions.insertOne(session);
    return send(res,{ok:true,orderId,checkoutUrl});
   }catch(e){return res.status(502).json({error:String(e.message||'Could not start Baniq checkout').slice(0,220)});}
@@ -698,7 +699,7 @@ app.post('/api/bkash/create',async(req,res)=>{
   customer.pkg=session.selectedPackage;customer.fee=Number(session.packagePrice);customer.prevDue=0;customer.status='active';customer.left=false;customer.disconnected=false;
   customer.expiry=nextExpiry.toISOString().slice(0,10);customer.lastPaymentStatus='paid';customer.lastPaymentMonth=iso.slice(0,7);customer.lastPaymentAmount=Number(session.amount);
   customer.lastPaymentSource='baniq';customer.lastPaymentAt=iso;customer.updatedAt=iso;
-  if(!duplicate)payments.push({id:'baniq-'+session.orderId,customer:String(session.customerId),clientCode:String(session.clientCode||''),amount:Number(session.amount),date:iso.slice(0,10),month:iso.slice(0,7),status:'paid',source:'baniq',method:'Baniq Pay',ref:String(session.orderId),orderId:String(session.orderId),createdAt:iso,updatedAt:iso});
+  if(!duplicate)payments.push({id:'baniq-'+session.orderId,customer:String(session.customerId),clientCode:String(session.clientCode||''),amount:Number(session.amount),date:iso.slice(0,10),month:iso.slice(0,7),status:'paid',source:'baniq',method:session.provider&&session.provider!=='auto'?'Baniq Pay ('+String(session.provider).toUpperCase()+')':'Baniq Pay',ref:String(session.orderId),orderId:String(session.orderId),createdAt:iso,updatedAt:iso});
   await states.updateOne({owner:String(session.owner)},{$set:{data,updatedAt:iso}});
   const sessions=col('baniq_checkout_sessions');if(sessions)await sessions.updateOne({orderId:String(session.orderId)},{$set:{status:'PAID',verifiedAt:iso,verifiedAmount:providerAmount,updatedAt:iso}});
   return {verified:true,status:'PAID',clientCode:String(session.clientCode||customer.clientCode||''),orderId:String(session.orderId)};
