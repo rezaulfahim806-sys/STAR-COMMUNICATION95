@@ -625,6 +625,111 @@ app.post('/api/bkash/create',async(req,res)=>{
   return send(res,{ok:true,paymentID:created.paymentID,bkashURL:created.bkashURL,merchantInvoiceNumber:invoice});
  }catch(e){return res.status(502).json({error:String(e.message||'Unable to start bKash payment').slice(0,220)})}
 });
+
+ // Baniq Pay server-side order creation, verification and paid-bill sync.
+ async function baniqRequest(method,path,credentials,body){
+  const base=String(process.env.BANIQ_API_BASE||'https://api.baniq.app').trim().replace(/\\/$/,'');
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+  try{
+   const response=await fetch(base+path,{method,headers:{'Accept':'application/json','Content-Type':'application/json','x-api-key-id':credentials.keyId,'x-api-secret':credentials.secret},body:body===undefined?undefined:JSON.stringify(body),signal:controller.signal,redirect:'error'});
+   const raw=await response.text();let data={};try{data=raw?JSON.parse(raw):{}}catch{data={message:raw.slice(0,300)}}
+   if(!response.ok)throw new Error(String(data.message||data.error||'Baniq API HTTP '+response.status).slice(0,220));
+   return data;
+  }finally{clearTimeout(timer)}
+ }
+ function baniqPaymentPageUrl(session,status){
+  const u=new URL(PAYMENT_PAGE_URL);u.searchParams.set('status',status);
+  if(session&&session.orderId)u.searchParams.set('orderId',session.orderId);
+  if(session&&session.customerId)u.searchParams.set('code',session.customerId);
+  if(session&&session.clientCode)u.searchParams.set('clientCode',session.clientCode);
+  u.searchParams.set('api',PUBLIC_URL);return u.toString();
+ }
+ app.post('/api/baniq/create',async(req,res)=>{
+  try{
+   const body=req.body||{},owner=String(body.company||'').trim().toLowerCase(),customerId=String(body.customerCode||body.code||'').trim();
+   const clientCode=String(body.clientCode||'').trim(),mobile=customerPhoneKey(body.customerMobile||body.mobile||'');
+   const selectedPackage=String(body.selectedPackage||body.package||'').trim(),packagePrice=Number(body.packagePrice??body.bill??0),requestedAmount=Number(body.amount||0);
+   if(!owner||!customerId||!selectedPackage||!Number.isFinite(packagePrice)||packagePrice<=0)return res.status(400).json({error:'Company, customer and package are required'});
+   const states=col('app_state');if(!states)return res.status(503).json({error:'Cloud database is not configured'});
+   const state=await states.findOne({owner});if(!state||!state.data)return res.status(404).json({error:'Company cloud data not found'});
+   const data=state.data,customers=Array.isArray(data.customers)?data.customers:[],customer=customers.find(c=>String(c.id||'')===customerId);
+   if(!customer||clientCode&&customerCodeKey(customer.clientCode||customer.code||customer.id)!==customerCodeKey(clientCode))return res.status(404).json({error:'Customer does not belong to this company'});
+   const savedPhone=customerPhoneKey(customer.phone||customer.mobile||'');if(mobile&&savedPhone&&mobile!==savedPhone)return res.status(403).json({error:'Customer mobile does not match Admin record'});
+   const choice=packageChoiceEnabled(customer),currentPackage=String(customer.pkg||customer.packageName||'').trim(),currentPrice=Number(customer.fee??customer.monthlyFee??0);
+   const packages=Array.isArray(data.settings&&data.settings.packages)?data.settings.packages:[];
+   const normalizeName=x=>String(x||'').trim().toLowerCase().replace(/\\s+/g,' ').replace(/\\s*mbps\\s*$/i,'');
+   let speed=selectedPackage,price=packagePrice;
+   if(!choice){speed=currentPackage;price=currentPrice;if(!speed||price<=0)return res.status(409).json({error:'Customer package is not configured'});if(normalizeName(selectedPackage)!==normalizeName(speed)||Math.abs(packagePrice-price)>0.01)return res.status(403).json({error:'Package selection is locked by Admin'});}
+   else{const p=packages.find(x=>normalizeName(x.speed||x.name)===normalizeName(selectedPackage));if(!p||Math.abs(Number(p.price??p.fee??0)-packagePrice)>0.01)return res.status(409).json({error:'Package list changed. Refresh and try again.'});}
+   const previousDue=Math.max(0,Number(customer.prevDue??customer.previousDue??0)),amount=Number((price+previousDue).toFixed(2));
+   if(!Number.isFinite(requestedAmount)||Math.abs(requestedAmount-amount)>0.01)return res.status(409).json({error:'Payment amount does not match Admin bill'});
+   if(amount<=0||amount>1000000)return res.status(400).json({error:'Baniq amount must be between ৳1 and ৳1,000,000'});
+   const credentials=await getBaniqCredentials(owner);if(!credentials.keyId||!credentials.secret)return res.status(503).json({error:'Admin Baniq API Key ID and Secret are not configured'});
+   const reference=('STAR-'+String(clientCode||customer.id)+'-'+Date.now()).replace(/[^A-Za-z0-9_-]/g,'').slice(0,64);
+   const successUrl=PUBLIC_URL+'/api/baniq/callback?reference='+encodeURIComponent(reference);
+   const cancelUrl=baniqPaymentPageUrl({customerId,clientCode},'cancelled');
+   const order=await baniqRequest('POST','/api/v1/orders',credentials,{amount:Math.round(amount*100),productName:'STAR COMMUNICATION Internet Bill '+String(clientCode||customer.id)+' - '+speed,reference,successUrl,cancelUrl,customerName:String(customer.name||'Customer'),customerPhone:String(customer.phone||customer.mobile||''),metadata:{company:owner,customerId,clientCode:String(clientCode||customer.clientCode||''),packageName:speed,packagePrice:price,previousDue,amount}});
+   const orderId=String(order.orderId||order.id||''),checkoutUrl=String(order.checkoutUrl||'');
+   if(!orderId||!checkoutUrl)return res.status(502).json({error:'Baniq did not return orderId and checkoutUrl'});
+   const sessions=col('baniq_checkout_sessions');if(!sessions)return res.status(503).json({error:'Payment database is not configured'});
+   const session={orderId,reference,owner,customerId,clientCode:String(clientCode||customer.clientCode||''),customerName:String(customer.name||'Customer'),customerMobile:String(customer.phone||customer.mobile||''),selectedPackage:speed,packagePrice:price,previousDue,amount,amountPaisa:Math.round(amount*100),status:'PENDING',createdAt:new Date().toISOString()};
+   await sessions.insertOne(session);
+   return send(res,{ok:true,orderId,checkoutUrl});
+  }catch(e){return res.status(502).json({error:String(e.message||'Could not start Baniq checkout').slice(0,220)});}
+ });
+ async function verifyAndApplyBaniqSession(session){
+  if(!session)return {verified:false,status:'NOT_FOUND'};
+  if(session.status==='PAID')return {verified:true,status:'PAID',clientCode:session.clientCode,orderId:session.orderId};
+  const credentials=await getBaniqCredentials(session.owner);
+  if(!credentials.keyId||!credentials.secret)throw new Error('Company Baniq API credentials are not configured');
+  const order=await baniqRequest('GET','/api/v1/orders/'+encodeURIComponent(session.orderId),credentials);
+  const paid=order.paid===true||String(order.status||'').toLowerCase()==='paid';
+  if(!paid)return {verified:false,status:String(order.status||'PENDING'),clientCode:session.clientCode,orderId:session.orderId};
+  const providerAmount=Number(order.amount);
+  if(!Number.isFinite(providerAmount)||Math.abs(providerAmount-Number(session.amountPaisa))>0.01)throw new Error('Baniq verified amount does not match bill');
+  const states=col('app_state');if(!states)return {verified:false,status:'DATABASE_UNAVAILABLE'};
+  const state=await states.findOne({owner:String(session.owner)});if(!state||!state.data)throw new Error('Company data missing after payment');
+  const data=state.data,customers=Array.isArray(data.customers)?data.customers:[],customer=customers.find(c=>String(c.id||'')===String(session.customerId));
+  if(!customer)throw new Error('Customer not found after payment verification');
+  const payments=Array.isArray(data.payments)?data.payments:(data.payments=[]),duplicate=payments.some(p=>String(p.orderId||p.ref||p.reference||'')===String(session.orderId));
+  const now=new Date(),iso=now.toISOString(),nextExpiry=new Date(now);nextExpiry.setDate(nextExpiry.getDate()+30);
+  customer.pkg=session.selectedPackage;customer.fee=Number(session.packagePrice);customer.prevDue=0;customer.status='active';customer.left=false;customer.disconnected=false;
+  customer.expiry=nextExpiry.toISOString().slice(0,10);customer.lastPaymentStatus='paid';customer.lastPaymentMonth=iso.slice(0,7);customer.lastPaymentAmount=Number(session.amount);
+  customer.lastPaymentSource='baniq';customer.lastPaymentAt=iso;customer.updatedAt=iso;
+  if(!duplicate)payments.push({id:'baniq-'+session.orderId,customer:String(session.customerId),clientCode:String(session.clientCode||''),amount:Number(session.amount),date:iso.slice(0,10),month:iso.slice(0,7),status:'paid',source:'baniq',method:'Baniq Pay',ref:String(session.orderId),orderId:String(session.orderId),createdAt:iso,updatedAt:iso});
+  await states.updateOne({owner:String(session.owner)},{$set:{data,updatedAt:iso}});
+  const sessions=col('baniq_checkout_sessions');if(sessions)await sessions.updateOne({orderId:String(session.orderId)},{$set:{status:'PAID',verifiedAt:iso,verifiedAmount:providerAmount,updatedAt:iso}});
+  return {verified:true,status:'PAID',clientCode:String(session.clientCode||customer.clientCode||''),orderId:String(session.orderId)};
+ }
+ app.get('/api/baniq/status',async(req,res)=>{
+  const orderId=String(req.query.orderId||'').trim();if(!orderId)return res.status(400).json({error:'orderId is required'});
+  try{const sessions=col('baniq_checkout_sessions');if(!sessions)return res.status(503).json({error:'Payment database is not configured'});
+   const session=await sessions.findOne({orderId});if(!session)return res.status(404).json({ok:true,verified:false,status:'NOT_FOUND'});
+   const result=await verifyAndApplyBaniqSession(session);return send(res,{ok:true,...result});
+  }catch(e){return res.status(502).json({ok:true,verified:false,status:'VERIFY_ERROR',error:String(e.message||'Baniq verification failed').slice(0,180)});}
+ });
+ app.get('/api/baniq/callback',async(req,res)=>{
+  const reference=String(req.query.reference||'').trim(),sessions=col('baniq_checkout_sessions');
+  if(!reference||!sessions)return res.redirect(baniqPaymentPageUrl(null,'failed'));
+  try{
+   const session=await sessions.findOne({reference});if(!session)return res.redirect(baniqPaymentPageUrl(null,'invalid'));
+   const result=await verifyAndApplyBaniqSession(session);
+   return res.redirect(baniqPaymentPageUrl(session,result.verified?'success':'failed'));
+  }catch(e){return res.redirect(baniqPaymentPageUrl(null,'failed'));}
+ });
+ app.post('/api/baniq/webhook',async(req,res)=>{
+  try{
+   const secret=String(process.env.BANIQ_WEBHOOK_SECRET||'').trim(),signature=String(req.headers['x-deshpay-signature']||'');
+   if(!secret||!req.rawBody||!signature)return res.status(401).json({error:'Baniq webhook signature is not configured'});
+   const expected='sha256='+crypto.createHmac('sha256',secret).update(req.rawBody).digest('hex');
+   const a=Buffer.from(signature),b=Buffer.from(expected);if(a.length!==b.length||!crypto.timingSafeEqual(a,b))return res.status(401).json({error:'Invalid Baniq webhook signature'});
+   const event=req.body||{},order=event.order||{};if(String(event.event||'')!=='order.paid'||!order.id)return send(res,{ok:true,ignored:true});
+   const sessions=col('baniq_checkout_sessions');if(!sessions)return res.status(503).json({error:'Payment database is not configured'});
+   const session=await sessions.findOne({orderId:String(order.id)});if(!session)return send(res,{ok:true,ignored:true});
+   await verifyAndApplyBaniqSession(session);return send(res,{ok:true,verified:true});
+  }catch(e){return res.status(502).json({error:String(e.message||'Webhook handling failed').slice(0,180)});}
+ });
+
 app.get('/api/bkash/status',async(req,res)=>{
  const paymentID=String(req.query.paymentID||'').trim();
  if(!paymentID)return res.status(400).json({error:'paymentID is required'});
