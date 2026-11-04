@@ -506,6 +506,78 @@ app.get('/api/sync/backups',auth,async(req,res)=>{
  const rows=await c.find({owner:req.user.username},{projection:{data:0}}).sort({savedAt:-1}).limit(20).toArray();
  send(res,{ok:true,backups:rows});
 });
+
+ // Customer Portal login: Customer ID + the mobile number stored by company Admin.
+ function customerPhoneKey(value){
+  let digits=String(value||'').replace(/\\D/g,'');
+  if(digits.startsWith('880'))digits=digits.slice(3);
+  if(digits.startsWith('0'))digits=digits.slice(1);
+  return digits;
+ }
+ function customerCodeKey(value){return String(value||'').trim().toUpperCase();}
+ function safePortalCustomer(c){
+  return {id:String(c.id||''),clientCode:String(c.clientCode||c.code||c.customerCode||c.id||''),name:String(c.name||'Customer'),
+   mobile:String(c.phone||c.mobile||c.contact||''),packageName:String(c.pkg||c.packageName||''),monthlyFee:Number(c.fee??c.monthlyFee??0),
+   previousDue:Number(c.prevDue??c.previousDue??0),expiryDate:String(c.expiry||c.expiryDate||c.dueDate||''),status:String(c.status||'ACTIVE'),
+   lastPaymentStatus:String(c.lastPaymentStatus||''),allowPackageChoice:packageChoiceEnabled(c),free:!!c.free,left:!!c.left};
+ }
+ app.post('/api/customer/login',async(req,res)=>{
+  const code=customerCodeKey(req.body&&req.body.customerId),phone=customerPhoneKey(req.body&&req.body.mobile);
+  if(!code||!phone)return res.status(400).json({error:'Customer ID ও Admin-এর কাছে নিবন্ধিত মোবাইল নম্বর দিন'});
+  try{
+   const states=col('app_state');if(!states)return res.status(503).json({error:'Customer cloud database is not configured'});
+   const docs=await states.find({'data.customers':{$exists:true}}).toArray(),matches=[];
+   for(const state of docs){
+    const owner=String(state.owner||'').trim().toLowerCase();
+    const customer=(state.data&&Array.isArray(state.data.customers)?state.data.customers:[]).find(c=>{
+     const ccode=customerCodeKey(c.clientCode||c.code||c.customerCode||c.id),cphone=customerPhoneKey(c.phone||c.mobile||c.contact);
+     return ccode===code&&cphone===phone;
+    });
+    if(customer)matches.push({owner,customer});
+   }
+   if(matches.length!==1)return res.status(401).json({error:'Customer ID অথবা মোবাইল নম্বর মিলছে না। Admin-এর সঙ্গে যোগাযোগ করুন।'});
+   const {owner,customer}=matches[0],accounts=col(ACCOUNT_COLLECTION);
+   if(accounts){
+    const account=await accounts.findOne({username:owner});
+    if(account&&(account.accountStatus==='disabled'||account.active===false||account.approvalStatus==='pending'||account.approvalStatus==='rejected'))
+     return res.status(403).json({error:String(account.disabledMessage||'কোম্পানির অ্যাকাউন্ট বন্ধ আছে। STAR COMMUNICATION Admin-এর সঙ্গে যোগাযোগ করুন।').slice(0,300)});
+   }
+   const portalCustomer=safePortalCustomer(customer);
+   const token=jwt.sign({username:'customer:'+code.toLowerCase(),role:'customer',owner,customerRecordId:String(customer.id||''),clientCode:portalCustomer.clientCode},JWT_SECRET,{expiresIn:'12h'});
+   return send(res,{ok:true,token,expiresIn:43200,customer:portalCustomer});
+  }catch(e){return res.status(503).json({error:'Customer Login service unavailable. কিছুক্ষণ পরে আবার চেষ্টা করুন।'});}
+ });
+ app.get('/api/customer/portal',auth,async(req,res)=>{
+  if(String(req.user.role||'')!=='customer')return res.status(403).json({error:'Customer portal access required'});
+  try{
+   const owner=ownerOf(req.user),states=col('app_state');if(!states)return res.status(503).json({error:'Cloud database is not configured'});
+   const state=await states.findOne({owner});if(!state||!state.data)return res.status(404).json({error:'Customer company data not found'});
+   const data=state.data,customers=Array.isArray(data.customers)?data.customers:[];
+   const customer=customers.find(c=>String(c.id||'')===String(req.user.customerRecordId||''))||customers.find(c=>customerCodeKey(c.clientCode||c.code||c.id)===customerCodeKey(req.user.clientCode));
+   if(!customer)return res.status(404).json({error:'Customer record not found'});
+   const code=customerCodeKey(customer.clientCode||customer.code||customer.id),id=String(customer.id||'');
+   const payments=(Array.isArray(data.payments)?data.payments:[]).filter(p=>{const pc=String(p.customer??p.customerId??p.clientCode??p.customerCode??'');return pc===id||customerCodeKey(pc)===code;})
+    .slice(-50).reverse().map(p=>({amount:Number(p.amount||0),date:String(p.date||p.createdAt||''),status:String(p.status||''),method:String(p.source||p.method||'')}));
+   const settings=data.settings||{},company=settings.company||{},packages=Array.isArray(settings.packages)?settings.packages:[],offers=Array.isArray(settings.offers)?settings.offers:[];
+   const creds=await getBaniqCredentials(owner).catch(()=>({keyId:'',secret:''}));
+   return send(res,{ok:true,customer:safePortalCustomer(customer),payments,packages,offers,
+    company:{name:String(settings.companyName||company.name||owner),supportPhone:String(settings.supportPhone||settings.complaintNumber||company.supportPhone||company.phone||settings.phone||'')},
+    baniq:{configured:!!(creds.keyId&&creds.secret)}});
+  }catch(e){return res.status(503).json({error:'Customer Portal data load failed'});}
+ });
+ app.post('/api/customer/complaints',auth,async(req,res)=>{
+  if(String(req.user.role||'')!=='customer')return res.status(403).json({error:'Customer portal access required'});
+  const message=String(req.body&&req.body.message||'').trim(),type=String(req.body&&req.body.type||'General').slice(0,80);
+  if(!message||message.length>2000)return res.status(400).json({error:'অভিযোগ ১ থেকে ২০০০ অক্ষরের মধ্যে লিখুন'});
+  try{
+   const portal=await col('app_state').findOne({owner:ownerOf(req.user)}),customers=portal&&portal.data&&portal.data.customers||[];
+   const customer=customers.find(c=>String(c.id||'')===String(req.user.customerRecordId||''))||customers.find(c=>customerCodeKey(c.clientCode||c.id)===customerCodeKey(req.user.clientCode));
+   if(!customer)return res.status(404).json({error:'Customer not found'});
+   const row={id:Date.now(),customerId:String(customer.id||''),customerCode:String(customer.clientCode||customer.code||customer.id||''),customerName:String(customer.name||'Customer'),customerMobile:String(customer.phone||customer.mobile||''),type,message,status:'OPEN',createdAt:new Date().toISOString()};
+   const result=await insert('complaints',row,ownerOf(req.user));return send(res,{ok:true,complaint:result});
+  }catch(e){return res.status(503).json({error:'অভিযোগ পাঠানো যায়নি'});}
+ });
+
 app.get('/api/customers',auth,async(req,res)=>send(res,await list('customers',ownerOf(req.user))));
 app.post('/api/customers',auth,async(req,res)=>{const b=req.body||{};const x={id:Date.now(),name:b.name,mobile:b.mobile||'',packageName:b.packageName||'',monthlyFee:Number(b.monthlyFee||0),pppoeUsername:b.pppoeUsername||'',pppoePassword:b.pppoePassword||'',onuId:b.onuId||'',expiryDate:b.expiryDate||null,status:b.status||'ACTIVE',previousDue:Number(b.previousDue||0),createdAt:new Date().toISOString()};send(res,await insert('customers',x,ownerOf(req.user)))});
 app.delete('/api/customers/:id',auth,async(req,res)=>{await remove('customers',req.params.id,ownerOf(req.user));send(res,{ok:true})});
