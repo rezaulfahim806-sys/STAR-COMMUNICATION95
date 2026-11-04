@@ -519,7 +519,7 @@ app.get('/api/sync/backups',auth,async(req,res)=>{
   return {id:String(c.id||''),clientCode:String(c.clientCode||c.code||c.customerCode||c.id||''),name:String(c.name||'Customer'),
    mobile:String(c.phone||c.mobile||c.contact||''),packageName:String(c.pkg||c.packageName||''),monthlyFee:Number(c.fee??c.monthlyFee??0),
    previousDue:Number(c.prevDue??c.previousDue??0),expiryDate:String(c.expiry||c.expiryDate||c.dueDate||''),status:String(c.status||'ACTIVE'),
-   lastPaymentStatus:String(c.lastPaymentStatus||''),allowPackageChoice:packageChoiceEnabled(c),free:!!c.free,left:!!c.left};
+   lastPaymentStatus:String(c.lastPaymentStatus||''),internetStatus:String(c.internetStatus||'on'),internetOffReason:String(c.internetOffReason||''),allowPackageChoice:packageChoiceEnabled(c),free:!!c.free,left:!!c.left};
  }
  app.post('/api/customer/login',async(req,res)=>{
   const code=customerCodeKey(req.body&&req.body.customerId),phone=customerPhoneKey(req.body&&req.body.mobile);
