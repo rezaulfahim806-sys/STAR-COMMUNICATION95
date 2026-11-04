@@ -9,8 +9,9 @@
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,"Noto Sans Bengali",sans-serif;color:var(--navy);background:var(--bg);-webkit-text-size-adjust:100%}
 body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
 button,input,select,textarea{font:inherit}button{cursor:pointer}
-.top{background:#fff;border-bottom:1px solid var(--line);padding:10px 14px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:5;min-height:68px}
-.logo{width:46px;height:46px;flex:none}.brand{font-size:clamp(14px,4.2vw,18px);font-weight:850;letter-spacing:.1px;line-height:1.2}.subtitle{font-size:12px;color:var(--muted);margin-top:3px}
+.top{background:#fff;border-bottom:1px solid var(--line);padding:8px 12px;display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:5;min-height:60px;width:100%;overflow:visible}
+.logo{width:clamp(38px,11vw,48px);height:clamp(38px,11vw,48px);flex:none}.brandWrap{flex:1;min-width:0}.brand{font-size:clamp(12px,4.1vw,18px);font-weight:850;letter-spacing:0;line-height:1.15;white-space:nowrap;overflow:visible}.subtitle{font-size:clamp(10px,3.2vw,12px);color:var(--muted);margin-top:3px;white-space:nowrap}
+@media(max-width:360px){.top{padding:8px 10px;gap:7px}.logo{width:38px;height:38px}.brand{font-size:12.5px}.subtitle{font-size:10px}}
 main{width:100%;max-width:520px;margin:0 auto;padding:14px 12px 22px}
 .panel{background:#fff;border:1px solid var(--line);border-radius:20px;padding:18px 16px;box-shadow:0 7px 24px #153b7008}
 .welcome{font-size:13px;color:var(--muted)}h1{font-size:clamp(22px,6.3vw,28px);line-height:1.32;margin:5px 0 8px;color:var(--navy);overflow-wrap:anywhere}
@@ -38,7 +39,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 
 <path fill="url(#starRed)" d="M60 3 76 38 116 40 86 64 97 105 60 82 23 105 34 64 4 40 44 38Z"/>
 <path d="M38 61 Q60 38 82 61 M44 70 Q60 54 76 70 M51 79 Q60 70 69 79" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/><circle cx="60" cy="88" r="5" fill="#fff"/>
 </svg>
-<div><div class="brand">STAR COMMUNICATION</div><div class="subtitle">গ্রাহক সেবা • Customer Portal</div></div>
+<div class="brandWrap"><div class="brand">STAR COMMUNICATION</div><div class="subtitle">গ্রাহক সেবা • Customer Portal</div></div>
 </header>
 <main>
 <section id="loginView" class="panel">
@@ -99,15 +100,20 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&
 function token(){return sessionStorage.getItem('starCustomerToken')||''}
 function showError(msg){$('loginError').textContent=msg;$('loginError').style.display='block'}
 $('loginForm').addEventListener('submit',async e=>{
- e.preventDefault();$('loginError').style.display='none';const customerId=$('customerId').value.trim().toUpperCase(),mobile=$('mobile').value.trim();
- if(!customerId||!mobile){showError('Customer ID ও মোবাইল নম্বর দুটোই লিখুন।');return}
+ e.preventDefault();$('loginError').style.display='none';
+ const customerId=$('customerId').value.trim().toUpperCase().replace(/[\\s-]/g,''),mobile=$('mobile').value.trim().replace(/\\s+/g,'');
+ if(!customerId||!mobile){showError('Customer ID ও Admin-এ নিবন্ধিত মোবাইল নম্বর দুটোই লিখুন।');return}
  const btn=$('loginButton');btn.disabled=true;btn.textContent='Login হচ্ছে…';
+ const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),75000);
  try{
-  const r=await fetch(API_BASE+'/api/customer/login',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({customerId,mobile})});
-  const j=await r.json().catch(()=>({}));if(!r.ok||!j.token)throw new Error(j.error||'Login করা যায়নি।');
+  const r=await fetch(API_BASE+'/api/customer/login',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({customerId,mobile}),signal:controller.signal,cache:'no-store'});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok||!j.token)throw new Error(j.error||('Login ব্যর্থ (HTTP '+r.status+')'));
   sessionStorage.setItem('starCustomerToken',j.token);await loadPortal();
- }catch(err){showError(err.message||'Login service এখন পাওয়া যাচ্ছে না।')}
- finally{btn.disabled=false;btn.textContent='Login করুন'}
+ }catch(err){
+  if(err&&err.name==='AbortError')showError('সার্ভার চালু হতে সময় নিচ্ছে। ১ মিনিট অপেক্ষা করে আবার Login করুন।');
+  else showError(err.message||'Login service এখন পাওয়া যাচ্ছে না। Render সার্ভার চালু আছে কি না Admin-কে যাচাই করতে বলুন।');
+ }finally{clearTimeout(timeout);btn.disabled=false;btn.textContent='Login করুন'}
 });
 async function api(path,options={}){const r=await fetch(API_BASE+path,{...options,headers:{'Content-Type':'application/json','Authorization':'Bearer '+token(),...(options.headers||{})},cache:'no-store'});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'সার্ভার থেকে তথ্য আনা যায়নি');return j}
 async function loadPortal(){
