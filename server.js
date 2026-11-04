@@ -530,8 +530,9 @@ app.get('/api/sync/backups',auth,async(req,res)=>{
    for(const state of docs){
     const owner=String(state.owner||'').trim().toLowerCase();
     const customer=(state.data&&Array.isArray(state.data.customers)?state.data.customers:[]).find(c=>{
-     const ccode=customerCodeKey(c.clientCode||c.code||c.customerCode||c.id),cphone=customerPhoneKey(c.phone||c.mobile||c.contact);
-     return ccode===code&&cphone===phone;
+     const ccode=customerCodeKey(c.clientCode||c.code||c.customerCode||c.id);
+     const phones=[c.phone,c.mobile,c.contact,c.contactNumber,c.whatsapp].map(customerPhoneKey).filter(Boolean);
+     return ccode===code&&phones.includes(phone);
     });
     if(customer)matches.push({owner,customer});
    }
