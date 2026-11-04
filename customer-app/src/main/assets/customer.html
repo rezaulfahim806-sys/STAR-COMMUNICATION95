@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>STAR COMMUNICATION — Customer Portal</title>
+<style>
+:root{--blue:#1769e0;--navy:#123b75;--bg:#f4f8ff;--text:#172b4d;--muted:#64748b;--line:#e3ebf7;--green:#168447}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,"Noto Sans Bengali",sans-serif;color:var(--text)}
+header{background:#fff;padding:18px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;position:sticky;top:0}
+.logo{width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg,#1769e0,#4aa3ff);color:#fff;display:grid;place-items:center;font-weight:800}
+.brand{font-weight:800}.sub{font-size:12px;color:var(--muted)}main{max-width:760px;margin:0 auto;padding:18px 14px 90px}.welcome{display:flex;justify-content:space-between;align-items:center;margin:8px 2px 18px}.pill{border-radius:30px;padding:6px 12px;background:#e8f8ef;color:var(--green);font-size:12px;font-weight:700}
+.card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:18px;margin:12px 0;box-shadow:0 5px 20px #183c7010}
+.hero{background:linear-gradient(135deg,#1769e0,#4b9cff);color:#fff;border:0}.hero .muted{color:#e0edff}.hero h1{font-size:32px;margin:8px 0}.muted{color:var(--muted);font-size:13px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.metric{background:#f1f6ff;border-radius:14px;padding:14px}.metric small{display:block;color:var(--muted)}.metric strong{font-size:22px;color:var(--blue)}
+button{border:0;border-radius:13px;padding:13px 16px;font-size:15px;font-weight:700;cursor:pointer}.primary{background:var(--blue);color:#fff;width:100%}.outline{background:#fff;color:var(--blue);border:1px solid #b8d2ff}.row{display:flex;justify-content:space-between;align-items:center;gap:10px}.section-title{font-size:18px;margin:0 0 12px}.datebox{background:#eaf8ef;border-radius:14px;padding:14px;color:#176b3c}.datebox strong{font-size:20px;display:block;margin:4px 0}.package{border:1px solid var(--line);border-radius:15px;padding:14px;margin:10px 0}.package.selected{border:2px solid var(--blue);background:#f5f9ff}.price{font-size:22px;color:var(--blue);font-weight:800}.label{display:block;font-size:13px;color:var(--muted);margin:10px 0 5px}input,textarea{width:100%;padding:12px;border:1px solid #d6e2f2;border-radius:12px;font:inherit;background:#fbfdff}textarea{min-height:90px;resize:vertical}.nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:10px 4px max(10px,env(safe-area-inset-bottom));}.nav a{color:var(--muted);font-size:12px;text-decoration:none;text-align:center}.nav a:first-child{color:var(--blue);font-weight:700}.notice{font-size:12px;color:var(--muted);line-height:1.5}
+</style>
+</head>
+<body>
+<header><div class="logo">SC</div><div><div class="brand">STAR COMMUNICATION</div><div class="sub">গ্রাহক সেবা • Customer Portal</div></div></header>
+<main>
+<div class="welcome"><div><div class="sub">স্বাগতম</div><h2 style="margin:4px 0">আপনার ইন্টারনেট অ্যাকাউন্ট</h2><div class="sub">গ্রাহক নম্বর: SC001</div></div><span class="pill">● সক্রিয়</span></div>
+<section class="card hero"><div class="muted">আপনার বর্তমান প্যাকেজ</div><h1>৫০ Mbps</h1><div>৳৮৫০ <span class="muted">/ মাস</span></div><div style="margin-top:16px"><button style="background:#fff;color:#1769e0" onclick="document.getElementById('packages').scrollIntoView({behavior:'smooth'})">প্যাকেজ পরিবর্তন</button></div></section>
+<div class="grid"><div class="card metric"><small>এই মাসের বিল</small><strong>৳৮৫০</strong></div><div class="card metric"><small>আগের বকেয়া</small><strong>৳০</strong></div></div>
+<section class="card"><div class="row"><h3 class="section-title">পরবর্তী বিলের তারিখ</h3><span class="pill">PAID</span></div><div class="datebox"><div class="muted">পরবর্তী মাসের বিল গণনা / Bill due date</div><strong>১ ডিসেম্বর ২০২৬</strong><div>বিলের আগে আপনাকে Reminder দেওয়া হবে।</div></div><p class="notice">তারিখ ও Reminder Admin-এর billing cycle অনুযায়ী Backend থেকে আসবে।</p></section>
+<section class="card" id="packages"><h3 class="section-title">আপনার প্যাকেজ নির্বাচন</h3><p class="muted">Admin অনুমতি দিলে আপনি নিজেই প্যাকেজ পরিবর্তন করতে পারবেন। Admin approval লাগবে না।</p>
+<div class="package"><div class="row"><b>৩০ Mbps</b><span class="price">৳৫২০/মাস</span></div><div class="muted">বর্তমান প্যাকেজের উদাহরণ</div></div>
+<div class="package selected"><div class="row"><b>৫০ Mbps</b><span class="price">৳৮৫০/মাস</span></div><div class="muted">জনপ্রিয় প্যাকেজ</div><button class="outline" onclick="selectPlan('৫০ Mbps','৳৮৫০')">এই প্যাকেজ নির্বাচন</button></div>
+<div class="package"><div class="row"><b>১০০ Mbps</b><span class="price">৳১৫০০/মাস</span></div><button class="outline" onclick="selectPlan('১০০ Mbps','৳১৫০০')">এই প্যাকেজ নির্বাচন</button></div>
+<p class="notice">এখানে দেখানো Package/Price নমুনা। বাস্তবে Admin-এর Package List API থেকে লোড করতে হবে। Package পরিবর্তনের পর পুরো নতুন মাসিক মূল্য প্রযোজ্য হবে। MikroTik speed provisioning পরে যুক্ত হবে।</p></section>
+<section class="card"><h3 class="section-title">বিল পরিশোধ</h3><div class="row"><span>নতুন প্যাকেজের মাসিক বিল</span><b id="payAmount">৳৮৫০</b></div><div class="row" style="margin:10px 0"><span>আগের বকেয়া</span><b>৳০</b></div><hr style="border:0;border-top:1px solid var(--line)"><div class="row"><b>মোট পরিশোধযোগ্য</b><strong id="total" class="price">৳৮৫০</strong></div><button class="primary" style="margin-top:14px" onclick="alert('বাস্তব Baniq Checkout Backend API যুক্ত হলে এখানে Payment শুরু হবে।')">Baniq Pay দিয়ে বিল পরিশোধ</button><p class="notice">Payment সফল দেখানোর আগে Backend Baniq থেকে Payment verify করবে। Verified হলে Customer ও Admin Dashboard—দুই জায়গায় Paid হবে।</p></section>
+<section class="card"><h3 class="section-title">আমার প্রোফাইল</h3><div class="muted">গ্রাহকের নাম</div><b>গ্রাহক</b><div class="muted" style="margin-top:10px">PPPoE Username</div><b>customer001</b><label class="label">মোবাইল নম্বর</label><input id="phone" value="017XXXXXXXX" inputmode="tel"><button class="outline" style="margin-top:10px" onclick="alert('বাস্তবে OTP যাচাই করে Backend-এ নম্বর আপডেট করতে হবে।')">নম্বর পরিবর্তন ও যাচাই</button><p class="notice">OTP যাচাই সফল হলে Customer List ও Admin Dashboard-এ নতুন নম্বর আপডেট হবে।</p></section>
+<section class="card"><h3 class="section-title">অভিযোগ ও সহায়তা</h3><div class="datebox"><div>গ্রাহক অভিযোগ / Support Number</div><strong>017XXXXXXXX</strong><div>এই নম্বর Admin Dashboard থেকে নির্ধারিত হবে।</div></div><label class="label">আপনার অভিযোগ লিখুন</label><textarea placeholder="ইন্টারনেট বা বিল সংক্রান্ত সমস্যার বিবরণ লিখুন..."></textarea><button class="primary" style="margin-top:10px" onclick="alert('অভিযোগ Backend-এ পাঠানোর API যুক্ত করতে হবে।')">অভিযোগ পাঠান</button></section>
+<section class="card"><h3 class="section-title">বিল ও পেমেন্ট ইতিহাস</h3><div class="row"><div><b>নভেম্বর ২০২৬</b><div class="muted">Baniq Pay • ০৪ নভেম্বর</div></div><span class="pill">পরিশোধিত</span></div></section>
+</main>
+<nav class="nav"><a href="#">⌂<br>হোম</a><a href="#packages">◈<br>প্যাকেজ</a><a href="#">▤<br>বিল</a><a href="#">♙<br>প্রোফাইল</a></nav>
+<script>
+function selectPlan(name,price){document.getElementById('payAmount').textContent=price;document.getElementById('total').textContent=price;alert(name+' নির্বাচন করা হয়েছে। বাস্তবে Package Change API যুক্ত করে সঙ্গে সঙ্গে Backend-এ সংরক্ষণ করতে হবে।');}
+</script>
+</body></html>
