@@ -509,7 +509,7 @@ app.get('/api/sync/backups',auth,async(req,res)=>{
 
  // Customer Portal login: Customer ID + the mobile number stored by company Admin.
  function customerPhoneKey(value){
-  let digits=String(value||'').replace(/\\D/g,'');
+  let digits=String(value||'').replace(/\D/g,'');
   if(digits.startsWith('880'))digits=digits.slice(3);
   if(digits.startsWith('0'))digits=digits.slice(1);
   return digits;
@@ -628,7 +628,7 @@ app.post('/api/bkash/create',async(req,res)=>{
 
  // Baniq Pay server-side order creation, verification and paid-bill sync.
  async function baniqRequest(method,path,credentials,body){
-  const base=String(process.env.BANIQ_API_BASE||'https://api.baniq.app').trim().replace(/\\/$/,'');
+  const base=String(process.env.BANIQ_API_BASE||'https://api.baniq.app').trim().replace(/\/$/,'');
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
   try{
    const response=await fetch(base+path,{method,headers:{'Accept':'application/json','Content-Type':'application/json','x-api-key-id':credentials.keyId,'x-api-secret':credentials.secret},body:body===undefined?undefined:JSON.stringify(body),signal:controller.signal,redirect:'error'});
@@ -657,7 +657,7 @@ app.post('/api/bkash/create',async(req,res)=>{
    const savedPhone=customerPhoneKey(customer.phone||customer.mobile||'');if(mobile&&savedPhone&&mobile!==savedPhone)return res.status(403).json({error:'Customer mobile does not match Admin record'});
    const choice=packageChoiceEnabled(customer),currentPackage=String(customer.pkg||customer.packageName||'').trim(),currentPrice=Number(customer.fee??customer.monthlyFee??0);
    const packages=Array.isArray(data.settings&&data.settings.packages)?data.settings.packages:[];
-   const normalizeName=x=>String(x||'').trim().toLowerCase().replace(/\\s+/g,' ').replace(/\\s*mbps\\s*$/i,'');
+   const normalizeName=x=>String(x||'').trim().toLowerCase().replace(/\s+/g,' ').replace(/\s*mbps\s*$/i,'');
    let speed=selectedPackage,price=packagePrice;
    if(!choice){speed=currentPackage;price=currentPrice;if(!speed||price<=0)return res.status(409).json({error:'Customer package is not configured'});if(normalizeName(selectedPackage)!==normalizeName(speed)||Math.abs(packagePrice-price)>0.01)return res.status(403).json({error:'Package selection is locked by Admin'});}
    else{const p=packages.find(x=>normalizeName(x.speed||x.name)===normalizeName(selectedPackage));if(!p||Math.abs(Number(p.price??p.fee??0)-packagePrice)>0.01)return res.status(409).json({error:'Package list changed. Refresh and try again.'});}
@@ -1036,7 +1036,7 @@ app.get('/api/integrations/baniq/settings',auth,async(req,res)=>{
   const configured=!!(credentials.keyId&&credentials.secret);
   const c=col('company_integrations'),row=c?await c.findOne({owner:ownerOf(req.user)}):null;
   const companySaved=!!(row&&row.baniq&&row.baniq.keyId&&row.baniq.secret);
-  return send(res,{ok:true,configured,keyId:configured?credentials.keyId:'',sharedCredentials:!companySaved,apiBase:(process.env.BANIQ_API_BASE||'https://api.baniq.app').replace(/\\/$/,'')});
+  return send(res,{ok:true,configured,keyId:configured?credentials.keyId:'',sharedCredentials:!companySaved,apiBase:(process.env.BANIQ_API_BASE||'https://api.baniq.app').replace(/\/$/,'')});
  }catch(e){return res.status(503).json({error:String(e.message||'Could not read Baniq settings').slice(0,160)})}
 });
 app.put('/api/integrations/baniq/settings',auth,async(req,res)=>{
