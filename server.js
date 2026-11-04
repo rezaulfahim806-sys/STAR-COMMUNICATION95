@@ -836,9 +836,17 @@ function decryptIntegrationSecret(box){
  return Buffer.concat([decipher.update(Buffer.from(box.data,'base64')),decipher.final()]).toString('utf8');
 }
 async function getBaniqCredentials(owner){
- // All companies use the single Baniq merchant configured on Render.
- // Company-specific credentials are intentionally ignored; customer and payment
- // records remain owner-scoped in their existing routes and collections.
+ // Prefer this company's encrypted Baniq credentials saved from Admin Settings.
+ const integrations=col('company_integrations');
+ if(integrations){
+  const row=await integrations.findOne({owner:String(owner)});
+  const saved=row&&row.baniq;
+  if(saved&&saved.keyId&&saved.secret){
+   const secret=decryptIntegrationSecret(saved.secret);
+   if(secret)return {keyId:String(saved.keyId).trim(),secret};
+  }
+ }
+ // Compatibility with existing Render-level credentials.
  return {
   keyId:String(process.env.BANIQ_API_KEY_ID||process.env.BANIQ_KEY_ID||'').trim(),
   secret:String(process.env.BANIQ_API_SECRET||process.env.BANIQ_SECRET||'').trim()
