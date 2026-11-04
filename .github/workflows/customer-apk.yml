@@ -12,8 +12,25 @@ permissions:
 jobs:
   customer-apk:
     runs-on: ubuntu-latest
+    env:
+      STAR_SIGNING_STORE_PASSWORD: ${{ secrets.STAR_SIGNING_STORE_PASSWORD }}
+      STAR_SIGNING_KEY_ALIAS: ${{ secrets.STAR_SIGNING_KEY_ALIAS }}
+      STAR_SIGNING_KEY_PASSWORD: ${{ secrets.STAR_SIGNING_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
+      - name: Install same STAR release signing key
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.STAR_SIGNING_KEYSTORE_BASE64 }}
+        run: |
+          set -e
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$STAR_SIGNING_STORE_PASSWORD" ] || [ -z "$STAR_SIGNING_KEY_ALIAS" ] || [ -z "$STAR_SIGNING_KEY_PASSWORD" ]; then
+            echo "::error::STAR release signing secrets are missing. Refusing to create an APK that cannot reliably update-install."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 --decode > customer-app/star-release-key.jks
+          test -s customer-app/star-release-key.jks
+          echo "Stable signing key installed."
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -22,13 +39,17 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
-      - name: Build separate Customer APK
+      - name: Build signed Customer APK
         run: gradle :customer-app:assembleDebug --no-daemon --stacktrace
-      - name: Verify APK exists
-        run: test -s customer-app/build/outputs/apk/debug/customer-app-debug.apk
+      - name: Verify APK and signature
+        run: |
+          set -e
+          APK=customer-app/build/outputs/apk/debug/customer-app-debug.apk
+          test -s "$APK"
+          jarsigner -verify "$APK"
       - uses: actions/upload-artifact@v4
         with:
-          name: STAR-COMMUNICATION-CUSTOMER-APK
+          name: STAR-COMMUNICATION-CUSTOMER-APK-SIGNED
           path: customer-app/build/outputs/apk/debug/customer-app-debug.apk
           if-no-files-found: error
           retention-days: 30
