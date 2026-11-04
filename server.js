@@ -33,7 +33,7 @@ async function initDb(){
  if(!ADMIN_USER||!ADMIN_HASH)throw new Error('ADMIN_USER and ADMIN_PASSWORD (or ADMIN_PASSWORD_HASH) are required');
  const client=new MongoClient(process.env.MONGODB_URI); await client.connect(); db=client.db(process.env.MONGODB_DB||'star_communication');
 }
-async function auth(req,res,next){try{const h=req.headers.authorization||'';if(!h.startsWith('Bearer '))throw 0;req.user=jwt.verify(h.slice(7),JWT_SECRET);if(String(req.user.role||'')==='customer')return res.status(403).json({error:'Customer token cannot access company admin APIs'});if(isSystemAdmin(req.user))return next();const ac=col(ACCOUNT_COLLECTION);if(ac){const u=String(req.user.username||'').trim().toLowerCase();const owner=String(req.user.owner||u).trim().toLowerCase();const account=await ac.findOne({username:owner});if(account&&(account.accountStatus==='disabled'||account.active===false||account.approvalStatus==='pending'||account.approvalStatus==='rejected'))return res.status(403).json({error:String(account.disabledMessage||(account.approvalStatus==='pending'?'Your company registration is awaiting approval':'এই কোম্পানির অ্যাকাউন্ট STAR COMMUNICATION Admin বন্ধ রেখেছেন। অনুগ্রহ করে Admin-এর সঙ্গে যোগাযোগ করুন।')).slice(0,500),accountDisabled:true});}next()}catch(e){res.status(401).json({error:'Unauthorized'})}}
+async function auth(req,res,next){try{const h=req.headers.authorization||'';if(!h.startsWith('Bearer '))throw 0;req.user=jwt.verify(h.slice(7),JWT_SECRET);if(isSystemAdmin(req.user))return next();const ac=col(ACCOUNT_COLLECTION);if(ac){const u=String(req.user.username||'').trim().toLowerCase();const owner=String(req.user.owner||u).trim().toLowerCase();const account=await ac.findOne({username:owner});if(account&&(account.accountStatus==='disabled'||account.active===false||account.approvalStatus==='pending'||account.approvalStatus==='rejected'))return res.status(403).json({error:String(account.disabledMessage||(account.approvalStatus==='pending'?'Your company registration is awaiting approval':'এই কোম্পানির অ্যাকাউন্ট STAR COMMUNICATION Admin বন্ধ রেখেছেন। অনুগ্রহ করে Admin-এর সঙ্গে যোগাযোগ করুন।')).slice(0,500),accountDisabled:true});}next()}catch(e){res.status(401).json({error:'Unauthorized'})}}
 function send(res,payload){res.json(payload)}
 const BKASH_BASE_URL=(process.env.BKASH_BASE_URL||'https://checkout.sandbox.bka.sh/v1.2.0-beta').replace(/\/$/,'');
 const BKASH_APP_KEY=process.env.BKASH_APP_KEY||'';
@@ -78,91 +78,6 @@ app.post('/api/public/complaints',async(req,res)=>{
  await complaints.insertOne(item);return res.status(201).json({ok:true,complaintId:item.id,message:'Complaint submitted'});
  }catch(e){console.error('Public complaint submission failed',e);return res.status(500).json({error:'Could not save complaint. Please try again.'})}
 });
-
-// Customer portal login: Customer ID (SC code) + the mobile number saved by the company Admin.
-// Customer tokens are restricted to /api/customer/* and cannot access owner/admin endpoints.
-const customerLoginAttempts=new Map();
-function normalizeCustomerPhone(value){
- let digits=String(value||'').replace(/\\D/g,'');
- if(digits.startsWith('0088'))digits=digits.slice(4);
- else if(digits.startsWith('88')&&digits.length===13)digits=digits.slice(2);
- if(digits.length===10&&digits.startsWith('1'))digits='0'+digits;
- return digits;
-}
-function customerLoginRateLimited(key){
- const now=Date.now(),windowMs=15*60*1000;
- let item=customerLoginAttempts.get(key);
- if(!item||now-item.startedAt>windowMs){item={startedAt:now,count:0};customerLoginAttempts.set(key,item)}
- item.count++;
- // Periodically clean expired IP buckets to keep memory bounded.
- if(customerLoginAttempts.size>5000){for(const [k,v] of customerLoginAttempts)if(now-v.startedAt>windowMs)customerLoginAttempts.delete(k)}
- return item.count>12;
-}
-async function findCustomerInCompany(owner,code,phoneDigits){
- const states=col('app_state');if(!states)return null;
- const state=await states.findOne({owner:String(owner).trim().toLowerCase()});
- if(!state||!state.data||!Array.isArray(state.data.customers))return null;
- const customers=state.data.customers;
- const customer=customers.find(c=>{
-  const id=String(c.clientCode||c.code||'').trim().toUpperCase();
-  const phone=normalizeCustomerPhone(c.phone||c.mobile||c.number||'');
-  return id===code&&(!phoneDigits||(phone&&phone===phoneDigits));
- });
- return customer?{state,customer}:null;
-}
-app.post('/api/customer/login',async(req,res)=>{
- res.set('Cache-Control','no-store');
- const code=String(req.body&&req.body.customerId||'').trim().toUpperCase();
- const phone=normalizeCustomerPhone(req.body&&req.body.mobileNumber);
- const ip=String(req.ip||req.socket&&req.socket.remoteAddress||'unknown');
- if(customerLoginRateLimited(ip))return res.status(429).json({error:'অনেকবার Login চেষ্টা হয়েছে। ১৫ মিনিট পরে আবার চেষ্টা করুন।'});
- if(!/^SC[0-9]{3,10}$/.test(code)||phone.length<10||phone.length>13)return res.status(401).json({error:'Customer ID অথবা Admin-এর কাছে সংরক্ষিত মোবাইল নম্বর সঠিক নয়।'});
- if(!db)return res.status(503).json({error:'Customer Login-এর জন্য Cloud Database সংযোগ নেই।'});
- try{
-  // Customer codes are company-scoped; scan only matching code entries and never return another company's data.
-  const states=col('app_state');
-  const candidates=await states.find({'data.customers.clientCode':code}).limit(100).toArray();
-  let match=null;
-  for(const state of candidates){
-   const owner=String(state.owner||'').trim().toLowerCase();
-   const found=(Array.isArray(state.data&&state.data.customers)?state.data.customers:[]).find(c=>
-    String(c.clientCode||c.code||'').trim().toUpperCase()===code &&
-    normalizeCustomerPhone(c.phone||c.mobile||c.number||'')===phone);
-   if(found){if(match)return res.status(401).json({error:'Customer ID অথবা মোবাইল নম্বর সঠিক নয়।'});match={owner,state,customer:found};}
-  }
-  if(!match)return res.status(401).json({error:'Customer ID অথবা Admin-এর কাছে সংরক্ষিত মোবাইল নম্বর সঠিক নয়।'});
-  const account=await col(ACCOUNT_COLLECTION).findOne({username:match.owner});
-  if(account&&(account.accountStatus==='disabled'||account.active===false||account.approvalStatus==='pending'||account.approvalStatus==='rejected')){
-   return res.status(403).json({error:String(account.disabledMessage||'কোম্পানির Customer Portal বর্তমানে বন্ধ আছে। Admin-এর সঙ্গে যোগাযোগ করুন।').slice(0,300)});
-  }
-  const token=jwt.sign({role:'customer',owner:match.owner,customerCode:code,customerId:String(match.customer.id||'')},JWT_SECRET,{expiresIn:'12h'});
-  return res.json({ok:true,token,expiresIn:43200,customer:{clientCode:code,name:String(match.customer.name||'Customer')}});
- }catch(e){console.error('[customer-login] error',String(e&&e.message||e));return res.status(503).json({error:'Customer Login service এখন ব্যস্ত। কিছুক্ষণ পরে চেষ্টা করুন।'});}
-});
-async function customerAuth(req,res,next){
- try{
-  const h=String(req.headers.authorization||'');if(!h.startsWith('Bearer '))throw 0;
-  const user=jwt.verify(h.slice(7),JWT_SECRET);
-  if(String(user.role||'')!=='customer'||!user.owner||!user.customerCode)throw 0;
-  req.customerUser=user;next();
- }catch(e){return res.status(401).json({error:'Login session শেষ হয়েছে। আবার Login করুন।'});}
-}
-app.get('/api/customer/me',customerAuth,async(req,res)=>{
- res.set('Cache-Control','no-store');
- try{
-  const owner=String(req.customerUser.owner||'').trim().toLowerCase();
-  const found=await findCustomerInCompany(owner,String(req.customerUser.customerCode||''),null);
-  if(!found)return res.status(404).json({error:'Customer record পাওয়া যায়নি। Admin-এর সঙ্গে যোগাযোগ করুন।'});
-  const c=found.customer,d=found.state.data||{},settings=d.settings||{};
-  const month=new Date().toISOString().slice(0,7);
-  const payments=(Array.isArray(d.payments)?d.payments:[]).filter(p=>String(p.customer)===String(c.id)&&p.status==='paid').sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||''))).slice(0,12).map(p=>({amount:Number(p.amount||0),month:String(p.month||''),method:String(p.method||''),createdAt:String(p.createdAt||''),status:'PAID'}));
-  const paidThisMonth=(Array.isArray(d.payments)?d.payments:[]).filter(p=>String(p.customer)===String(c.id)&&p.month===month&&p.status==='paid').reduce((sum,p)=>sum+Number(p.amount||0),0);
-  const fee=Number(c.fee||0),previousDue=Number(c.prevDue||0),billDue=Math.max(0,fee-paidThisMonth),totalDue=Math.max(0,previousDue+billDue);
-  const support=String(settings.customerSupportNumber||settings.supportNumber||settings.complaintNumber||settings.merchantNumber||'');
-  return res.json({ok:true,customer:{id:String(c.id||''),clientCode:String(c.clientCode||c.code||''),name:String(c.name||'Customer'),mobile:String(c.phone||c.mobile||''),address:String(c.address||''),area:String(c.area||''),packageName:String(c.pkg||c.packageName||''),monthlyFee:fee,previousDue,billDue,totalDue,paidThisMonth,expiryDate:String(c.expiry||c.expiryDate||''),status:String(c.status||'active'),isFree:!!c.free,allowPackageChoice:packageChoiceEnabled(c),supportNumber:support,company:String(owner),companyName:String(settings.cloud&&settings.cloud.companyName||'STAR COMMUNICATION'),payments}});
- }catch(e){return res.status(503).json({error:'Customer তথ্য লোড করা যায়নি।'});}
-});
-
 // Public read-only package lookup used by customer Payment Links.
 app.get('/api/public/packages',async(req,res)=>{
  res.set('Cache-Control','no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -591,6 +506,78 @@ app.get('/api/sync/backups',auth,async(req,res)=>{
  const rows=await c.find({owner:req.user.username},{projection:{data:0}}).sort({savedAt:-1}).limit(20).toArray();
  send(res,{ok:true,backups:rows});
 });
+
+ // Customer Portal login: Customer ID + the mobile number stored by company Admin.
+ function customerPhoneKey(value){
+  let digits=String(value||'').replace(/\\D/g,'');
+  if(digits.startsWith('880'))digits=digits.slice(3);
+  if(digits.startsWith('0'))digits=digits.slice(1);
+  return digits;
+ }
+ function customerCodeKey(value){return String(value||'').trim().toUpperCase();}
+ function safePortalCustomer(c){
+  return {id:String(c.id||''),clientCode:String(c.clientCode||c.code||c.customerCode||c.id||''),name:String(c.name||'Customer'),
+   mobile:String(c.phone||c.mobile||c.contact||''),packageName:String(c.pkg||c.packageName||''),monthlyFee:Number(c.fee??c.monthlyFee??0),
+   previousDue:Number(c.prevDue??c.previousDue??0),expiryDate:String(c.expiry||c.expiryDate||c.dueDate||''),status:String(c.status||'ACTIVE'),
+   lastPaymentStatus:String(c.lastPaymentStatus||''),allowPackageChoice:packageChoiceEnabled(c),free:!!c.free,left:!!c.left};
+ }
+ app.post('/api/customer/login',async(req,res)=>{
+  const code=customerCodeKey(req.body&&req.body.customerId),phone=customerPhoneKey(req.body&&req.body.mobile);
+  if(!code||!phone)return res.status(400).json({error:'Customer ID ও Admin-এর কাছে নিবন্ধিত মোবাইল নম্বর দিন'});
+  try{
+   const states=col('app_state');if(!states)return res.status(503).json({error:'Customer cloud database is not configured'});
+   const docs=await states.find({'data.customers':{$exists:true}}).toArray(),matches=[];
+   for(const state of docs){
+    const owner=String(state.owner||'').trim().toLowerCase();
+    const customer=(state.data&&Array.isArray(state.data.customers)?state.data.customers:[]).find(c=>{
+     const ccode=customerCodeKey(c.clientCode||c.code||c.customerCode||c.id),cphone=customerPhoneKey(c.phone||c.mobile||c.contact);
+     return ccode===code&&cphone===phone;
+    });
+    if(customer)matches.push({owner,customer});
+   }
+   if(matches.length!==1)return res.status(401).json({error:'Customer ID অথবা মোবাইল নম্বর মিলছে না। Admin-এর সঙ্গে যোগাযোগ করুন।'});
+   const {owner,customer}=matches[0],accounts=col(ACCOUNT_COLLECTION);
+   if(accounts){
+    const account=await accounts.findOne({username:owner});
+    if(account&&(account.accountStatus==='disabled'||account.active===false||account.approvalStatus==='pending'||account.approvalStatus==='rejected'))
+     return res.status(403).json({error:String(account.disabledMessage||'কোম্পানির অ্যাকাউন্ট বন্ধ আছে। STAR COMMUNICATION Admin-এর সঙ্গে যোগাযোগ করুন।').slice(0,300)});
+   }
+   const portalCustomer=safePortalCustomer(customer);
+   const token=jwt.sign({username:'customer:'+code.toLowerCase(),role:'customer',owner,customerRecordId:String(customer.id||''),clientCode:portalCustomer.clientCode},JWT_SECRET,{expiresIn:'12h'});
+   return send(res,{ok:true,token,expiresIn:43200,customer:portalCustomer});
+  }catch(e){return res.status(503).json({error:'Customer Login service unavailable. কিছুক্ষণ পরে আবার চেষ্টা করুন।'});}
+ });
+ app.get('/api/customer/portal',auth,async(req,res)=>{
+  if(String(req.user.role||'')!=='customer')return res.status(403).json({error:'Customer portal access required'});
+  try{
+   const owner=ownerOf(req.user),states=col('app_state');if(!states)return res.status(503).json({error:'Cloud database is not configured'});
+   const state=await states.findOne({owner});if(!state||!state.data)return res.status(404).json({error:'Customer company data not found'});
+   const data=state.data,customers=Array.isArray(data.customers)?data.customers:[];
+   const customer=customers.find(c=>String(c.id||'')===String(req.user.customerRecordId||''))||customers.find(c=>customerCodeKey(c.clientCode||c.code||c.id)===customerCodeKey(req.user.clientCode));
+   if(!customer)return res.status(404).json({error:'Customer record not found'});
+   const code=customerCodeKey(customer.clientCode||customer.code||customer.id),id=String(customer.id||'');
+   const payments=(Array.isArray(data.payments)?data.payments:[]).filter(p=>{const pc=String(p.customer??p.customerId??p.clientCode??p.customerCode??'');return pc===id||customerCodeKey(pc)===code;})
+    .slice(-50).reverse().map(p=>({amount:Number(p.amount||0),date:String(p.date||p.createdAt||''),status:String(p.status||''),method:String(p.source||p.method||'')}));
+   const settings=data.settings||{},company=settings.company||{},packages=Array.isArray(settings.packages)?settings.packages:[],offers=Array.isArray(settings.offers)?settings.offers:[];
+   const creds=await getBaniqCredentials(owner).catch(()=>({keyId:'',secret:''}));
+   return send(res,{ok:true,customer:safePortalCustomer(customer),payments,packages,offers,
+    company:{name:String(settings.companyName||company.name||owner),supportPhone:String(settings.supportPhone||settings.complaintNumber||company.supportPhone||company.phone||settings.phone||'')},
+    baniq:{configured:!!(creds.keyId&&creds.secret)}});
+  }catch(e){return res.status(503).json({error:'Customer Portal data load failed'});}
+ });
+ app.post('/api/customer/complaints',auth,async(req,res)=>{
+  if(String(req.user.role||'')!=='customer')return res.status(403).json({error:'Customer portal access required'});
+  const message=String(req.body&&req.body.message||'').trim(),type=String(req.body&&req.body.type||'General').slice(0,80);
+  if(!message||message.length>2000)return res.status(400).json({error:'অভিযোগ ১ থেকে ২০০০ অক্ষরের মধ্যে লিখুন'});
+  try{
+   const portal=await col('app_state').findOne({owner:ownerOf(req.user)}),customers=portal&&portal.data&&portal.data.customers||[];
+   const customer=customers.find(c=>String(c.id||'')===String(req.user.customerRecordId||''))||customers.find(c=>customerCodeKey(c.clientCode||c.id)===customerCodeKey(req.user.clientCode));
+   if(!customer)return res.status(404).json({error:'Customer not found'});
+   const row={id:Date.now(),customerId:String(customer.id||''),customerCode:String(customer.clientCode||customer.code||customer.id||''),customerName:String(customer.name||'Customer'),customerMobile:String(customer.phone||customer.mobile||''),type,message,status:'OPEN',createdAt:new Date().toISOString()};
+   const result=await insert('complaints',row,ownerOf(req.user));return send(res,{ok:true,complaint:result});
+  }catch(e){return res.status(503).json({error:'অভিযোগ পাঠানো যায়নি'});}
+ });
+
 app.get('/api/customers',auth,async(req,res)=>send(res,await list('customers',ownerOf(req.user))));
 app.post('/api/customers',auth,async(req,res)=>{const b=req.body||{};const x={id:Date.now(),name:b.name,mobile:b.mobile||'',packageName:b.packageName||'',monthlyFee:Number(b.monthlyFee||0),pppoeUsername:b.pppoeUsername||'',pppoePassword:b.pppoePassword||'',onuId:b.onuId||'',expiryDate:b.expiryDate||null,status:b.status||'ACTIVE',previousDue:Number(b.previousDue||0),createdAt:new Date().toISOString()};send(res,await insert('customers',x,ownerOf(req.user)))});
 app.delete('/api/customers/:id',auth,async(req,res)=>{await remove('customers',req.params.id,ownerOf(req.user));send(res,{ok:true})});
@@ -638,6 +625,111 @@ app.post('/api/bkash/create',async(req,res)=>{
   return send(res,{ok:true,paymentID:created.paymentID,bkashURL:created.bkashURL,merchantInvoiceNumber:invoice});
  }catch(e){return res.status(502).json({error:String(e.message||'Unable to start bKash payment').slice(0,220)})}
 });
+
+ // Baniq Pay server-side order creation, verification and paid-bill sync.
+ async function baniqRequest(method,path,credentials,body){
+  const base=String(process.env.BANIQ_API_BASE||'https://api.baniq.app').trim().replace(/\\/$/,'');
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+  try{
+   const response=await fetch(base+path,{method,headers:{'Accept':'application/json','Content-Type':'application/json','x-api-key-id':credentials.keyId,'x-api-secret':credentials.secret},body:body===undefined?undefined:JSON.stringify(body),signal:controller.signal,redirect:'error'});
+   const raw=await response.text();let data={};try{data=raw?JSON.parse(raw):{}}catch{data={message:raw.slice(0,300)}}
+   if(!response.ok)throw new Error(String(data.message||data.error||'Baniq API HTTP '+response.status).slice(0,220));
+   return data;
+  }finally{clearTimeout(timer)}
+ }
+ function baniqPaymentPageUrl(session,status){
+  const u=new URL(PAYMENT_PAGE_URL);u.searchParams.set('status',status);
+  if(session&&session.orderId)u.searchParams.set('orderId',session.orderId);
+  if(session&&session.customerId)u.searchParams.set('code',session.customerId);
+  if(session&&session.clientCode)u.searchParams.set('clientCode',session.clientCode);
+  u.searchParams.set('api',PUBLIC_URL);return u.toString();
+ }
+ app.post('/api/baniq/create',async(req,res)=>{
+  try{
+   const body=req.body||{},owner=String(body.company||'').trim().toLowerCase(),customerId=String(body.customerCode||body.code||'').trim();
+   const clientCode=String(body.clientCode||'').trim(),mobile=customerPhoneKey(body.customerMobile||body.mobile||'');
+   const selectedPackage=String(body.selectedPackage||body.package||'').trim(),packagePrice=Number(body.packagePrice??body.bill??0),requestedAmount=Number(body.amount||0);
+   if(!owner||!customerId||!selectedPackage||!Number.isFinite(packagePrice)||packagePrice<=0)return res.status(400).json({error:'Company, customer and package are required'});
+   const states=col('app_state');if(!states)return res.status(503).json({error:'Cloud database is not configured'});
+   const state=await states.findOne({owner});if(!state||!state.data)return res.status(404).json({error:'Company cloud data not found'});
+   const data=state.data,customers=Array.isArray(data.customers)?data.customers:[],customer=customers.find(c=>String(c.id||'')===customerId);
+   if(!customer||clientCode&&customerCodeKey(customer.clientCode||customer.code||customer.id)!==customerCodeKey(clientCode))return res.status(404).json({error:'Customer does not belong to this company'});
+   const savedPhone=customerPhoneKey(customer.phone||customer.mobile||'');if(mobile&&savedPhone&&mobile!==savedPhone)return res.status(403).json({error:'Customer mobile does not match Admin record'});
+   const choice=packageChoiceEnabled(customer),currentPackage=String(customer.pkg||customer.packageName||'').trim(),currentPrice=Number(customer.fee??customer.monthlyFee??0);
+   const packages=Array.isArray(data.settings&&data.settings.packages)?data.settings.packages:[];
+   const normalizeName=x=>String(x||'').trim().toLowerCase().replace(/\\s+/g,' ').replace(/\\s*mbps\\s*$/i,'');
+   let speed=selectedPackage,price=packagePrice;
+   if(!choice){speed=currentPackage;price=currentPrice;if(!speed||price<=0)return res.status(409).json({error:'Customer package is not configured'});if(normalizeName(selectedPackage)!==normalizeName(speed)||Math.abs(packagePrice-price)>0.01)return res.status(403).json({error:'Package selection is locked by Admin'});}
+   else{const p=packages.find(x=>normalizeName(x.speed||x.name)===normalizeName(selectedPackage));if(!p||Math.abs(Number(p.price??p.fee??0)-packagePrice)>0.01)return res.status(409).json({error:'Package list changed. Refresh and try again.'});}
+   const previousDue=Math.max(0,Number(customer.prevDue??customer.previousDue??0)),amount=Number((price+previousDue).toFixed(2));
+   if(!Number.isFinite(requestedAmount)||Math.abs(requestedAmount-amount)>0.01)return res.status(409).json({error:'Payment amount does not match Admin bill'});
+   if(amount<=0||amount>1000000)return res.status(400).json({error:'Baniq amount must be between ৳1 and ৳1,000,000'});
+   const credentials=await getBaniqCredentials(owner);if(!credentials.keyId||!credentials.secret)return res.status(503).json({error:'Admin Baniq API Key ID and Secret are not configured'});
+   const reference=('STAR-'+String(clientCode||customer.id)+'-'+Date.now()).replace(/[^A-Za-z0-9_-]/g,'').slice(0,64);
+   const successUrl=PUBLIC_URL+'/api/baniq/callback?reference='+encodeURIComponent(reference);
+   const cancelUrl=baniqPaymentPageUrl({customerId,clientCode},'cancelled');
+   const order=await baniqRequest('POST','/api/v1/orders',credentials,{amount:Math.round(amount*100),productName:'STAR COMMUNICATION Internet Bill '+String(clientCode||customer.id)+' - '+speed,reference,successUrl,cancelUrl,customerName:String(customer.name||'Customer'),customerPhone:String(customer.phone||customer.mobile||''),metadata:{company:owner,customerId,clientCode:String(clientCode||customer.clientCode||''),packageName:speed,packagePrice:price,previousDue,amount}});
+   const orderId=String(order.orderId||order.id||''),checkoutUrl=String(order.checkoutUrl||'');
+   if(!orderId||!checkoutUrl)return res.status(502).json({error:'Baniq did not return orderId and checkoutUrl'});
+   const sessions=col('baniq_checkout_sessions');if(!sessions)return res.status(503).json({error:'Payment database is not configured'});
+   const session={orderId,reference,owner,customerId,clientCode:String(clientCode||customer.clientCode||''),customerName:String(customer.name||'Customer'),customerMobile:String(customer.phone||customer.mobile||''),selectedPackage:speed,packagePrice:price,previousDue,amount,amountPaisa:Math.round(amount*100),status:'PENDING',createdAt:new Date().toISOString()};
+   await sessions.insertOne(session);
+   return send(res,{ok:true,orderId,checkoutUrl});
+  }catch(e){return res.status(502).json({error:String(e.message||'Could not start Baniq checkout').slice(0,220)});}
+ });
+ async function verifyAndApplyBaniqSession(session){
+  if(!session)return {verified:false,status:'NOT_FOUND'};
+  if(session.status==='PAID')return {verified:true,status:'PAID',clientCode:session.clientCode,orderId:session.orderId};
+  const credentials=await getBaniqCredentials(session.owner);
+  if(!credentials.keyId||!credentials.secret)throw new Error('Company Baniq API credentials are not configured');
+  const order=await baniqRequest('GET','/api/v1/orders/'+encodeURIComponent(session.orderId),credentials);
+  const paid=order.paid===true||String(order.status||'').toLowerCase()==='paid';
+  if(!paid)return {verified:false,status:String(order.status||'PENDING'),clientCode:session.clientCode,orderId:session.orderId};
+  const providerAmount=Number(order.amount);
+  if(!Number.isFinite(providerAmount)||Math.abs(providerAmount-Number(session.amountPaisa))>0.01)throw new Error('Baniq verified amount does not match bill');
+  const states=col('app_state');if(!states)return {verified:false,status:'DATABASE_UNAVAILABLE'};
+  const state=await states.findOne({owner:String(session.owner)});if(!state||!state.data)throw new Error('Company data missing after payment');
+  const data=state.data,customers=Array.isArray(data.customers)?data.customers:[],customer=customers.find(c=>String(c.id||'')===String(session.customerId));
+  if(!customer)throw new Error('Customer not found after payment verification');
+  const payments=Array.isArray(data.payments)?data.payments:(data.payments=[]),duplicate=payments.some(p=>String(p.orderId||p.ref||p.reference||'')===String(session.orderId));
+  const now=new Date(),iso=now.toISOString(),nextExpiry=new Date(now);nextExpiry.setDate(nextExpiry.getDate()+30);
+  customer.pkg=session.selectedPackage;customer.fee=Number(session.packagePrice);customer.prevDue=0;customer.status='active';customer.left=false;customer.disconnected=false;
+  customer.expiry=nextExpiry.toISOString().slice(0,10);customer.lastPaymentStatus='paid';customer.lastPaymentMonth=iso.slice(0,7);customer.lastPaymentAmount=Number(session.amount);
+  customer.lastPaymentSource='baniq';customer.lastPaymentAt=iso;customer.updatedAt=iso;
+  if(!duplicate)payments.push({id:'baniq-'+session.orderId,customer:String(session.customerId),clientCode:String(session.clientCode||''),amount:Number(session.amount),date:iso.slice(0,10),month:iso.slice(0,7),status:'paid',source:'baniq',method:'Baniq Pay',ref:String(session.orderId),orderId:String(session.orderId),createdAt:iso,updatedAt:iso});
+  await states.updateOne({owner:String(session.owner)},{$set:{data,updatedAt:iso}});
+  const sessions=col('baniq_checkout_sessions');if(sessions)await sessions.updateOne({orderId:String(session.orderId)},{$set:{status:'PAID',verifiedAt:iso,verifiedAmount:providerAmount,updatedAt:iso}});
+  return {verified:true,status:'PAID',clientCode:String(session.clientCode||customer.clientCode||''),orderId:String(session.orderId)};
+ }
+ app.get('/api/baniq/status',async(req,res)=>{
+  const orderId=String(req.query.orderId||'').trim();if(!orderId)return res.status(400).json({error:'orderId is required'});
+  try{const sessions=col('baniq_checkout_sessions');if(!sessions)return res.status(503).json({error:'Payment database is not configured'});
+   const session=await sessions.findOne({orderId});if(!session)return res.status(404).json({ok:true,verified:false,status:'NOT_FOUND'});
+   const result=await verifyAndApplyBaniqSession(session);return send(res,{ok:true,...result});
+  }catch(e){return res.status(502).json({ok:true,verified:false,status:'VERIFY_ERROR',error:String(e.message||'Baniq verification failed').slice(0,180)});}
+ });
+ app.get('/api/baniq/callback',async(req,res)=>{
+  const reference=String(req.query.reference||'').trim(),sessions=col('baniq_checkout_sessions');
+  if(!reference||!sessions)return res.redirect(baniqPaymentPageUrl(null,'failed'));
+  try{
+   const session=await sessions.findOne({reference});if(!session)return res.redirect(baniqPaymentPageUrl(null,'invalid'));
+   const result=await verifyAndApplyBaniqSession(session);
+   return res.redirect(baniqPaymentPageUrl(session,result.verified?'success':'failed'));
+  }catch(e){return res.redirect(baniqPaymentPageUrl(null,'failed'));}
+ });
+ app.post('/api/baniq/webhook',async(req,res)=>{
+  try{
+   const secret=String(process.env.BANIQ_WEBHOOK_SECRET||'').trim(),signature=String(req.headers['x-deshpay-signature']||'');
+   if(!secret||!req.rawBody||!signature)return res.status(401).json({error:'Baniq webhook signature is not configured'});
+   const expected='sha256='+crypto.createHmac('sha256',secret).update(req.rawBody).digest('hex');
+   const a=Buffer.from(signature),b=Buffer.from(expected);if(a.length!==b.length||!crypto.timingSafeEqual(a,b))return res.status(401).json({error:'Invalid Baniq webhook signature'});
+   const event=req.body||{},order=event.order||{};if(String(event.event||'')!=='order.paid'||!order.id)return send(res,{ok:true,ignored:true});
+   const sessions=col('baniq_checkout_sessions');if(!sessions)return res.status(503).json({error:'Payment database is not configured'});
+   const session=await sessions.findOne({orderId:String(order.id)});if(!session)return send(res,{ok:true,ignored:true});
+   await verifyAndApplyBaniqSession(session);return send(res,{ok:true,verified:true});
+  }catch(e){return res.status(502).json({error:String(e.message||'Webhook handling failed').slice(0,180)});}
+ });
+
 app.get('/api/bkash/status',async(req,res)=>{
  const paymentID=String(req.query.paymentID||'').trim();
  if(!paymentID)return res.status(400).json({error:'paymentID is required'});
@@ -921,9 +1013,17 @@ function decryptIntegrationSecret(box){
  return Buffer.concat([decipher.update(Buffer.from(box.data,'base64')),decipher.final()]).toString('utf8');
 }
 async function getBaniqCredentials(owner){
- // All companies use the single Baniq merchant configured on Render.
- // Company-specific credentials are intentionally ignored; customer and payment
- // records remain owner-scoped in their existing routes and collections.
+ // Prefer this company's encrypted Baniq credentials saved from Admin Settings.
+ const integrations=col('company_integrations');
+ if(integrations){
+  const row=await integrations.findOne({owner:String(owner)});
+  const saved=row&&row.baniq;
+  if(saved&&saved.keyId&&saved.secret){
+   const secret=decryptIntegrationSecret(saved.secret);
+   if(secret)return {keyId:String(saved.keyId).trim(),secret};
+  }
+ }
+ // Compatibility with existing Render-level credentials.
  return {
   keyId:String(process.env.BANIQ_API_KEY_ID||process.env.BANIQ_KEY_ID||'').trim(),
   secret:String(process.env.BANIQ_API_SECRET||process.env.BANIQ_SECRET||'').trim()
@@ -932,11 +1032,11 @@ async function getBaniqCredentials(owner){
 app.get('/api/integrations/baniq/settings',auth,async(req,res)=>{
  if(!isOwner(req.user))return res.status(403).json({error:'Company owner access required'});
  try{
-  const c=col('company_integrations');if(!c)return res.status(503).json({error:'Cloud database is not configured'});
-  const sharedKeyId=String(process.env.BANIQ_API_KEY_ID||process.env.BANIQ_KEY_ID||'').trim();
-  const sharedSecret=String(process.env.BANIQ_API_SECRET||process.env.BANIQ_SECRET||'').trim();
-  const sharedConfigured=!!(sharedKeyId&&sharedSecret);
-  return send(res,{ok:true,configured:sharedConfigured,keyId:sharedConfigured?sharedKeyId:'',sharedCredentials:true,apiBase:(process.env.BANIQ_API_BASE||'https://api.baniq.app').replace(/\/$/,'')});
+  const credentials=await getBaniqCredentials(ownerOf(req.user));
+  const configured=!!(credentials.keyId&&credentials.secret);
+  const c=col('company_integrations'),row=c?await c.findOne({owner:ownerOf(req.user)}):null;
+  const companySaved=!!(row&&row.baniq&&row.baniq.keyId&&row.baniq.secret);
+  return send(res,{ok:true,configured,keyId:configured?credentials.keyId:'',sharedCredentials:!companySaved,apiBase:(process.env.BANIQ_API_BASE||'https://api.baniq.app').replace(/\\/$/,'')});
  }catch(e){return res.status(503).json({error:String(e.message||'Could not read Baniq settings').slice(0,160)})}
 });
 app.put('/api/integrations/baniq/settings',auth,async(req,res)=>{
