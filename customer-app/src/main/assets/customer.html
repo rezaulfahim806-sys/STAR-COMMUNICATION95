@@ -64,7 +64,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 
 <div class="grid"><div class="metric"><small>এই মাসের বিল</small><strong id="billNow">৳—</strong></div><div class="metric"><small>আগের বকেয়া</small><strong id="billDue">৳—</strong></div></div>
 <div class="card"><div class="itemrow"><h3>পরবর্তী বিলের তারিখ</h3><span id="paidStatus" class="pill">—</span></div><div class="datebox"><span>পরবর্তী বিল গণনা / Bill due date</span><strong id="dueDate">—</strong><span>বিলের আগে আপনাকে Reminder দেওয়া হবে।</span></div></div>
 <div id="offerCard" class="card" style="display:none"><h3>🎁 Admin-এর Offer</h3><div id="offerText"></div></div>
-<div class="card"><h3>💳 দ্রুত বিল পরিশোধ</h3><div class="muted">Admin-এর Baniq Pay API দিয়ে নিরাপদ পেমেন্ট করুন।</div><button class="btn" id="homePayBtn" onclick="openPayment()">Baniq Pay দিয়ে বিল পরিশোধ</button><div id="baniqNote" class="muted" style="margin-top:7px"></div></div>
+<div class="card"><h3>💳 দ্রুত বিল পরিশোধ</h3><div class="muted">Admin-এর Baniq Pay API দিয়ে নিরাপদ পেমেন্ট করুন।</div><button class="btn" id="homePayBtn" onclick="showPaymentMethods()">bKash / Nagad দিয়ে বিল পরিশোধ</button><div id="baniqNote" class="muted" style="margin-top:7px"></div></div>
 </div>
 
 <div id="packageSection" class="section">
@@ -85,6 +85,16 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 
 <div class="footer">STAR COMMUNICATION • Customer Portal</div>
 </section>
 </main>
+<div id="paymentMethodModal" style="display:none;position:fixed;inset:0;z-index:99;background:rgba(10,25,50,.58);padding:18px;align-items:center;justify-content:center">
+ <div style="width:100%;max-width:360px;background:#fff;border-radius:22px;padding:22px;box-shadow:0 18px 60px #071b3b44">
+  <h3 style="margin:0 0 8px;color:#17304f">পেমেন্ট মাধ্যম বেছে নিন</h3>
+  <p class="muted" style="margin:0 0 14px">Baniq API দিয়ে সরাসরি নির্বাচিত checkout খুলবে।</p>
+  <button class="btn" id="payBkashBtn" style="background:#d91c70" onclick="openBaniqPayment('bkash')">বিকাশ (bKash)</button>
+  <button class="btn" id="payNagadBtn" style="background:#f06a16;margin-top:9px" onclick="openBaniqPayment('nagad')">নগদ (Nagad)</button>
+  <button class="btn light" onclick="hidePaymentMethods()" style="margin-top:9px">বাতিল</button>
+  <div id="directPaymentStatus" class="muted" style="margin-top:10px"></div>
+ </div>
+</div>
 <nav class="nav" id="bottomNav" style="display:none">
 <button class="active" data-tab="home" onclick="goTab('home')"><span class="ico">⌂</span>হোম</button>
 <button data-tab="package" onclick="goTab('package')"><span class="ico">◇</span>প্যাকেজ</button>
@@ -150,12 +160,27 @@ function selectPackage(i){const list=portalData.packages||[],p=list.filter(x=>x&
 function renderPayments(){const xs=Array.isArray(portalData.payments)?portalData.payments:[];if(!xs.length){$('paymentHistory').textContent='এখনো কোনো পেমেন্ট রেকর্ড নেই।';return}
  $('paymentHistory').innerHTML=xs.map(p=>'<div class="item"><div class="itemrow"><b>'+esc(p.method||'Payment')+'</b><span class="price">'+money(p.amount)+'</span></div><div class="muted">'+esc(fmtDate(String(p.date||'').slice(0,10)))+' • '+esc(String(p.status||'').toUpperCase())+'</div></div>').join('');
 }
-function openPayment(){
+function showPaymentMethods(){
  const c=portalData&&portalData.customer||{},pkg=chosenPackage||{speed:pkgName(c),price:Number(c.monthlyFee||0)},prev=Math.max(0,Number(c.previousDue||0)),total=Number(pkg.price)+prev;
  if(!(portalData.baniq&&portalData.baniq.configured)){alert('Admin Dashboard-এ Baniq API Key ID ও Secret সেট করুন।');return}
  if(!pkg.speed||!Number.isFinite(total)||total<=0){alert('বিলের তথ্য সঠিক নয়। Admin-এর সঙ্গে যোগাযোগ করুন।');return}
- const q=new URLSearchParams({code:String(c.id||''),clientCode:String(c.clientCode||c.id||''),company:String(portalData.company&&portalData.company.slug||''),mobile:String(c.mobile||''),name:String(c.name||'Customer'),package:String(pkg.speed),bill:String(pkg.price),prev:String(prev),total:String(total),api:API_BASE,allowPackageChoice:String(!!c.allowPackageChoice),packages:JSON.stringify(portalData.packages||[])});
- window.location.href=PAYMENT_PAGE+'?'+q.toString();
+ $('directPaymentStatus').textContent='';
+ $('paymentMethodModal').style.display='flex';
+}
+function hidePaymentMethods(){ $('paymentMethodModal').style.display='none'; }
+async function openBaniqPayment(provider){
+ const c=portalData&&portalData.customer||{},pkg=chosenPackage||{speed:pkgName(c),price:Number(c.monthlyFee||0)},prev=Math.max(0,Number(c.previousDue||0)),total=Number(pkg.price)+prev;
+ if(!['bkash','nagad'].includes(provider)){alert('সঠিক পেমেন্ট মাধ্যম বেছে নিন।');return}
+ if(!(portalData.baniq&&portalData.baniq.configured)){alert('Admin Dashboard-এ Baniq API Key ID ও Secret সেট করুন।');return}
+ if(!pkg.speed||!Number.isFinite(total)||total<=0){alert('বিলের তথ্য সঠিক নয়। Admin-এর সঙ্গে যোগাযোগ করুন।');return}
+ const bk=$('payBkashBtn'),ng=$('payNagadBtn'),status=$('directPaymentStatus');
+ bk.disabled=true;ng.disabled=true;status.textContent='Baniq '+(provider==='bkash'?'bKash':'Nagad')+' checkout চালু হচ্ছে…';
+ try{
+  const r=await fetch(API_BASE+'/api/baniq/create',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({company:String(portalData.company&&portalData.company.slug||''),customerCode:String(c.id||''),clientCode:String(c.clientCode||c.id||''),customerName:String(c.name||'Customer'),customerMobile:String(c.mobile||''),selectedPackage:String(pkg.speed),packagePrice:Number(pkg.price),previousDue:prev,amount:total,provider,merchantInvoiceNumber:'SC-'+String(c.clientCode||c.id||'')+'-'+Date.now()})});
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok||!(data.checkoutUrl||data.bkashURL))throw new Error(data.error||('Baniq checkout চালু হয়নি (HTTP '+r.status+')'));
+  location.href=data.checkoutUrl||data.bkashURL;
+ }catch(e){status.textContent=e.message||'Payment service unavailable.';bk.disabled=false;ng.disabled=false}
 }
 async function sendComplaint(){
  const message=$('complaintMessage').value.trim();if(!message){alert('অভিযোগ লিখুন');return}
