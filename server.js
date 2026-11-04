@@ -33,7 +33,7 @@ async function initDb(){
  if(!ADMIN_USER||!ADMIN_HASH)throw new Error('ADMIN_USER and ADMIN_PASSWORD (or ADMIN_PASSWORD_HASH) are required');
  const client=new MongoClient(process.env.MONGODB_URI); await client.connect(); db=client.db(process.env.MONGODB_DB||'star_communication');
 }
-async function auth(req,res,next){try{const h=req.headers.authorization||'';if(!h.startsWith('Bearer '))throw 0;req.user=jwt.verify(h.slice(7),JWT_SECRET);if(isSystemAdmin(req.user))return next();const ac=col(ACCOUNT_COLLECTION);if(ac){const u=String(req.user.username||'').trim().toLowerCase();const owner=String(req.user.owner||u).trim().toLowerCase();const account=await ac.findOne({username:owner});if(account&&(account.accountStatus==='disabled'||account.active===false||account.approvalStatus==='pending'||account.approvalStatus==='rejected'))return res.status(403).json({error:String(account.disabledMessage||(account.approvalStatus==='pending'?'Your company registration is awaiting approval':'এই কোম্পানির অ্যাকাউন্ট STAR COMMUNICATION Admin বন্ধ রেখেছেন। অনুগ্রহ করে Admin-এর সঙ্গে যোগাযোগ করুন।')).slice(0,500),accountDisabled:true});}next()}catch(e){res.status(401).json({error:'Unauthorized'})}}
+async function auth(req,res,next){try{const h=req.headers.authorization||'';if(!h.startsWith('Bearer '))throw 0;req.user=jwt.verify(h.slice(7),JWT_SECRET);if(String(req.user.role||'')==='customer')return res.status(403).json({error:'Customer token cannot access company admin APIs'});if(isSystemAdmin(req.user))return next();const ac=col(ACCOUNT_COLLECTION);if(ac){const u=String(req.user.username||'').trim().toLowerCase();const owner=String(req.user.owner||u).trim().toLowerCase();const account=await ac.findOne({username:owner});if(account&&(account.accountStatus==='disabled'||account.active===false||account.approvalStatus==='pending'||account.approvalStatus==='rejected'))return res.status(403).json({error:String(account.disabledMessage||(account.approvalStatus==='pending'?'Your company registration is awaiting approval':'এই কোম্পানির অ্যাকাউন্ট STAR COMMUNICATION Admin বন্ধ রেখেছেন। অনুগ্রহ করে Admin-এর সঙ্গে যোগাযোগ করুন।')).slice(0,500),accountDisabled:true});}next()}catch(e){res.status(401).json({error:'Unauthorized'})}}
 function send(res,payload){res.json(payload)}
 const BKASH_BASE_URL=(process.env.BKASH_BASE_URL||'https://checkout.sandbox.bka.sh/v1.2.0-beta').replace(/\/$/,'');
 const BKASH_APP_KEY=process.env.BKASH_APP_KEY||'';
@@ -78,6 +78,91 @@ app.post('/api/public/complaints',async(req,res)=>{
  await complaints.insertOne(item);return res.status(201).json({ok:true,complaintId:item.id,message:'Complaint submitted'});
  }catch(e){console.error('Public complaint submission failed',e);return res.status(500).json({error:'Could not save complaint. Please try again.'})}
 });
+
+// Customer portal login: Customer ID (SC code) + the mobile number saved by the company Admin.
+// Customer tokens are restricted to /api/customer/* and cannot access owner/admin endpoints.
+const customerLoginAttempts=new Map();
+function normalizeCustomerPhone(value){
+ let digits=String(value||'').replace(/\\D/g,'');
+ if(digits.startsWith('0088'))digits=digits.slice(2);
+ else if(digits.startsWith('88')&&digits.length===13)digits=digits.slice(2);
+ if(digits.length===10&&digits.startsWith('1'))digits='0'+digits;
+ return digits;
+}
+function customerLoginRateLimited(key){
+ const now=Date.now(),windowMs=15*60*1000;
+ let item=customerLoginAttempts.get(key);
+ if(!item||now-item.startedAt>windowMs){item={startedAt:now,count:0};customerLoginAttempts.set(key,item)}
+ item.count++;
+ // Periodically clean expired IP buckets to keep memory bounded.
+ if(customerLoginAttempts.size>5000){for(const [k,v] of customerLoginAttempts)if(now-v.startedAt>windowMs)customerLoginAttempts.delete(k)}
+ return item.count>12;
+}
+async function findCustomerInCompany(owner,code,phoneDigits){
+ const states=col('app_state');if(!states)return null;
+ const state=await states.findOne({owner:String(owner).trim().toLowerCase()});
+ if(!state||!state.data||!Array.isArray(state.data.customers))return null;
+ const customers=state.data.customers;
+ const customer=customers.find(c=>{
+  const id=String(c.clientCode||c.code||'').trim().toUpperCase();
+  const phone=normalizeCustomerPhone(c.phone||c.mobile||c.number||'');
+  return id===code&&phone&&phone===phoneDigits;
+ });
+ return customer?{state,customer}:null;
+}
+app.post('/api/customer/login',async(req,res)=>{
+ res.set('Cache-Control','no-store');
+ const code=String(req.body&&req.body.customerId||'').trim().toUpperCase();
+ const phone=normalizeCustomerPhone(req.body&&req.body.mobileNumber);
+ const ip=String(req.ip||req.socket&&req.socket.remoteAddress||'unknown');
+ if(customerLoginRateLimited(ip))return res.status(429).json({error:'অনেকবার Login চেষ্টা হয়েছে। ১৫ মিনিট পরে আবার চেষ্টা করুন।'});
+ if(!/^SC[0-9]{3,10}$/.test(code)||phone.length<10||phone.length>13)return res.status(401).json({error:'Customer ID অথবা Admin-এর কাছে সংরক্ষিত মোবাইল নম্বর সঠিক নয়।'});
+ if(!db)return res.status(503).json({error:'Customer Login-এর জন্য Cloud Database সংযোগ নেই।'});
+ try{
+  // Customer codes are company-scoped; scan only matching code entries and never return another company's data.
+  const states=col('app_state');
+  const candidates=await states.find({'data.customers.clientCode':code}).limit(100).toArray();
+  let match=null;
+  for(const state of candidates){
+   const owner=String(state.owner||'').trim().toLowerCase();
+   const found=(Array.isArray(state.data&&state.data.customers)?state.data.customers:[]).find(c=>
+    String(c.clientCode||c.code||'').trim().toUpperCase()===code &&
+    normalizeCustomerPhone(c.phone||c.mobile||c.number||'')===phone);
+   if(found){if(match)return res.status(401).json({error:'Customer ID অথবা মোবাইল নম্বর সঠিক নয়।'});match={owner,state,customer:found};}
+  }
+  if(!match)return res.status(401).json({error:'Customer ID অথবা Admin-এর কাছে সংরক্ষিত মোবাইল নম্বর সঠিক নয়।'});
+  const account=await col(ACCOUNT_COLLECTION).findOne({username:match.owner});
+  if(account&&(account.accountStatus==='disabled'||account.active===false||account.approvalStatus==='pending'||account.approvalStatus==='rejected')){
+   return res.status(403).json({error:String(account.disabledMessage||'কোম্পানির Customer Portal বর্তমানে বন্ধ আছে। Admin-এর সঙ্গে যোগাযোগ করুন।').slice(0,300)});
+  }
+  const token=jwt.sign({role:'customer',owner:match.owner,customerCode:code,customerId:String(match.customer.id||'')},JWT_SECRET,{expiresIn:'12h'});
+  return res.json({ok:true,token,expiresIn:43200,customer:{clientCode:code,name:String(match.customer.name||'Customer')}});
+ }catch(e){console.error('[customer-login] error',String(e&&e.message||e));return res.status(503).json({error:'Customer Login service এখন ব্যস্ত। কিছুক্ষণ পরে চেষ্টা করুন।'});}
+});
+async function customerAuth(req,res,next){
+ try{
+  const h=String(req.headers.authorization||'');if(!h.startsWith('Bearer '))throw 0;
+  const user=jwt.verify(h.slice(7),JWT_SECRET);
+  if(String(user.role||'')!=='customer'||!user.owner||!user.customerCode)throw 0;
+  req.customerUser=user;next();
+ }catch(e){return res.status(401).json({error:'Login session শেষ হয়েছে। আবার Login করুন।'});}
+}
+app.get('/api/customer/me',customerAuth,async(req,res)=>{
+ res.set('Cache-Control','no-store');
+ try{
+  const owner=String(req.customerUser.owner||'').trim().toLowerCase();
+  const found=await findCustomerInCompany(owner,String(req.customerUser.customerCode||''),null);
+  if(!found)return res.status(404).json({error:'Customer record পাওয়া যায়নি। Admin-এর সঙ্গে যোগাযোগ করুন।'});
+  const c=found.customer,d=found.state.data||{},settings=d.settings||{};
+  const month=new Date().toISOString().slice(0,7);
+  const payments=(Array.isArray(d.payments)?d.payments:[]).filter(p=>String(p.customer)===String(c.id)&&p.status==='paid').sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||''))).slice(0,12).map(p=>({amount:Number(p.amount||0),month:String(p.month||''),method:String(p.method||''),createdAt:String(p.createdAt||''),status:'PAID'}));
+  const paidThisMonth=(Array.isArray(d.payments)?d.payments:[]).filter(p=>String(p.customer)===String(c.id)&&p.month===month&&p.status==='paid').reduce((sum,p)=>sum+Number(p.amount||0),0);
+  const fee=Number(c.fee||0),previousDue=Number(c.prevDue||0),billDue=Math.max(0,fee-paidThisMonth),totalDue=Math.max(0,previousDue+billDue);
+  const support=String(settings.customerSupportNumber||settings.supportNumber||settings.complaintNumber||settings.merchantNumber||'');
+  return res.json({ok:true,customer:{id:String(c.id||''),clientCode:String(c.clientCode||c.code||''),name:String(c.name||'Customer'),mobile:String(c.phone||c.mobile||''),address:String(c.address||''),area:String(c.area||''),packageName:String(c.pkg||c.packageName||''),monthlyFee:fee,previousDue,billDue,totalDue,paidThisMonth,expiryDate:String(c.expiry||c.expiryDate||''),status:String(c.status||'active'),isFree:!!c.free,allowPackageChoice:packageChoiceEnabled(c),supportNumber:support,company:String(owner),companyName:String(settings.cloud&&settings.cloud.companyName||'STAR COMMUNICATION'),payments}});
+ }catch(e){return res.status(503).json({error:'Customer তথ্য লোড করা যায়নি।'});}
+});
+
 // Public read-only package lookup used by customer Payment Links.
 app.get('/api/public/packages',async(req,res)=>{
  res.set('Cache-Control','no-store, no-cache, must-revalidate, proxy-revalidate');
