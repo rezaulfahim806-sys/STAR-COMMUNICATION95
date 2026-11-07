@@ -531,7 +531,9 @@ app.get('/api/sync/backups',auth,async(req,res)=>{
    const states=col('app_state');if(!states)return res.status(503).json({error:'Customer cloud database is not configured'});
    const docs=await states.find({'data.customers':{$exists:true}}).toArray(),matches=[];
    for(const state of docs){
-    const owner=String(state.owner||'').trim().toLowerCase();
+    // Preserve the exact owner value stored in MongoDB. Lowercasing it here can
+    // make the following /api/customer/portal lookup miss a case-sensitive owner.
+    const owner=String(state.owner||'').trim();
     const customer=(state.data&&Array.isArray(state.data.customers)?state.data.customers:[]).find(c=>{
      const ccode=customerCodeKey(c.clientCode||c.code||c.customerCode||c.id);
      const phones=[c.phone,c.mobile,c.contact,c.contactNumber,c.whatsapp].map(customerPhoneKey).filter(Boolean);
@@ -542,7 +544,7 @@ app.get('/api/sync/backups',auth,async(req,res)=>{
    if(matches.length!==1)return res.status(401).json({error:'Customer ID অথবা মোবাইল নম্বর মিলছে না। Admin-এর সঙ্গে যোগাযোগ করুন।'});
    const {owner,customer}=matches[0],accounts=col(ACCOUNT_COLLECTION);
    if(accounts){
-    const account=await accounts.findOne({username:owner});
+    const account=await accounts.findOne({username:String(owner).toLowerCase()})||await accounts.findOne({username:owner});
     if(account&&(account.accountStatus==='disabled'||account.active===false||account.approvalStatus==='pending'||account.approvalStatus==='rejected'))
      return res.status(403).json({error:String(account.disabledMessage||'কোম্পানির অ্যাকাউন্ট বন্ধ আছে। STAR COMMUNICATION Admin-এর সঙ্গে যোগাযোগ করুন।').slice(0,300)});
    }
