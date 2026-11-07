@@ -158,9 +158,15 @@ function renderPackages(){
  if(!c.allowPackageChoice){$('packageList').innerHTML='<div class="item">বর্তমান প্যাকেজ: <b>'+esc(pkgName(c))+'</b><div class="muted">Package choice Admin বন্ধ রেখেছেন।</div></div>';chosenPackage={speed:pkgName(c),price:Number(c.monthlyFee||0)};return}
  const valid=list.filter(p=>p&&Number(p.price??p.fee)>0&&String(p.speed||p.name||'').trim());
  if(!valid.length){$('packageList').innerHTML='<div class="muted">Admin Dashboard-এ কোনো package list পাওয়া যায়নি।</div>';return}
- $('packageList').innerHTML=valid.map((p,i)=>{const speed=String(p.speed||p.name),price=Number(p.price??p.fee);return '<div class="item"><div class="itemrow"><b>'+esc(speed)+'</b><span class="price">'+money(price)+'</span></div><button class="btn outline" onclick="selectPackage('+i+')">'+(chosenPackage&&chosenPackage.speed===speed?'✓ নির্বাচিত':'এই প্যাকেজ নির্বাচন')+'</button></div>'}).join('');
+ $('packageList').innerHTML=valid.map((p,i)=>{const speed=String(p.speed||p.name),price=Number(p.price??p.fee);return '<div class="item"><div class="itemrow"><b>'+esc(speed)+'</b><span class="price">'+money(price)+'</span></div><button class="btn outline" onclick="selectPackage('+i+')">'+(chosenPackage&&chosenPackage.speed===speed?'✓ Checkout চালু করুন':'সরাসরি Checkout')+'</button></div>'}).join('');
 }
-function selectPackage(i){const list=portalData.packages||[],p=list.filter(x=>x&&Number(x.price??x.fee)>0)[i];if(!p)return;chosenPackage={speed:String(p.speed||p.name),price:Number(p.price??p.fee)};renderPackages()}
+async function selectPackage(i){
+ const list=portalData.packages||[],p=list.filter(x=>x&&Number(x.price??x.fee)>0)[i];if(!p)return;
+ chosenPackage={speed:String(p.speed||p.name),price:Number(p.price??p.fee)};
+ renderPackages();
+ // Package selection immediately starts the secure Baniq checkout.
+ await openBaniqPayment('bkash');
+}
 function renderPayments(){const xs=Array.isArray(portalData.payments)?portalData.payments:[];if(!xs.length){$('paymentHistory').textContent='এখনো কোনো পেমেন্ট রেকর্ড নেই।';return}
  $('paymentHistory').innerHTML=xs.map(p=>'<div class="item"><div class="itemrow"><b>'+esc(p.method||'Payment')+'</b><span class="price">'+money(p.amount)+'</span></div><div class="muted">'+esc(fmtDate(String(p.date||'').slice(0,10)))+' • '+esc(String(p.status||'').toUpperCase())+'</div></div>').join('');
 }
@@ -205,5 +211,7 @@ window.addEventListener('pageshow',()=>{
  if(portalData&&token())api('/api/customer/portal').then(j=>{portalData=j;renderPortal()}).catch(()=>{});
 });
 restoreCustomerSession();
+// Keep the customer expiry-day counter fresh while the portal stays open.
+setInterval(()=>{if(portalData&&portalData.customer){const el=$('expiryCountdown');if(el)el.textContent=fmtExpiryCountdown(portalData.customer.expiryDate)}},60000);
 </script>
 </body></html>
