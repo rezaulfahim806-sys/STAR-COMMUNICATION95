@@ -228,7 +228,7 @@ let dv=due(c),pp=paid(c),run=Math.max(0,Number(c.fee||0)-Math.min(Number(c.fee||
 return '<div class="customer compactCustomer" style="padding:9px 10px;margin:7px 0;border-left:4px solid '+(c.status==='expired'?'#e53935':c.status==='inactive'?'#ed9b00':'#119b50')+'">'
 +'<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px;flex-wrap:wrap">'
 +'<label style="display:flex;align-items:center;gap:5px;font-size:12px"><input type="checkbox" class="customer-sms-check" data-customer-id="'+esc(c.id)+'" '+(selectedSmsIds.has(String(c.id))?'checked':'')+' onchange="toggleSmsCustomer(&quot;'+esc(c.id)+'&quot;,this.checked)" style="width:17px;height:17px"> SMS</label>'
-+'<span style="font-size:11px;color:var(--muted)">#'+serial+' · '+clientCode+'</span><span class="badge '+c.status+'">'+String(c.status).toUpperCase()+'</span>'+(isOverdue&&c.status!==\'left\'&&!c.free?'<span class="badge expired">EXPIRED</span>':'')+'</div>'
++'<span style="font-size:11px;color:var(--muted)">#'+serial+' · '+clientCode+'</span><span class="badge '+c.status+'">'+String(c.status).toUpperCase()+'</span>'+(isOverdue&&c.status!=='left'&&!c.free?'<span class="badge expired">EXPIRED</span>':'')+'</div>'
 +'<div style="display:flex;align-items:center;gap:9px;min-width:0">'
 +'<div class="avatar" style="width:42px;height:42px;min-width:42px;font-size:18px">'+esc((c.name||'?')[0].toUpperCase())+'</div>'
 +'<div style="flex:1;min-width:0"><div class="name" style="font-size:15px;line-height:1.25">'+esc(c.name||'Customer')+'</div>'
