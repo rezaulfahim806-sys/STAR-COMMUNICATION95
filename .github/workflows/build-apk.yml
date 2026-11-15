@@ -1,4 +1,5 @@
 name: Build STAR COMMUNICATION APK
+# Rebuild for the latest customer-status and session fixes
 
 on:
   workflow_dispatch:
